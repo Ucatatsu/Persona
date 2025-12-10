@@ -124,14 +124,36 @@
   <!-- Модальное окно редактирования профиля -->
   <div id="edit-profile-modal" class="modal hidden">
     <div class="modal-overlay"></div>
-    <div class="modal-content">
+    <div class="modal-content edit-profile-content">
       <div class="modal-header">
         <h2>Редактировать профиль</h2>
         <button class="modal-close" id="close-edit-profile">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- Баннер -->
+        <div class="edit-banner-wrapper">
+          <div class="edit-banner" id="edit-banner-preview">
+            <span class="edit-banner-text">Нажмите чтобы изменить баннер</span>
+          </div>
+          <input type="file" id="edit-banner-input" accept="image/*,.gif" hidden>
+        </div>
+        
+        <!-- Аватарка -->
+        <div class="edit-avatar-wrapper">
+          <div class="edit-avatar" id="edit-avatar-preview">
+            <span class="edit-avatar-icon">📷</span>
+          </div>
+          <input type="file" id="edit-avatar-input" accept="image/*,.gif" hidden>
+          <span class="edit-avatar-hint">Изменить фото</span>
+        </div>
+        
         <div class="form-group">
-          <label>Имя</label>
+          <label>Ник (username)</label>
+          <input type="text" id="edit-username" placeholder="your_username">
+          <span class="form-hint" id="username-hint"></span>
+        </div>
+        <div class="form-group">
+          <label>Отображаемое имя</label>
           <input type="text" id="edit-display-name" placeholder="Ваше имя">
         </div>
         <div class="form-group">
@@ -141,14 +163,6 @@
         <div class="form-group">
           <label>О себе</label>
           <textarea id="edit-bio" placeholder="Расскажите о себе..." rows="3"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Цвет аватарки</label>
-          <input type="color" id="edit-avatar-color" value="#4fc3f7">
-        </div>
-        <div class="form-group">
-          <label>Цвет баннера</label>
-          <input type="color" id="edit-banner-color" value="#1976d2">
         </div>
         <button class="btn-primary" id="save-profile-btn">Сохранить</button>
       </div>

@@ -276,11 +276,16 @@ function renderUsers(users) {
   usersList.innerHTML = users.map(user => {
     const isOnline = onlineUsers.includes(user.id);
     const unread = user.unread_count || 0;
+    const avatarStyle = user.avatar_url 
+      ? `background-image: url(${user.avatar_url}); background-size: cover; background-position: center;`
+      : `background: var(--message-sent);`;
+    const avatarContent = user.avatar_url ? '' : user.username[0].toUpperCase();
+    
     return `
       <div class="user-item ${isOnline ? '' : 'offline'} ${selectedUser?.id === user.id ? 'active' : ''}" 
            data-id="${user.id}" data-name="${user.username}">
-        <div class="user-avatar" style="background: ${user.avatar_color || '#4fc3f7'}">
-          ${user.username[0].toUpperCase()}
+        <div class="user-avatar" style="${avatarStyle}">
+          ${avatarContent}
           <div class="online-indicator"></div>
         </div>
         <div class="user-info">
@@ -472,9 +477,31 @@ async function loadMyProfile() {
 async function showMyProfile() {
   const profile = await loadMyProfile();
   
-  document.getElementById('profile-avatar').textContent = currentUser.username[0].toUpperCase();
-  document.getElementById('profile-avatar').style.background = profile?.avatar_color || '#4fc3f7';
-  document.getElementById('profile-banner').style.background = profile?.banner_color || 'linear-gradient(135deg, #4fc3f7, #1976d2)';
+  const avatarEl = document.getElementById('profile-avatar');
+  const bannerEl = document.getElementById('profile-banner');
+  
+  // Аватарка
+  if (profile?.avatar_url) {
+    avatarEl.style.backgroundImage = `url(${profile.avatar_url})`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.style.backgroundPosition = 'center';
+    avatarEl.textContent = '';
+  } else {
+    avatarEl.style.backgroundImage = '';
+    avatarEl.style.background = 'var(--message-sent)';
+    avatarEl.textContent = currentUser.username[0].toUpperCase();
+  }
+  
+  // Баннер
+  if (profile?.banner_url) {
+    bannerEl.style.backgroundImage = `url(${profile.banner_url})`;
+    bannerEl.style.backgroundSize = 'cover';
+    bannerEl.style.backgroundPosition = 'center';
+  } else {
+    bannerEl.style.backgroundImage = '';
+    bannerEl.style.background = 'linear-gradient(135deg, #4fc3f7, #1976d2)';
+  }
+  
   document.getElementById('profile-name').textContent = profile?.display_name || currentUser.username;
   document.getElementById('profile-username').textContent = '@' + currentUser.username;
   document.getElementById('profile-bio').textContent = profile?.bio || '';
@@ -490,14 +517,79 @@ closeProfileBtn.addEventListener('click', () => {
 });
 
 // Edit profile
+const editAvatarInput = document.getElementById('edit-avatar-input');
+const editBannerInput = document.getElementById('edit-banner-input');
+const editAvatarPreview = document.getElementById('edit-avatar-preview');
+const editBannerPreview = document.getElementById('edit-banner-preview');
+const usernameHint = document.getElementById('username-hint');
+
+let pendingAvatarFile = null;
+let pendingBannerFile = null;
+
 editProfileBtn.addEventListener('click', () => {
   profileModal.classList.add('hidden');
+  
+  // Заполняем поля
+  document.getElementById('edit-username').value = currentUser.username || '';
   document.getElementById('edit-display-name').value = currentUserProfile?.display_name || '';
   document.getElementById('edit-phone').value = currentUserProfile?.phone || '';
   document.getElementById('edit-bio').value = currentUserProfile?.bio || '';
-  document.getElementById('edit-avatar-color').value = currentUserProfile?.avatar_color || '#4fc3f7';
-  document.getElementById('edit-banner-color').value = currentUserProfile?.banner_color || '#1976d2';
+  
+  // Превью аватарки
+  if (currentUserProfile?.avatar_url) {
+    editAvatarPreview.style.backgroundImage = `url(${currentUserProfile.avatar_url})`;
+    editAvatarPreview.textContent = '';
+  } else {
+    editAvatarPreview.style.backgroundImage = '';
+    editAvatarPreview.innerHTML = `<span class="edit-avatar-icon">📷</span>`;
+  }
+  
+  // Превью баннера
+  if (currentUserProfile?.banner_url) {
+    editBannerPreview.style.backgroundImage = `url(${currentUserProfile.banner_url})`;
+  } else {
+    editBannerPreview.style.backgroundImage = '';
+  }
+  
+  pendingAvatarFile = null;
+  pendingBannerFile = null;
+  usernameHint.textContent = '';
+  
   editProfileModal.classList.remove('hidden');
+});
+
+// Клик по аватарке
+editAvatarPreview.addEventListener('click', () => editAvatarInput.click());
+document.querySelector('.edit-avatar-wrapper')?.addEventListener('click', () => editAvatarInput.click());
+
+// Клик по баннеру
+editBannerPreview.addEventListener('click', () => editBannerInput.click());
+
+// Превью аватарки
+editAvatarInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    pendingAvatarFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      editAvatarPreview.style.backgroundImage = `url(${e.target.result})`;
+      editAvatarPreview.innerHTML = '';
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Превью баннера
+editBannerInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    pendingBannerFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      editBannerPreview.style.backgroundImage = `url(${e.target.result})`;
+    };
+    reader.readAsDataURL(file);
+  }
 });
 
 closeEditProfileBtn.addEventListener('click', () => {
@@ -505,22 +597,74 @@ closeEditProfileBtn.addEventListener('click', () => {
 });
 
 saveProfileBtn.addEventListener('click', async () => {
-  const data = {
-    display_name: document.getElementById('edit-display-name').value,
-    phone: document.getElementById('edit-phone').value,
-    bio: document.getElementById('edit-bio').value,
-    avatar_color: document.getElementById('edit-avatar-color').value,
-    banner_color: document.getElementById('edit-banner-color').value
-  };
+  saveProfileBtn.disabled = true;
+  saveProfileBtn.textContent = 'Сохранение...';
   
-  await fetch(`/api/user/${currentUser.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
+  try {
+    // Загружаем аватарку если есть
+    if (pendingAvatarFile) {
+      const formData = new FormData();
+      formData.append('avatar', pendingAvatarFile);
+      await fetch(`/api/user/${currentUser.id}/avatar`, {
+        method: 'POST',
+        body: formData
+      });
+    }
+    
+    // Загружаем баннер если есть
+    if (pendingBannerFile) {
+      const formData = new FormData();
+      formData.append('banner', pendingBannerFile);
+      await fetch(`/api/user/${currentUser.id}/banner`, {
+        method: 'POST',
+        body: formData
+      });
+    }
+    
+    // Меняем username если изменился
+    const newUsername = document.getElementById('edit-username').value.trim();
+    if (newUsername && newUsername !== currentUser.username) {
+      const res = await fetch(`/api/user/${currentUser.id}/username`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername })
+      });
+      const result = await res.json();
+      if (result.success) {
+        currentUser.username = newUsername;
+        localStorage.setItem('kvant_user', JSON.stringify(currentUser));
+        document.querySelector('.current-user').textContent = newUsername;
+      } else {
+        usernameHint.textContent = result.error || 'Ошибка смены ника';
+        usernameHint.className = 'form-hint error';
+        saveProfileBtn.disabled = false;
+        saveProfileBtn.textContent = 'Сохранить';
+        return;
+      }
+    }
+    
+    // Сохраняем остальные данные
+    const data = {
+      display_name: document.getElementById('edit-display-name').value,
+      phone: document.getElementById('edit-phone').value,
+      bio: document.getElementById('edit-bio').value
+    };
+    
+    await fetch(`/api/user/${currentUser.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    editProfileModal.classList.add('hidden');
+    showMyProfile();
+    
+  } catch (e) {
+    console.error('Save profile error:', e);
+  }
   
-  editProfileModal.classList.add('hidden');
-  showMyProfile();
+  saveProfileBtn.disabled = false;
+  saveProfileBtn.textContent = 'Сохранить';
 });
 
 // ===== SETTINGS MODAL =====
@@ -568,9 +712,31 @@ async function showUserProfile(userId) {
   
   if (!profile) return;
   
-  document.getElementById('user-profile-avatar').textContent = profile.username[0].toUpperCase();
-  document.getElementById('user-profile-avatar').style.background = profile.avatar_color || '#4fc3f7';
-  document.getElementById('user-profile-banner').style.background = profile.banner_color || 'linear-gradient(135deg, #4fc3f7, #1976d2)';
+  const avatarEl = document.getElementById('user-profile-avatar');
+  const bannerEl = document.getElementById('user-profile-banner');
+  
+  // Аватарка
+  if (profile.avatar_url) {
+    avatarEl.style.backgroundImage = `url(${profile.avatar_url})`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.style.backgroundPosition = 'center';
+    avatarEl.textContent = '';
+  } else {
+    avatarEl.style.backgroundImage = '';
+    avatarEl.style.background = 'var(--message-sent)';
+    avatarEl.textContent = profile.username[0].toUpperCase();
+  }
+  
+  // Баннер
+  if (profile.banner_url) {
+    bannerEl.style.backgroundImage = `url(${profile.banner_url})`;
+    bannerEl.style.backgroundSize = 'cover';
+    bannerEl.style.backgroundPosition = 'center';
+  } else {
+    bannerEl.style.backgroundImage = '';
+    bannerEl.style.background = 'linear-gradient(135deg, #4fc3f7, #1976d2)';
+  }
+  
   document.getElementById('user-profile-name').textContent = profile.display_name || profile.username;
   document.getElementById('user-profile-username').textContent = '@' + profile.username;
   document.getElementById('user-profile-bio').textContent = profile.bio || '';

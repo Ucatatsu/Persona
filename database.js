@@ -29,8 +29,8 @@ async function initDB() {
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_color TEXT DEFAULT '#4fc3f7'`);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_color TEXT DEFAULT '#1976d2'`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS messages (
@@ -122,7 +122,7 @@ async function getAllUsers() {
 async function getUser(userId) {
   try {
     const result = await pool.query(
-      'SELECT id, username, display_name, phone, bio, avatar_color, banner_color FROM users WHERE id = $1',
+      'SELECT id, username, display_name, phone, bio, avatar_url, banner_url FROM users WHERE id = $1',
       [userId]
     );
     return result.rows[0] || null;
@@ -134,21 +134,54 @@ async function getUser(userId) {
 
 async function updateUser(userId, data) {
   try {
-    const { display_name, phone, bio, avatar_color, banner_color } = data;
+    const { display_name, phone, bio } = data;
     await pool.query(
       `UPDATE users SET 
         display_name = COALESCE($2, display_name),
         phone = COALESCE($3, phone),
-        bio = COALESCE($4, bio),
-        avatar_color = COALESCE($5, avatar_color),
-        banner_color = COALESCE($6, banner_color)
+        bio = COALESCE($4, bio)
       WHERE id = $1`,
-      [userId, display_name, phone, bio, avatar_color, banner_color]
+      [userId, display_name, phone, bio]
     );
     return { success: true };
   } catch (e) {
     console.error('Update user error:', e);
     return { success: false, error: 'Ошибка обновления' };
+  }
+}
+
+async function updateUserAvatar(userId, avatarUrl) {
+  try {
+    await pool.query('UPDATE users SET avatar_url = $2 WHERE id = $1', [userId, avatarUrl]);
+    return { success: true };
+  } catch (e) {
+    console.error('Update avatar error:', e);
+    return { success: false };
+  }
+}
+
+async function updateUserBanner(userId, bannerUrl) {
+  try {
+    await pool.query('UPDATE users SET banner_url = $2 WHERE id = $1', [userId, bannerUrl]);
+    return { success: true };
+  } catch (e) {
+    console.error('Update banner error:', e);
+    return { success: false };
+  }
+}
+
+async function updateUsername(userId, username) {
+  try {
+    // Проверяем уникальность
+    const existing = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username, userId]);
+    if (existing.rows.length > 0) {
+      return { success: false, error: 'Этот ник уже занят' };
+    }
+    await pool.query('UPDATE users SET username = $2 WHERE id = $1', [userId, username]);
+    return { success: true };
+  } catch (e) {
+    console.error('Update username error:', e);
+    return { success: false, error: 'Ошибка смены ника' };
   }
 }
 
@@ -192,7 +225,7 @@ async function getMessages(userId1, userId2) {
 async function getContacts(userId) {
   try {
     const result = await pool.query(`
-      SELECT DISTINCT u.id, u.username, u.display_name, u.avatar_color,
+      SELECT DISTINCT u.id, u.username, u.display_name, u.avatar_url,
         (SELECT COUNT(*) FROM messages m 
          WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.is_read = FALSE) as unread_count
       FROM users u
@@ -275,4 +308,4 @@ async function deletePushSubscription(endpoint) {
   }
 }
 
-module.exports = { initDB, createUser, loginUser, getAllUsers, getUser, updateUser, searchUsers, saveMessage, getMessages, getContacts, markMessagesAsRead, getUnreadCount, savePushSubscription, getPushSubscriptions, deletePushSubscription };
+module.exports = { initDB, createUser, loginUser, getAllUsers, getUser, updateUser, updateUserAvatar, updateUserBanner, updateUsername, searchUsers, saveMessage, getMessages, getContacts, markMessagesAsRead, getUnreadCount, savePushSubscription, getPushSubscriptions, deletePushSubscription };

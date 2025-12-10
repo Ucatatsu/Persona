@@ -2,9 +2,44 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const webpush = require('web-push');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('./database');
 
 const app = express();
+
+// Создаём папку для загрузок
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Настройка multer для загрузки файлов
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только изображения (jpg, png, gif, webp)'));
+    }
+  }
+});
 
 // VAPID ключи для push-уведомлений
 // Генерируются один раз: npx web-push generate-vapid-keys
@@ -69,6 +104,36 @@ app.get('/api/user/:userId', async (req, res) => {
 app.put('/api/user/:userId', async (req, res) => {
   const { userId } = req.params;
   const result = await db.updateUser(userId, req.body);
+  res.json(result);
+});
+
+// Загрузка аватарки
+app.post('/api/user/:userId/avatar', upload.single('avatar'), async (req, res) => {
+  const { userId } = req.params;
+  if (!req.file) {
+    return res.json({ success: false, error: 'Файл не загружен' });
+  }
+  const avatarUrl = `/uploads/${req.file.filename}`;
+  const result = await db.updateUserAvatar(userId, avatarUrl);
+  res.json({ success: true, avatarUrl });
+});
+
+// Загрузка баннера
+app.post('/api/user/:userId/banner', upload.single('banner'), async (req, res) => {
+  const { userId } = req.params;
+  if (!req.file) {
+    return res.json({ success: false, error: 'Файл не загружен' });
+  }
+  const bannerUrl = `/uploads/${req.file.filename}`;
+  const result = await db.updateUserBanner(userId, bannerUrl);
+  res.json({ success: true, bannerUrl });
+});
+
+// Смена username
+app.put('/api/user/:userId/username', async (req, res) => {
+  const { userId } = req.params;
+  const { username } = req.body;
+  const result = await db.updateUsername(userId, username);
   res.json(result);
 });
 
