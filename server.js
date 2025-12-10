@@ -1,9 +1,21 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const webpush = require('web-push');
 const db = require('./database');
 
 const app = express();
+
+// VAPID ключи для push-уведомлений
+// Генерируются один раз: npx web-push generate-vapid-keys
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BJIi1Qqv2MLNIj1LHVrG_MOBt4lDbSwJ8J1ZMzYyCmgT5O2WE2ug4Bgmctf5hxTFy-nJbA1QhIXAuhZGbIlyCkE';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'imDt5ppyzZKVfSoW2urGJf7X8qLT41_Avfm0jpWnDAY';
+
+webpush.setVapidDetails(
+  'mailto:admin@kvant.app',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -69,6 +81,34 @@ app.get('/api/messages/:oderId', async (req, res) => {
   res.json(messages);
 });
 
+// Push уведомления
+app.get('/api/vapid-public-key', (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/push-subscribe', async (req, res) => {
+  const { userId, subscription } = req.body;
+  const result = await db.savePushSubscription(userId, subscription);
+  res.json(result);
+});
+
+// Функция отправки push-уведомления
+async function sendPushNotification(userId, payload) {
+  const subscriptions = await db.getPushSubscriptions(userId);
+  
+  for (const subscription of subscriptions) {
+    try {
+      await webpush.sendNotification(subscription, JSON.stringify(payload));
+    } catch (error) {
+      console.error('Push error:', error);
+      // Если подписка недействительна - удаляем
+      if (error.statusCode === 410 || error.statusCode === 404) {
+        await db.deletePushSubscription(subscription.endpoint);
+      }
+    }
+  }
+}
+
 // Socket.io
 io.on('connection', (socket) => {
   console.log('Пользователь подключился');
@@ -79,12 +119,20 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send-message', async (data) => {
-    const { senderId, receiverId, text } = data;
+    const { senderId, receiverId, text, senderName } = data;
     const message = await db.saveMessage(senderId, receiverId, text);
     
     const receiverSocket = onlineUsers.get(receiverId);
     if (receiverSocket) {
       io.to(receiverSocket).emit('new-message', message);
+    } else {
+      // Пользователь оффлайн - отправляем push
+      sendPushNotification(receiverId, {
+        title: senderName || 'Новое сообщение',
+        body: text.length > 100 ? text.substring(0, 100) + '...' : text,
+        tag: `msg-${senderId}`,
+        senderId: senderId
+      });
     }
     socket.emit('message-sent', message);
   });

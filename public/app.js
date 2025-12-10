@@ -4,11 +4,77 @@ let currentUser = null;
 let selectedUser = null;
 let onlineUsers = [];
 let notificationsEnabled = localStorage.getItem('notifications') !== 'false';
+let swRegistration = null;
+
+// Регистрация Service Worker для push-уведомлений
+async function registerServiceWorker() {
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    try {
+      swRegistration = await navigator.serviceWorker.register('/sw.js');
+      console.log('Service Worker зарегистрирован');
+    } catch (e) {
+      console.error('Ошибка регистрации SW:', e);
+    }
+  }
+}
+
+// Подписка на push-уведомления
+async function subscribeToPush() {
+  if (!swRegistration || !currentUser) return;
+  
+  try {
+    // Получаем публичный ключ с сервера
+    const res = await fetch('/api/vapid-public-key');
+    const { publicKey } = await res.json();
+    
+    // Проверяем существующую подписку
+    let subscription = await swRegistration.pushManager.getSubscription();
+    
+    if (!subscription) {
+      // Создаём новую подписку
+      subscription = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+    }
+    
+    // Отправляем подписку на сервер
+    await fetch('/api/push-subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        subscription: subscription.toJSON()
+      })
+    });
+    
+    console.log('Push подписка активирована');
+  } catch (e) {
+    console.error('Ошибка подписки на push:', e);
+  }
+}
+
+// Конвертация base64 ключа
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 // Запрос разрешения на уведомления
 async function requestNotificationPermission() {
   if ('Notification' in window && Notification.permission === 'default') {
-    await Notification.requestPermission();
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      await subscribeToPush();
+    }
+  } else if (Notification.permission === 'granted') {
+    await subscribeToPush();
   }
 }
 
@@ -27,6 +93,9 @@ function showNotification(title, body, onClick) {
     };
   }
 }
+
+// Инициализация Service Worker
+registerServiceWorker();
 
 // Проверяем сохранённую сессию при загрузке
 const savedUser = localStorage.getItem('kvant_user');
@@ -315,7 +384,8 @@ messageForm.addEventListener('submit', (e) => {
   socket.emit('send-message', {
     senderId: currentUser.id,
     receiverId: selectedUser.id,
-    text: messageInput.value.trim()
+    text: messageInput.value.trim(),
+    senderName: currentUser.username
   });
   messageInput.value = '';
 });

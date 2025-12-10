@@ -54,6 +54,19 @@ async function initDB() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
 
+    // Таблица push-подписок
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, endpoint)
+      )
+    `);
+
     console.log('База данных инициализирована');
   } finally {
     client.release();
@@ -221,4 +234,45 @@ async function getUnreadCount(userId) {
   }
 }
 
-module.exports = { initDB, createUser, loginUser, getAllUsers, getUser, updateUser, searchUsers, saveMessage, getMessages, getContacts, markMessagesAsRead, getUnreadCount };
+// Push подписки
+async function savePushSubscription(userId, subscription) {
+  const id = uuidv4();
+  try {
+    await pool.query(
+      `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth) 
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, endpoint) DO UPDATE SET p256dh = $4, auth = $5`,
+      [id, userId, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth]
+    );
+    return { success: true };
+  } catch (e) {
+    console.error('Save push subscription error:', e);
+    return { success: false };
+  }
+}
+
+async function getPushSubscriptions(userId) {
+  try {
+    const result = await pool.query(
+      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1',
+      [userId]
+    );
+    return result.rows.map(row => ({
+      endpoint: row.endpoint,
+      keys: { p256dh: row.p256dh, auth: row.auth }
+    }));
+  } catch (e) {
+    console.error('Get push subscriptions error:', e);
+    return [];
+  }
+}
+
+async function deletePushSubscription(endpoint) {
+  try {
+    await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+  } catch (e) {
+    console.error('Delete push subscription error:', e);
+  }
+}
+
+module.exports = { initDB, createUser, loginUser, getAllUsers, getUser, updateUser, searchUsers, saveMessage, getMessages, getContacts, markMessagesAsRead, getUnreadCount, savePushSubscription, getPushSubscriptions, deletePushSubscription };
