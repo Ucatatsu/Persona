@@ -174,12 +174,17 @@
     <div class="modal-overlay"></div>
     <div class="modal-content settings-modal-content">
       <div class="settings-sidebar">
-        <div class="settings-nav">
-          <div class="settings-nav-item active" data-section="general">
-            <span class="nav-icon">⚙️</span>
-            <span>Основные</span>
+        <!-- Профиль пользователя -->
+        <div class="settings-user">
+          <div class="settings-user-avatar" id="settings-avatar"></div>
+          <div class="settings-user-info">
+            <span class="settings-user-name" id="settings-username"></span>
+            <span class="settings-user-status">В сети</span>
           </div>
-          <div class="settings-nav-item" data-section="appearance">
+        </div>
+        
+        <div class="settings-nav">
+          <div class="settings-nav-item active" data-section="appearance">
             <span class="nav-icon">🎨</span>
             <span>Оформление</span>
           </div>
@@ -196,41 +201,19 @@
             <span>О приложении</span>
           </div>
         </div>
-        <button class="btn-danger settings-logout" id="logout-btn">Выйти</button>
+        
+        <div class="settings-sidebar-footer">
+          <button class="settings-logout-btn" id="logout-btn">
+            <span>🚪</span> Выйти из аккаунта
+          </button>
+        </div>
       </div>
       
       <div class="settings-content">
         <button class="modal-close" id="close-settings">&times;</button>
         
-        <!-- Основные -->
-        <div class="settings-section active" id="section-general">
-          <h2>Основные настройки</h2>
-          <div class="settings-group">
-            <div class="settings-item">
-              <div class="settings-item-info">
-                <span class="settings-item-title">Язык</span>
-                <span class="settings-item-desc">Язык интерфейса</span>
-              </div>
-              <select id="setting-language" class="settings-select">
-                <option value="ru">Русский</option>
-                <option value="en">English</option>
-              </select>
-            </div>
-            <div class="settings-item">
-              <div class="settings-item-info">
-                <span class="settings-item-title">Автозапуск</span>
-                <span class="settings-item-desc">Запускать при старте системы</span>
-              </div>
-              <label class="toggle">
-                <input type="checkbox" id="setting-autostart">
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-        
         <!-- Оформление -->
-        <div class="settings-section" id="section-appearance">
+        <div class="settings-section active" id="section-appearance">
           <h2>Оформление</h2>
           
           <div class="settings-group">

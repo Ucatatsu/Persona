@@ -302,8 +302,18 @@ function renderUsers(users) {
   });
 }
 
+let selectedUserProfile = null;
+
 async function selectUser(userId, username) {
   selectedUser = { id: userId, username };
+  
+  // Загружаем профиль собеседника для аватарки
+  try {
+    const res = await fetch(`/api/user/${userId}`);
+    selectedUserProfile = await res.json();
+  } catch (e) {
+    selectedUserProfile = null;
+  }
   
   document.querySelectorAll('.user-item').forEach(i => i.classList.remove('active'));
   document.querySelector(`[data-id="${userId}"]`)?.classList.add('active');
@@ -314,7 +324,7 @@ async function selectUser(userId, username) {
   if (badge) badge.remove();
   
   const isOnline = onlineUsers.includes(userId);
-  document.querySelector('.chat-user-name').textContent = username;
+  document.querySelector('.chat-user-name').textContent = selectedUserProfile?.display_name || username;
   document.querySelector('.chat-user-status').textContent = isOnline ? 'В сети' : 'Не в сети';
   document.querySelector('.chat-user-status').style.color = isOnline ? 'var(--online)' : 'var(--text-muted)';
   
@@ -333,7 +343,22 @@ async function loadMessages() {
 function renderMessages(messages) {
   messagesDiv.innerHTML = messages.map(msg => {
     const isSent = msg.sender_id === currentUser.id;
-    const initial = isSent ? currentUser.username[0] : selectedUser.username[0];
+    
+    // Определяем аватарку
+    let avatarHtml;
+    if (isSent) {
+      if (currentUserProfile?.avatar_url) {
+        avatarHtml = `<div class="message-avatar" style="background-image: url(${currentUserProfile.avatar_url}); background-size: cover;"></div>`;
+      } else {
+        avatarHtml = `<div class="message-avatar">${currentUser.username[0].toUpperCase()}</div>`;
+      }
+    } else {
+      if (selectedUserProfile?.avatar_url) {
+        avatarHtml = `<div class="message-avatar" style="background-image: url(${selectedUserProfile.avatar_url}); background-size: cover;"></div>`;
+      } else {
+        avatarHtml = `<div class="message-avatar">${selectedUser.username[0].toUpperCase()}</div>`;
+      }
+    }
     
     // Проверяем тип сообщения
     if (msg.message_type === 'audio_call' || msg.message_type === 'video_call') {
@@ -359,7 +384,7 @@ function renderMessages(messages) {
     
     return `
       <div class="message ${isSent ? 'sent' : 'received'}">
-        <div class="message-avatar">${initial.toUpperCase()}</div>
+        ${avatarHtml}
         <div class="message-content">
           <div class="message-bubble">${escapeHtml(msg.text)}</div>
           <div class="message-time">${formatTime(msg.created_at)}</div>
@@ -441,12 +466,27 @@ socket.on('new-message', (message) => {
 
 function appendMessage(msg) {
   const isSent = msg.sender_id === currentUser.id;
-  const initial = isSent ? currentUser.username[0] : selectedUser.username[0];
+  
+  // Определяем аватарку
+  let avatarHtml;
+  if (isSent) {
+    if (currentUserProfile?.avatar_url) {
+      avatarHtml = `<div class="message-avatar" style="background-image: url(${currentUserProfile.avatar_url}); background-size: cover;"></div>`;
+    } else {
+      avatarHtml = `<div class="message-avatar">${currentUser.username[0].toUpperCase()}</div>`;
+    }
+  } else {
+    if (selectedUserProfile?.avatar_url) {
+      avatarHtml = `<div class="message-avatar" style="background-image: url(${selectedUserProfile.avatar_url}); background-size: cover;"></div>`;
+    } else {
+      avatarHtml = `<div class="message-avatar">${selectedUser.username[0].toUpperCase()}</div>`;
+    }
+  }
   
   const div = document.createElement('div');
   div.className = `message ${isSent ? 'sent' : 'received'}`;
   div.innerHTML = `
-    <div class="message-avatar">${initial.toUpperCase()}</div>
+    ${avatarHtml}
     <div class="message-content">
       <div class="message-bubble">${escapeHtml(msg.text)}</div>
       <div class="message-time">${formatTime(msg.created_at)}</div>
@@ -726,7 +766,20 @@ function adjustColor(color, amount) {
 // Применяем настройки при загрузке
 document.addEventListener('DOMContentLoaded', applySettings);
 
-settingsBtn.addEventListener('click', () => {
+settingsBtn.addEventListener('click', async () => {
+  // Показываем аватарку и имя пользователя
+  const settingsAvatar = document.getElementById('settings-avatar');
+  const settingsUsername = document.getElementById('settings-username');
+  
+  if (currentUserProfile?.avatar_url) {
+    settingsAvatar.style.backgroundImage = `url(${currentUserProfile.avatar_url})`;
+    settingsAvatar.textContent = '';
+  } else {
+    settingsAvatar.style.backgroundImage = '';
+    settingsAvatar.textContent = currentUser.username[0].toUpperCase();
+  }
+  settingsUsername.textContent = currentUserProfile?.display_name || currentUser.username;
+  
   // Загружаем текущие значения
   document.getElementById('notifications-checkbox').checked = notificationsEnabled;
   document.getElementById('sounds-checkbox').checked = userSettings.sounds !== false;
@@ -750,6 +803,12 @@ settingsBtn.addEventListener('click', () => {
   document.querySelectorAll('.theme-option').forEach(opt => {
     opt.classList.toggle('active', opt.dataset.theme === (userSettings.theme || 'dark'));
   });
+  
+  // Сбрасываем на первый раздел
+  document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+  document.querySelector('.settings-nav-item').classList.add('active');
+  document.querySelector('.settings-section').classList.add('active');
   
   settingsModal.classList.remove('hidden');
 });
