@@ -672,17 +672,190 @@ const settingsModal = document.getElementById('settings-modal');
 const settingsBtn = document.getElementById('settings-btn');
 const closeSettingsBtn = document.getElementById('close-settings');
 
+// Загрузка настроек из localStorage
+const userSettings = JSON.parse(localStorage.getItem('kvant_settings') || '{}');
+
+function saveSettings() {
+  localStorage.setItem('kvant_settings', JSON.stringify(userSettings));
+}
+
+function applySettings() {
+  // Применяем фон
+  messagesDiv.className = 'messages';
+  if (userSettings.background && userSettings.background !== 'default') {
+    if (userSettings.background === 'custom' && userSettings.customBg) {
+      messagesDiv.style.backgroundImage = `url(${userSettings.customBg})`;
+      messagesDiv.style.backgroundSize = 'cover';
+      messagesDiv.style.backgroundPosition = 'center';
+    } else {
+      messagesDiv.classList.add(`bg-${userSettings.background}`);
+      messagesDiv.style.backgroundImage = '';
+    }
+  }
+  
+  // Размер сообщений
+  if (userSettings.messageSize && userSettings.messageSize !== 'medium') {
+    messagesDiv.classList.add(`size-${userSettings.messageSize}`);
+  }
+  
+  // Компактный режим
+  if (userSettings.compact) {
+    messagesDiv.classList.add('compact');
+  }
+  
+  // Скрыть аватарки
+  if (userSettings.hideAvatars) {
+    messagesDiv.classList.add('no-avatars');
+  }
+  
+  // Акцентный цвет
+  if (userSettings.accentColor) {
+    document.documentElement.style.setProperty('--accent', userSettings.accentColor);
+    document.documentElement.style.setProperty('--message-sent', `linear-gradient(135deg, ${userSettings.accentColor}, ${adjustColor(userSettings.accentColor, -30)})`);
+  }
+}
+
+function adjustColor(color, amount) {
+  const hex = color.replace('#', '');
+  const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
+  const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
+  const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+// Применяем настройки при загрузке
+document.addEventListener('DOMContentLoaded', applySettings);
+
 settingsBtn.addEventListener('click', () => {
+  // Загружаем текущие значения
   document.getElementById('notifications-checkbox').checked = notificationsEnabled;
+  document.getElementById('sounds-checkbox').checked = userSettings.sounds !== false;
+  document.getElementById('setting-compact').checked = userSettings.compact || false;
+  document.getElementById('setting-avatars').checked = !userSettings.hideAvatars;
+  document.getElementById('setting-preview').checked = userSettings.preview !== false;
+  document.getElementById('setting-online-status').checked = userSettings.onlineStatus !== false;
+  document.getElementById('setting-typing').checked = userSettings.typing !== false;
+  document.getElementById('setting-read-receipts').checked = userSettings.readReceipts !== false;
+  
+  // Активируем текущие опции
+  document.querySelectorAll('.bg-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.bg === (userSettings.background || 'default'));
+  });
+  document.querySelectorAll('.size-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.size === (userSettings.messageSize || 'medium'));
+  });
+  document.querySelectorAll('.color-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.color === (userSettings.accentColor || '#4fc3f7'));
+  });
+  document.querySelectorAll('.theme-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.theme === (userSettings.theme || 'dark'));
+  });
+  
   settingsModal.classList.remove('hidden');
 });
 
+// Навигация по разделам
+document.querySelectorAll('.settings-nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById(`section-${item.dataset.section}`).classList.add('active');
+  });
+});
+
+// Уведомления
 document.getElementById('notifications-checkbox').addEventListener('change', (e) => {
   notificationsEnabled = e.target.checked;
   localStorage.setItem('notifications', notificationsEnabled);
   if (notificationsEnabled) {
     requestNotificationPermission();
   }
+});
+
+// Звуки
+document.getElementById('sounds-checkbox').addEventListener('change', (e) => {
+  userSettings.sounds = e.target.checked;
+  saveSettings();
+});
+
+// Компактный режим
+document.getElementById('setting-compact').addEventListener('change', (e) => {
+  userSettings.compact = e.target.checked;
+  saveSettings();
+  applySettings();
+});
+
+// Аватарки
+document.getElementById('setting-avatars').addEventListener('change', (e) => {
+  userSettings.hideAvatars = !e.target.checked;
+  saveSettings();
+  applySettings();
+});
+
+// Фон чата
+document.querySelectorAll('.bg-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    if (opt.dataset.bg === 'custom') {
+      document.getElementById('custom-bg-input').click();
+      return;
+    }
+    document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    userSettings.background = opt.dataset.bg;
+    saveSettings();
+    applySettings();
+  });
+});
+
+// Кастомный фон
+document.getElementById('custom-bg-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      userSettings.background = 'custom';
+      userSettings.customBg = e.target.result;
+      saveSettings();
+      applySettings();
+      document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
+      document.querySelector('[data-bg="custom"]').classList.add('active');
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Размер сообщений
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    userSettings.messageSize = btn.dataset.size;
+    saveSettings();
+    applySettings();
+  });
+});
+
+// Акцентный цвет
+document.querySelectorAll('.color-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.color-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    userSettings.accentColor = opt.dataset.color;
+    saveSettings();
+    applySettings();
+  });
+});
+
+// Тема
+document.querySelectorAll('.theme-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    userSettings.theme = opt.dataset.theme;
+    saveSettings();
+    // TODO: применить тему
+  });
 });
 
 closeSettingsBtn.addEventListener('click', () => {

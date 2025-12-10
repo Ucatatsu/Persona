@@ -172,22 +172,249 @@
   <!-- Модальное окно настроек -->
   <div id="settings-modal" class="modal hidden">
     <div class="modal-overlay"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Настройки</h2>
-        <button class="modal-close" id="close-settings">&times;</button>
+    <div class="modal-content settings-modal-content">
+      <div class="settings-sidebar">
+        <div class="settings-nav">
+          <div class="settings-nav-item active" data-section="general">
+            <span class="nav-icon">⚙️</span>
+            <span>Основные</span>
+          </div>
+          <div class="settings-nav-item" data-section="appearance">
+            <span class="nav-icon">🎨</span>
+            <span>Оформление</span>
+          </div>
+          <div class="settings-nav-item" data-section="notifications">
+            <span class="nav-icon">🔔</span>
+            <span>Уведомления</span>
+          </div>
+          <div class="settings-nav-item" data-section="privacy">
+            <span class="nav-icon">🔒</span>
+            <span>Приватность</span>
+          </div>
+          <div class="settings-nav-item" data-section="about">
+            <span class="nav-icon">ℹ️</span>
+            <span>О приложении</span>
+          </div>
+        </div>
+        <button class="btn-danger settings-logout" id="logout-btn">Выйти</button>
       </div>
-      <div class="modal-body settings-body">
-        <div class="settings-item" id="notifications-toggle">
-          <span>🔔 Уведомления</span>
-          <input type="checkbox" id="notifications-checkbox" checked>
+      
+      <div class="settings-content">
+        <button class="modal-close" id="close-settings">&times;</button>
+        
+        <!-- Основные -->
+        <div class="settings-section active" id="section-general">
+          <h2>Основные настройки</h2>
+          <div class="settings-group">
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Язык</span>
+                <span class="settings-item-desc">Язык интерфейса</span>
+              </div>
+              <select id="setting-language" class="settings-select">
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Автозапуск</span>
+                <span class="settings-item-desc">Запускать при старте системы</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-autostart">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
-        <div class="settings-item" id="sounds-toggle">
-          <span>🔊 Звуки</span>
-          <input type="checkbox" id="sounds-checkbox" checked>
+        
+        <!-- Оформление -->
+        <div class="settings-section" id="section-appearance">
+          <h2>Оформление</h2>
+          
+          <div class="settings-group">
+            <h3>Тема</h3>
+            <div class="theme-selector">
+              <div class="theme-option active" data-theme="dark">
+                <div class="theme-preview dark"></div>
+                <span>Тёмная</span>
+              </div>
+              <div class="theme-option" data-theme="light">
+                <div class="theme-preview light"></div>
+                <span>Светлая</span>
+              </div>
+              <div class="theme-option" data-theme="system">
+                <div class="theme-preview system"></div>
+                <span>Системная</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="settings-group">
+            <h3>Фон чата</h3>
+            <div class="bg-selector">
+              <div class="bg-option active" data-bg="default">
+                <div class="bg-preview" style="background: url('background.jpg') center/cover"></div>
+              </div>
+              <div class="bg-option" data-bg="gradient1">
+                <div class="bg-preview" style="background: linear-gradient(135deg, #1a1a2e, #16213e)"></div>
+              </div>
+              <div class="bg-option" data-bg="gradient2">
+                <div class="bg-preview" style="background: linear-gradient(135deg, #0f0c29, #302b63, #24243e)"></div>
+              </div>
+              <div class="bg-option" data-bg="gradient3">
+                <div class="bg-preview" style="background: linear-gradient(135deg, #232526, #414345)"></div>
+              </div>
+              <div class="bg-option" data-bg="solid">
+                <div class="bg-preview" style="background: #0a1628"></div>
+              </div>
+              <div class="bg-option" data-bg="custom">
+                <div class="bg-preview custom-bg">📷</div>
+                <input type="file" id="custom-bg-input" accept="image/*" hidden>
+              </div>
+            </div>
+          </div>
+          
+          <div class="settings-group">
+            <h3>Размер сообщений</h3>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Размер текста</span>
+              </div>
+              <div class="size-selector">
+                <button class="size-btn" data-size="small">A</button>
+                <button class="size-btn active" data-size="medium">A</button>
+                <button class="size-btn" data-size="large">A</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="settings-group">
+            <h3>Акцентный цвет</h3>
+            <div class="color-selector">
+              <div class="color-option active" data-color="#4fc3f7" style="background: #4fc3f7"></div>
+              <div class="color-option" data-color="#7c4dff" style="background: #7c4dff"></div>
+              <div class="color-option" data-color="#ff4081" style="background: #ff4081"></div>
+              <div class="color-option" data-color="#00e676" style="background: #00e676"></div>
+              <div class="color-option" data-color="#ffab00" style="background: #ffab00"></div>
+              <div class="color-option" data-color="#ff5722" style="background: #ff5722"></div>
+            </div>
+          </div>
+          
+          <div class="settings-group">
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Компактный режим</span>
+                <span class="settings-item-desc">Уменьшить отступы между сообщениями</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-compact">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Показывать аватарки</span>
+                <span class="settings-item-desc">Отображать аватарки в сообщениях</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-avatars" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
-        <div class="settings-divider"></div>
-        <button class="btn-danger" id="logout-btn">Выйти из аккаунта</button>
+        
+        <!-- Уведомления -->
+        <div class="settings-section" id="section-notifications">
+          <h2>Уведомления</h2>
+          <div class="settings-group">
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Push-уведомления</span>
+                <span class="settings-item-desc">Получать уведомления о новых сообщениях</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="notifications-checkbox" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Звуки</span>
+                <span class="settings-item-desc">Звуковые уведомления</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="sounds-checkbox" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Предпросмотр сообщений</span>
+                <span class="settings-item-desc">Показывать текст в уведомлениях</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-preview" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Приватность -->
+        <div class="settings-section" id="section-privacy">
+          <h2>Приватность</h2>
+          <div class="settings-group">
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Статус онлайн</span>
+                <span class="settings-item-desc">Показывать когда вы в сети</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-online-status" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Индикатор набора</span>
+                <span class="settings-item-desc">Показывать когда вы печатаете</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-typing" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Прочитано</span>
+                <span class="settings-item-desc">Отправлять отчёты о прочтении</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-read-receipts" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- О приложении -->
+        <div class="settings-section" id="section-about">
+          <h2>О приложении</h2>
+          <div class="about-content">
+            <img src="icon.png" alt="Квант" class="about-logo">
+            <h3>Квант</h3>
+            <p class="about-version">Версия 1.0.0</p>
+            <p class="about-desc">Современный мессенджер с поддержкой аудио и видеозвонков</p>
+            <div class="about-links">
+              <a href="#" class="about-link">Политика конфиденциальности</a>
+              <a href="#" class="about-link">Условия использования</a>
+            </div>
+            <p class="about-copyright">© 2024 Квант. Все права защищены.</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
