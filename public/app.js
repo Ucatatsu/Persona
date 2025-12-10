@@ -375,3 +375,33 @@ document.addEventListener('click', (e) => {
     emojiPicker.classList.add('hidden');
   }
 });
+
+
+// ===== MOBILE NAVIGATION =====
+const sidebar = document.querySelector('.sidebar');
+const backBtn = document.getElementById('back-btn');
+
+function isMobile() {
+  return window.innerWidth <= 768;
+}
+
+// При выборе чата на мобильном — скрыть sidebar
+const originalSelectUser = selectUser;
+selectUser = async function(userId, username) {
+  await originalSelectUser(userId, username);
+  if (isMobile()) {
+    sidebar.classList.add('hidden-mobile');
+  }
+};
+
+// Кнопка назад — показать sidebar
+backBtn.addEventListener('click', () => {
+  sidebar.classList.remove('hidden-mobile');
+});
+
+// При изменении размера окна
+window.addEventListener('resize', () => {
+  if (!isMobile()) {
+    sidebar.classList.remove('hidden-mobile');
+  }
+});
