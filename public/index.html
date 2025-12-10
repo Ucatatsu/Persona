@@ -191,6 +191,40 @@
     <div class="emoji-grid"></div>
   </div>
 
+  <!-- Модалка звонка -->
+  <div id="call-modal" class="modal hidden">
+    <div class="modal-overlay call-overlay"></div>
+    <div class="call-container">
+      <div class="call-user-avatar" id="call-avatar"></div>
+      <div class="call-user-name" id="call-name"></div>
+      <div class="call-status" id="call-status">Вызов...</div>
+      <div class="call-timer hidden" id="call-timer">00:00</div>
+      <div class="call-videos hidden" id="call-videos">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
+      <div class="call-actions">
+        <button class="call-btn call-btn-mute" id="mute-btn" title="Выкл. микрофон">🎤</button>
+        <button class="call-btn call-btn-end" id="end-call-btn" title="Завершить">📞</button>
+        <button class="call-btn call-btn-video" id="toggle-video-btn" title="Вкл. видео">📹</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Входящий звонок -->
+  <div id="incoming-call-modal" class="modal hidden">
+    <div class="modal-overlay call-overlay"></div>
+    <div class="call-container incoming">
+      <div class="call-user-avatar" id="incoming-call-avatar"></div>
+      <div class="call-user-name" id="incoming-call-name"></div>
+      <div class="call-status">Входящий звонок...</div>
+      <div class="call-actions">
+        <button class="call-btn call-btn-decline" id="decline-call-btn">✕</button>
+        <button class="call-btn call-btn-accept" id="accept-call-btn">📞</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>

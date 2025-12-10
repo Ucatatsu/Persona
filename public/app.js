@@ -571,3 +571,265 @@ window.addEventListener('resize', () => {
     sidebar.classList.remove('hidden-mobile');
   }
 });
+
+
+// ===== WEBRTC CALLS =====
+let localStream = null;
+let remoteStream = null;
+let peerConnection = null;
+let callTimer = null;
+let callSeconds = 0;
+let currentCallUser = null;
+let isVideoCall = false;
+
+const callModal = document.getElementById('call-modal');
+const incomingCallModal = document.getElementById('incoming-call-modal');
+const callAvatar = document.getElementById('call-avatar');
+const callName = document.getElementById('call-name');
+const callStatus = document.getElementById('call-status');
+const callTimerEl = document.getElementById('call-timer');
+const callVideos = document.getElementById('call-videos');
+const localVideo = document.getElementById('local-video');
+const remoteVideo = document.getElementById('remote-video');
+const muteBtn = document.getElementById('mute-btn');
+const endCallBtn = document.getElementById('end-call-btn');
+const toggleVideoBtn = document.getElementById('toggle-video-btn');
+const acceptCallBtn = document.getElementById('accept-call-btn');
+const declineCallBtn = document.getElementById('decline-call-btn');
+
+const iceServers = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+
+// Кнопки звонка в хедере
+document.querySelectorAll('.action-btn').forEach((btn, index) => {
+  btn.addEventListener('click', () => {
+    if (!selectedUser) return;
+    startCall(index === 1); // index 1 = видеозвонок
+  });
+});
+
+async function startCall(video = false) {
+  if (!selectedUser) return;
+  
+  isVideoCall = video;
+  currentCallUser = selectedUser;
+  
+  callAvatar.textContent = selectedUser.username[0].toUpperCase();
+  callName.textContent = selectedUser.username;
+  callStatus.textContent = 'Вызов...';
+  callTimerEl.classList.add('hidden');
+  callVideos.classList.toggle('hidden', !video);
+  callModal.classList.remove('hidden');
+  
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: video
+    });
+    
+    if (video) {
+      localVideo.srcObject = localStream;
+    }
+    
+    peerConnection = new RTCPeerConnection(iceServers);
+    
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+    
+    peerConnection.ontrack = (event) => {
+      remoteVideo.srcObject = event.streams[0];
+    };
+    
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit('ice-candidate', {
+          to: currentCallUser.id,
+          candidate: event.candidate
+        });
+      }
+    };
+    
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    
+    socket.emit('call-user', {
+      to: selectedUser.id,
+      from: currentUser.id,
+      fromName: currentUser.username,
+      offer: offer,
+      isVideo: video
+    });
+    
+  } catch (err) {
+    console.error('Ошибка доступа к медиа:', err);
+    endCall();
+    alert('Не удалось получить доступ к камере/микрофону');
+  }
+}
+
+// Входящий звонок
+let incomingCallData = null;
+
+socket.on('incoming-call', async (data) => {
+  incomingCallData = data;
+  document.getElementById('incoming-call-avatar').textContent = data.fromName[0].toUpperCase();
+  document.getElementById('incoming-call-name').textContent = data.fromName;
+  incomingCallModal.classList.remove('hidden');
+});
+
+acceptCallBtn.addEventListener('click', async () => {
+  if (!incomingCallData) return;
+  
+  incomingCallModal.classList.add('hidden');
+  isVideoCall = incomingCallData.isVideo;
+  currentCallUser = { id: incomingCallData.from, username: incomingCallData.fromName };
+  
+  callAvatar.textContent = incomingCallData.fromName[0].toUpperCase();
+  callName.textContent = incomingCallData.fromName;
+  callStatus.textContent = 'Подключение...';
+  callVideos.classList.toggle('hidden', !isVideoCall);
+  callModal.classList.remove('hidden');
+  
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: isVideoCall
+    });
+    
+    if (isVideoCall) {
+      localVideo.srcObject = localStream;
+    }
+    
+    peerConnection = new RTCPeerConnection(iceServers);
+    
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+    
+    peerConnection.ontrack = (event) => {
+      remoteVideo.srcObject = event.streams[0];
+    };
+    
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit('ice-candidate', {
+          to: currentCallUser.id,
+          candidate: event.candidate
+        });
+      }
+    };
+    
+    await peerConnection.setRemoteDescription(incomingCallData.offer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    
+    socket.emit('call-answer', {
+      to: incomingCallData.from,
+      answer: answer
+    });
+    
+    startCallTimer();
+    
+  } catch (err) {
+    console.error('Ошибка:', err);
+    endCall();
+  }
+});
+
+declineCallBtn.addEventListener('click', () => {
+  if (incomingCallData) {
+    socket.emit('call-decline', { to: incomingCallData.from });
+  }
+  incomingCallModal.classList.add('hidden');
+  incomingCallData = null;
+});
+
+socket.on('call-answered', async (data) => {
+  await peerConnection.setRemoteDescription(data.answer);
+  callStatus.textContent = 'Соединено';
+  startCallTimer();
+});
+
+socket.on('call-declined', () => {
+  callStatus.textContent = 'Звонок отклонён';
+  setTimeout(endCall, 2000);
+});
+
+socket.on('call-ended', () => {
+  endCall();
+});
+
+socket.on('call-failed', (data) => {
+  callStatus.textContent = data.reason;
+  setTimeout(endCall, 2000);
+});
+
+socket.on('ice-candidate', async (data) => {
+  if (peerConnection) {
+    await peerConnection.addIceCandidate(data.candidate);
+  }
+});
+
+function startCallTimer() {
+  callSeconds = 0;
+  callTimerEl.classList.remove('hidden');
+  callTimer = setInterval(() => {
+    callSeconds++;
+    const mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+    const secs = (callSeconds % 60).toString().padStart(2, '0');
+    callTimerEl.textContent = `${mins}:${secs}`;
+  }, 1000);
+}
+
+function endCall() {
+  if (callTimer) {
+    clearInterval(callTimer);
+    callTimer = null;
+  }
+  
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  
+  if (currentCallUser) {
+    socket.emit('call-end', { to: currentCallUser.id });
+  }
+  
+  callModal.classList.add('hidden');
+  currentCallUser = null;
+}
+
+endCallBtn.addEventListener('click', endCall);
+
+// Mute/unmute
+let isMuted = false;
+muteBtn.addEventListener('click', () => {
+  if (localStream) {
+    isMuted = !isMuted;
+    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+    muteBtn.classList.toggle('active', !isMuted);
+    muteBtn.textContent = isMuted ? '🔇' : '🎤';
+  }
+});
+
+// Toggle video
+toggleVideoBtn.addEventListener('click', async () => {
+  if (!peerConnection) return;
+  
+  const videoTrack = localStream?.getVideoTracks()[0];
+  if (videoTrack) {
+    videoTrack.enabled = !videoTrack.enabled;
+    toggleVideoBtn.classList.toggle('active', videoTrack.enabled);
+  }
+});

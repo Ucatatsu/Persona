@@ -86,6 +86,49 @@ io.on('connection', (socket) => {
     socket.emit('message-sent', message);
   });
 
+  // WebRTC сигнализация для звонков
+  socket.on('call-user', (data) => {
+    const { to, from, fromName, offer, isVideo } = data;
+    const receiverSocket = onlineUsers.get(to);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit('incoming-call', { from, fromName, offer, isVideo });
+    } else {
+      socket.emit('call-failed', { reason: 'Пользователь не в сети' });
+    }
+  });
+
+  socket.on('call-answer', (data) => {
+    const { to, answer } = data;
+    const callerSocket = onlineUsers.get(to);
+    if (callerSocket) {
+      io.to(callerSocket).emit('call-answered', { answer });
+    }
+  });
+
+  socket.on('call-decline', (data) => {
+    const { to } = data;
+    const callerSocket = onlineUsers.get(to);
+    if (callerSocket) {
+      io.to(callerSocket).emit('call-declined');
+    }
+  });
+
+  socket.on('call-end', (data) => {
+    const { to } = data;
+    const otherSocket = onlineUsers.get(to);
+    if (otherSocket) {
+      io.to(otherSocket).emit('call-ended');
+    }
+  });
+
+  socket.on('ice-candidate', (data) => {
+    const { to, candidate } = data;
+    const otherSocket = onlineUsers.get(to);
+    if (otherSocket) {
+      io.to(otherSocket).emit('ice-candidate', { candidate });
+    }
+  });
+
   socket.on('disconnect', () => {
     for (const [userId, socketId] of onlineUsers.entries()) {
       if (socketId === socket.id) {
