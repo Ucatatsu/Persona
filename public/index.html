@@ -72,6 +72,21 @@
         <button class="action-btn" title="Видеозвонок">📹</button>
       </div>
     </div>
+    
+    <!-- Полоска активного звонка (как в Telegram) -->
+    <div class="active-call-bar hidden" id="active-call-bar">
+      <div class="call-bar-info">
+        <span class="call-bar-icon">📞</span>
+        <span class="call-bar-text">Звонок</span>
+        <span class="call-bar-name" id="call-bar-name"></span>
+        <span class="call-bar-timer" id="call-bar-timer">00:00</span>
+      </div>
+      <div class="call-bar-actions">
+        <button class="call-bar-btn" id="call-bar-expand" title="Развернуть">↗️</button>
+        <button class="call-bar-btn call-bar-end" id="call-bar-end" title="Завершить">✕</button>
+      </div>
+    </div>
+    
     <div class="messages" id="messages"></div>
     <form class="message-form" id="message-form">
       <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off" disabled>
@@ -199,16 +214,15 @@
       <div class="call-user-name" id="call-name"></div>
       <div class="call-status" id="call-status">Вызов...</div>
       <div class="call-timer hidden" id="call-timer">00:00</div>
-      <div class="call-videos" id="call-videos">
+      <div class="call-videos hidden" id="call-videos">
         <video id="remote-video" autoplay playsinline></video>
         <video id="local-video" autoplay playsinline muted></video>
       </div>
       <div class="call-actions">
-        <button class="call-btn call-btn-mute active" id="mute-btn" title="Выкл. микрофон">🎤</button>
-        <button class="call-btn call-btn-video" id="toggle-video-btn" title="Вкл. видео">📹</button>
-        <button class="call-btn call-btn-screen" id="screen-share-btn" title="Демонстрация экрана">🖥️</button>
-        <button class="call-btn call-btn-leave" id="leave-call-btn" title="Выйти (можно вернуться)">↩️</button>
-        <button class="call-btn call-btn-end" id="end-call-btn" title="Завершить звонок">📵</button>
+        <button class="call-btn call-btn-mute active" id="mute-btn" title="Микрофон">🎤</button>
+        <button class="call-btn call-btn-video" id="toggle-video-btn" title="Камера">📹</button>
+        <button class="call-btn call-btn-screen" id="screen-share-btn" title="Демонстрация">🖥️</button>
+        <button class="call-btn call-btn-end" id="end-call-btn" title="Завершить">📵</button>
       </div>
     </div>
   </div>

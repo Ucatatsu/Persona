@@ -606,6 +606,7 @@ let currentCallUser = null;
 let currentCallId = null;
 let isVideoCall = false;
 let isScreenSharing = false;
+let isCallMinimized = false;
 
 const callModal = document.getElementById('call-modal');
 const incomingCallModal = document.getElementById('incoming-call-modal');
@@ -620,9 +621,15 @@ const muteBtn = document.getElementById('mute-btn');
 const endCallBtn = document.getElementById('end-call-btn');
 const toggleVideoBtn = document.getElementById('toggle-video-btn');
 const screenShareBtn = document.getElementById('screen-share-btn');
-const leaveCallBtn = document.getElementById('leave-call-btn');
 const acceptCallBtn = document.getElementById('accept-call-btn');
 const declineCallBtn = document.getElementById('decline-call-btn');
+
+// Полоска активного звонка
+const activeCallBar = document.getElementById('active-call-bar');
+const callBarName = document.getElementById('call-bar-name');
+const callBarTimer = document.getElementById('call-bar-timer');
+const callBarExpand = document.getElementById('call-bar-expand');
+const callBarEnd = document.getElementById('call-bar-end');
 
 const iceServers = {
   iceServers: [
@@ -631,29 +638,61 @@ const iceServers = {
   ]
 };
 
+// Показать/скрыть полоску звонка
+function showCallBar() {
+  if (currentCallUser) {
+    callBarName.textContent = currentCallUser.username;
+    activeCallBar.classList.remove('hidden');
+    isCallMinimized = true;
+  }
+}
+
+function hideCallBar() {
+  activeCallBar.classList.add('hidden');
+  isCallMinimized = false;
+}
+
+// Обновление таймера на полоске
+function updateCallBarTimer() {
+  const mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+  const secs = (callSeconds % 60).toString().padStart(2, '0');
+  callBarTimer.textContent = `${mins}:${secs}`;
+}
+
+// Клик по полоске - развернуть звонок
+activeCallBar.addEventListener('click', (e) => {
+  if (e.target === callBarEnd || e.target === callBarExpand) return;
+  expandCall();
+});
+
+callBarExpand.addEventListener('click', expandCall);
+
+function expandCall() {
+  callModal.classList.remove('hidden');
+  hideCallBar();
+}
+
+callBarEnd.addEventListener('click', () => {
+  endCall(true);
+});
+
+// Сворачивание звонка - клик по оверлею
+document.querySelector('.call-overlay')?.addEventListener('click', () => {
+  if (currentCallUser && callTimer) {
+    callModal.classList.add('hidden');
+    showCallBar();
+  }
+});
+
 // Кнопки звонка в хедере
-let pendingCallType = false; // false = audio, true = video
+let pendingCallType = false;
 
 document.querySelectorAll('.action-btn').forEach((btn, index) => {
   btn.addEventListener('click', () => {
     if (!selectedUser) return;
-    pendingCallType = index === 1; // index 1 = видеозвонок
-    // Проверяем есть ли активный звонок
-    socket.emit('check-active-call', { oderId: selectedUser.id, userId: currentUser.id });
+    pendingCallType = index === 1;
+    startCall(pendingCallType);
   });
-});
-
-// Обработка проверки активного звонка
-socket.on('active-call-found', async (data) => {
-  // Есть активный звонок - предлагаем вернуться
-  if (confirm('Есть активный звонок. Вернуться?')) {
-    await rejoinCall(data.callId, data.call);
-  }
-});
-
-socket.on('no-active-call', () => {
-  // Нет активного звонка - начинаем новый
-  startCall(pendingCallType);
 });
 
 async function startCall(video = false) {
@@ -666,8 +705,9 @@ async function startCall(video = false) {
   callName.textContent = selectedUser.username;
   callStatus.textContent = 'Вызов...';
   callTimerEl.classList.add('hidden');
-  callVideos.classList.remove('hidden');
+  callVideos.classList.add('hidden');
   callModal.classList.remove('hidden');
+  hideCallBar();
   
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -675,7 +715,10 @@ async function startCall(video = false) {
       video: video
     });
     
-    localVideo.srcObject = localStream;
+    if (video) {
+      localVideo.srcObject = localStream;
+      callVideos.classList.remove('hidden');
+    }
     
     peerConnection = new RTCPeerConnection(iceServers);
     
@@ -685,6 +728,10 @@ async function startCall(video = false) {
     
     peerConnection.ontrack = (event) => {
       remoteVideo.srcObject = event.streams[0];
+      // Показываем видео если есть входящий видеопоток
+      if (event.streams[0].getVideoTracks().length > 0) {
+        callVideos.classList.remove('hidden');
+      }
     };
     
     peerConnection.onicecandidate = (event) => {
@@ -716,12 +763,10 @@ async function startCall(video = false) {
   }
 }
 
-// Получаем callId при инициации звонка
 socket.on('call-initiated', (data) => {
   currentCallId = data.callId;
 });
 
-// Входящий звонок
 let incomingCallData = null;
 
 socket.on('incoming-call', async (data) => {
@@ -743,7 +788,7 @@ acceptCallBtn.addEventListener('click', async () => {
   callAvatar.textContent = incomingCallData.fromName[0].toUpperCase();
   callName.textContent = incomingCallData.fromName;
   callStatus.textContent = 'Подключение...';
-  callVideos.classList.remove('hidden');
+  callVideos.classList.add('hidden');
   callModal.classList.remove('hidden');
   
   try {
@@ -752,7 +797,10 @@ acceptCallBtn.addEventListener('click', async () => {
       video: isVideoCall
     });
     
-    localVideo.srcObject = localStream;
+    if (isVideoCall) {
+      localVideo.srcObject = localStream;
+      callVideos.classList.remove('hidden');
+    }
     
     peerConnection = new RTCPeerConnection(iceServers);
     
@@ -762,6 +810,9 @@ acceptCallBtn.addEventListener('click', async () => {
     
     peerConnection.ontrack = (event) => {
       remoteVideo.srcObject = event.streams[0];
+      if (event.streams[0].getVideoTracks().length > 0) {
+        callVideos.classList.remove('hidden');
+      }
     };
     
     peerConnection.onicecandidate = (event) => {
@@ -815,6 +866,7 @@ socket.on('call-declined', () => {
 socket.on('call-ended', () => {
   cleanupCall();
   callModal.classList.add('hidden');
+  hideCallBar();
 });
 
 socket.on('call-failed', (data) => {
@@ -832,7 +884,6 @@ socket.on('ice-candidate', async (data) => {
   }
 });
 
-// Сообщение о звонке в чат
 socket.on('call-message', (message) => {
   if (selectedUser && (message.sender_id === selectedUser.id || message.receiver_id === selectedUser.id)) {
     appendCallMessage(message);
@@ -842,90 +893,6 @@ socket.on('call-message', (message) => {
   }
 });
 
-// Собеседник вышел из звонка (но не завершил)
-socket.on('call-user-left', (data) => {
-  callStatus.textContent = 'Собеседник вышел...';
-});
-
-// Запрос на возврат в звонок
-socket.on('call-rejoin-request', async (data) => {
-  if (!peerConnection) return;
-  
-  try {
-    await peerConnection.setRemoteDescription(data.offer);
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    
-    socket.emit('call-rejoin-answer', {
-      to: data.userId,
-      answer: answer,
-      callId: data.callId
-    });
-  } catch (e) {
-    console.error('Rejoin error:', e);
-  }
-});
-
-socket.on('call-rejoined', async (data) => {
-  await peerConnection.setRemoteDescription(data.answer);
-  callStatus.textContent = 'Соединено';
-});
-
-async function rejoinCall(callId, call) {
-  currentCallId = callId;
-  currentCallUser = { id: call.participants.find(p => p !== currentUser.id), username: call.callerName };
-  isVideoCall = call.isVideo;
-  
-  callAvatar.textContent = currentCallUser.username[0].toUpperCase();
-  callName.textContent = currentCallUser.username;
-  callStatus.textContent = 'Переподключение...';
-  callVideos.classList.remove('hidden');
-  callModal.classList.remove('hidden');
-  
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: isVideoCall
-    });
-    
-    localVideo.srcObject = localStream;
-    
-    peerConnection = new RTCPeerConnection(iceServers);
-    
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-    
-    peerConnection.ontrack = (event) => {
-      remoteVideo.srcObject = event.streams[0];
-    };
-    
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit('ice-candidate', {
-          to: currentCallUser.id,
-          candidate: event.candidate
-        });
-      }
-    };
-    
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    
-    socket.emit('call-rejoin', {
-      callId: currentCallId,
-      userId: currentUser.id,
-      offer: offer
-    });
-    
-    updateVideoButtonState();
-    
-  } catch (err) {
-    console.error('Rejoin error:', err);
-    endCall(false);
-  }
-}
-
 function startCallTimer() {
   callSeconds = 0;
   callTimerEl.classList.remove('hidden');
@@ -934,6 +901,7 @@ function startCallTimer() {
     const mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
     const secs = (callSeconds % 60).toString().padStart(2, '0');
     callTimerEl.textContent = `${mins}:${secs}`;
+    updateCallBarTimer();
   }, 1000);
 }
 
@@ -961,6 +929,7 @@ function cleanupCall() {
   isScreenSharing = false;
   currentCallUser = null;
   currentCallId = null;
+  hideCallBar();
 }
 
 function endCall(sendEnd = true) {
@@ -970,35 +939,11 @@ function endCall(sendEnd = true) {
   
   cleanupCall();
   callModal.classList.add('hidden');
-}
-
-// Выход из звонка без завершения
-function leaveCall() {
-  if (currentCallUser && currentCallId) {
-    socket.emit('call-leave', { to: currentCallUser.id, callId: currentCallId });
-  }
-  
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-  
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
-  }
-  
-  callModal.classList.add('hidden');
-  // Не очищаем currentCallId чтобы можно было вернуться
+  hideCallBar();
 }
 
 endCallBtn.addEventListener('click', () => endCall(true));
 
-if (leaveCallBtn) {
-  leaveCallBtn.addEventListener('click', leaveCall);
-}
-
-// Mute/unmute
 let isMuted = false;
 muteBtn.addEventListener('click', () => {
   if (localStream) {
@@ -1009,12 +954,12 @@ muteBtn.addEventListener('click', () => {
   }
 });
 
-// Toggle video
 function updateVideoButtonState() {
   const videoTrack = localStream?.getVideoTracks()[0];
   if (toggleVideoBtn) {
-    toggleVideoBtn.classList.toggle('active', videoTrack?.enabled);
-    toggleVideoBtn.textContent = videoTrack?.enabled ? '📹' : '📷';
+    const hasVideo = videoTrack?.enabled;
+    toggleVideoBtn.classList.toggle('active', hasVideo);
+    toggleVideoBtn.textContent = hasVideo ? '📹' : '📷';
   }
 }
 
@@ -1024,16 +969,19 @@ toggleVideoBtn.addEventListener('click', async () => {
   const videoTrack = localStream.getVideoTracks()[0];
   
   if (videoTrack) {
-    // Есть видео - переключаем
     videoTrack.enabled = !videoTrack.enabled;
+    if (videoTrack.enabled) {
+      callVideos.classList.remove('hidden');
+      localVideo.srcObject = localStream;
+    }
   } else {
-    // Нет видео - добавляем
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
       const newVideoTrack = newStream.getVideoTracks()[0];
       
       localStream.addTrack(newVideoTrack);
       localVideo.srcObject = localStream;
+      callVideos.classList.remove('hidden');
       
       const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
       if (sender) {
@@ -1051,16 +999,13 @@ toggleVideoBtn.addEventListener('click', async () => {
   updateVideoButtonState();
 });
 
-// Screen sharing
 if (screenShareBtn) {
   screenShareBtn.addEventListener('click', async () => {
     if (!peerConnection) return;
     
     if (isScreenSharing) {
-      // Выключаем демонстрацию
       stopScreenShare();
     } else {
-      // Включаем демонстрацию
       try {
         screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
@@ -1069,7 +1014,6 @@ if (screenShareBtn) {
         
         const screenTrack = screenStream.getVideoTracks()[0];
         
-        // Заменяем видео трек на экран
         const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
           sender.replaceTrack(screenTrack);
@@ -1078,11 +1022,10 @@ if (screenShareBtn) {
         }
         
         localVideo.srcObject = screenStream;
+        callVideos.classList.remove('hidden');
         isScreenSharing = true;
         screenShareBtn.classList.add('active');
-        screenShareBtn.textContent = '🖥️';
         
-        // Когда пользователь останавливает демонстрацию через браузер
         screenTrack.onended = () => {
           stopScreenShare();
         };
@@ -1102,7 +1045,6 @@ async function stopScreenShare() {
     screenStream = null;
   }
   
-  // Возвращаем камеру
   const videoTrack = localStream?.getVideoTracks()[0];
   if (videoTrack) {
     const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
@@ -1115,11 +1057,9 @@ async function stopScreenShare() {
   isScreenSharing = false;
   if (screenShareBtn) {
     screenShareBtn.classList.remove('active');
-    screenShareBtn.textContent = '🖥️';
   }
 }
 
-// Функция для отображения сообщения о звонке
 function appendCallMessage(msg) {
   const isSent = msg.sender_id === currentUser.id;
   const duration = msg.call_duration || 0;

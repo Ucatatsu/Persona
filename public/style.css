@@ -1007,6 +1007,102 @@ button {
 }
 
 
+/* ===== ACTIVE CALL BAR (Telegram style) ===== */
+.active-call-bar {
+  grid-column: 2;
+  position: absolute;
+  top: calc(var(--panel-height) + 24px);
+  left: calc(320px + 24px);
+  right: 24px;
+  height: 44px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 50;
+  cursor: pointer;
+  animation: slideDown 0.3s ease;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.call-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.call-bar-icon {
+  font-size: 16px;
+  animation: pulse-icon 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.call-bar-text {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.call-bar-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.call-bar-timer {
+  font-size: 14px;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.call-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.call-bar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.call-bar-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.call-bar-end {
+  background: rgba(239, 68, 68, 0.8);
+}
+
+.call-bar-end:hover {
+  background: rgba(239, 68, 68, 1);
+}
+
+@media (max-width: 768px) {
+  .active-call-bar {
+    left: 8px;
+    right: 8px;
+    top: calc(var(--panel-height) + 16px);
+  }
+}
+
 /* ===== CALL MODAL ===== */
 .call-overlay {
   background: rgba(0, 0, 0, 0.9);
@@ -1066,12 +1162,16 @@ button {
   max-width: 800px;
   position: relative;
   margin-bottom: 20px;
-  min-height: 200px;
+  min-height: 300px;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.call-videos.hidden {
+  display: none !important;
 }
 
 #remote-video {

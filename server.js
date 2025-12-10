@@ -136,7 +136,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('call-end', async (data) => {
-    const { to, callId, userId } = data;
+    const { to, callId } = data;
     const otherSocket = onlineUsers.get(to);
     
     const call = activeCalls.get(callId);
