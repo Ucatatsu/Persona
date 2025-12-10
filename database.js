@@ -39,11 +39,15 @@ async function initDB() {
         receiver_id TEXT NOT NULL REFERENCES users(id),
         text TEXT NOT NULL,
         is_read BOOLEAN DEFAULT FALSE,
+        message_type TEXT DEFAULT 'text',
+        call_duration INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     
     await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE`);
+    await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'text'`);
+    await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_duration INTEGER DEFAULT 0`);
 
     // Индексы для быстрого поиска
     await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id)`);
@@ -148,20 +152,20 @@ async function searchUsers(query) {
   }
 }
 
-async function saveMessage(senderId, receiverId, text) {
+async function saveMessage(senderId, receiverId, text, messageType = 'text', callDuration = 0) {
   const id = uuidv4();
   const created_at = new Date().toISOString();
   await pool.query(
-    'INSERT INTO messages (id, sender_id, receiver_id, text, created_at) VALUES ($1, $2, $3, $4, $5)',
-    [id, senderId, receiverId, text, created_at]
+    'INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [id, senderId, receiverId, text, messageType, callDuration, created_at]
   );
-  return { id, sender_id: senderId, receiver_id: receiverId, text, created_at };
+  return { id, sender_id: senderId, receiver_id: receiverId, text, created_at, message_type: messageType, call_duration: callDuration };
 }
 
 async function getMessages(userId1, userId2) {
   try {
     const result = await pool.query(`
-      SELECT id, sender_id, receiver_id, text, created_at FROM messages 
+      SELECT id, sender_id, receiver_id, text, message_type, call_duration, created_at FROM messages 
       WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
       ORDER BY created_at ASC
     `, [userId1, userId2]);

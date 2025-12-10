@@ -18,6 +18,9 @@ app.use(express.json());
 // Онлайн пользователи
 const onlineUsers = new Map();
 
+// Активные звонки: { oderId: { oderId, participants: [userId1, userId2], startTime, isVideo } }
+const activeCalls = new Map();
+
 // API роуты
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
@@ -91,33 +94,105 @@ io.on('connection', (socket) => {
     const { to, from, fromName, offer, isVideo } = data;
     const receiverSocket = onlineUsers.get(to);
     if (receiverSocket) {
-      io.to(receiverSocket).emit('incoming-call', { from, fromName, offer, isVideo });
+      // Создаём запись о звонке
+      const callId = `${from}-${to}-${Date.now()}`;
+      activeCalls.set(callId, {
+        callId,
+        participants: [from, to],
+        caller: from,
+        callerName: fromName,
+        startTime: null, // Установится при ответе
+        isVideo
+      });
+      io.to(receiverSocket).emit('incoming-call', { from, fromName, offer, isVideo, callId });
+      socket.emit('call-initiated', { callId });
     } else {
       socket.emit('call-failed', { reason: 'Пользователь не в сети' });
     }
   });
 
-  socket.on('call-answer', (data) => {
-    const { to, answer } = data;
+  socket.on('call-answer', async (data) => {
+    const { to, answer, callId } = data;
     const callerSocket = onlineUsers.get(to);
     if (callerSocket) {
-      io.to(callerSocket).emit('call-answered', { answer });
+      // Устанавливаем время начала звонка
+      const call = activeCalls.get(callId);
+      if (call) {
+        call.startTime = Date.now();
+        activeCalls.set(callId, call);
+      }
+      io.to(callerSocket).emit('call-answered', { answer, callId });
     }
   });
 
-  socket.on('call-decline', (data) => {
-    const { to } = data;
+  socket.on('call-decline', async (data) => {
+    const { to, callId } = data;
     const callerSocket = onlineUsers.get(to);
     if (callerSocket) {
       io.to(callerSocket).emit('call-declined');
     }
+    // Удаляем звонок
+    if (callId) activeCalls.delete(callId);
   });
 
-  socket.on('call-end', (data) => {
-    const { to } = data;
+  socket.on('call-end', async (data) => {
+    const { to, callId, userId } = data;
+    const otherSocket = onlineUsers.get(to);
+    
+    const call = activeCalls.get(callId);
+    if (call && call.startTime) {
+      // Звонок состоялся - сохраняем в чат
+      const duration = Math.floor((Date.now() - call.startTime) / 1000);
+      const callType = call.isVideo ? 'video_call' : 'audio_call';
+      const callText = call.isVideo ? 'Видеозвонок' : 'Аудиозвонок';
+      
+      // Сохраняем сообщение о звонке
+      const message = await db.saveMessage(call.caller, call.participants.find(p => p !== call.caller), callText, callType, duration);
+      
+      // Отправляем обоим участникам
+      const callerSocket = onlineUsers.get(call.caller);
+      const receiverSocket = onlineUsers.get(call.participants.find(p => p !== call.caller));
+      if (callerSocket) io.to(callerSocket).emit('call-message', message);
+      if (receiverSocket) io.to(receiverSocket).emit('call-message', message);
+    }
+    
+    if (otherSocket) {
+      io.to(otherSocket).emit('call-ended', { callId });
+    }
+    
+    // Удаляем звонок
+    if (callId) activeCalls.delete(callId);
+  });
+
+  // Выход из звонка без завершения (можно вернуться)
+  socket.on('call-leave', (data) => {
+    const { to, callId } = data;
     const otherSocket = onlineUsers.get(to);
     if (otherSocket) {
-      io.to(otherSocket).emit('call-ended');
+      io.to(otherSocket).emit('call-user-left', { callId });
+    }
+  });
+
+  // Возврат в звонок
+  socket.on('call-rejoin', async (data) => {
+    const { callId, userId, offer } = data;
+    const call = activeCalls.get(callId);
+    if (call) {
+      const otherUserId = call.participants.find(p => p !== userId);
+      const otherSocket = onlineUsers.get(otherUserId);
+      if (otherSocket) {
+        io.to(otherSocket).emit('call-rejoin-request', { callId, userId, offer });
+      }
+    } else {
+      socket.emit('call-failed', { reason: 'Звонок завершён' });
+    }
+  });
+
+  socket.on('call-rejoin-answer', (data) => {
+    const { to, answer, callId } = data;
+    const otherSocket = onlineUsers.get(to);
+    if (otherSocket) {
+      io.to(otherSocket).emit('call-rejoined', { answer, callId });
     }
   });
 
@@ -127,6 +202,18 @@ io.on('connection', (socket) => {
     if (otherSocket) {
       io.to(otherSocket).emit('ice-candidate', { candidate });
     }
+  });
+
+  // Проверка активного звонка
+  socket.on('check-active-call', (data) => {
+    const { oderId, userId } = data;
+    for (const [callId, call] of activeCalls.entries()) {
+      if (call.participants.includes(userId) && call.participants.includes(oderId)) {
+        socket.emit('active-call-found', { callId, call });
+        return;
+      }
+    }
+    socket.emit('no-active-call');
   });
 
   socket.on('disconnect', () => {
