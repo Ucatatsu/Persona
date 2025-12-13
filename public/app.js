@@ -127,7 +127,7 @@ function throttle(fn, limit) {
 }
 
 // Кэширование DOM элементов
-function $(id) {
+function getEl(id) {
     if (!state.dom[id]) {
         state.dom[id] = document.getElementById(id);
     }
@@ -584,7 +584,7 @@ const updateContactsList = debounce(() => {
 
 // Оптимизированный рендеринг с DocumentFragment и делегированием событий
 function renderUsers(users) {
-    const usersList = $('users-list');
+    const usersList = getEl('users-list');
     
     if (!users.length) {
         usersList.innerHTML = '<div class="empty-list">Нет контактов<br>Найдите пользователя через поиск</div>';
@@ -645,7 +645,7 @@ function renderUsers(users) {
 
 // Делегирование событий для списка пользователей (один раз при инициализации)
 function initUserListEvents() {
-    $('users-list')?.addEventListener('click', (e) => {
+    getEl('users-list')?.addEventListener('click', (e) => {
         const item = e.target.closest('.user-item');
         if (item) {
             selectUser(item.dataset.id, item.dataset.name);
@@ -702,7 +702,7 @@ async function loadMessages() {
 
 // Оптимизированный рендеринг сообщений
 function renderMessages(messages) {
-    const messagesDiv = $('messages');
+    const messagesDiv = getEl('messages');
     const fragment = document.createDocumentFragment();
     
     messages.forEach(msg => {
@@ -776,7 +776,7 @@ function getAvatarHtml(isSent) {
 }
 
 function appendMessage(msg) {
-    const messagesDiv = $('messages');
+    const messagesDiv = getEl('messages');
     const isSent = msg.sender_id === state.currentUser.id;
     
     messagesDiv.appendChild(createMessageElement(msg, isSent));
@@ -1568,10 +1568,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // === ФОРМЫ АВТОРИЗАЦИИ ===
     
-    const loginForm = $('login-form');
-    const registerForm = $('register-form');
-    const loginError = $('login-error');
-    const registerError = $('register-error');
+    const loginForm = getEl('login-form');
+    const registerForm = getEl('register-form');
+    const loginError = getEl('login-error');
+    const registerError = getEl('register-error');
     
     // Переключение форм
     document.getElementById('to-register-btn')?.addEventListener('click', () => {
@@ -2308,11 +2308,13 @@ async function showAdminPanel() {
     }
 }
 
+let adminListenerAdded = false;
+
 function renderAdminUsers(users) {
     const container = document.getElementById('admin-users');
     
     container.innerHTML = users.map(user => `
-        <div class="admin-user" data-user-id="${user.id}">
+        <div class="admin-user" data-user-id="${user.id}" data-user-role="${user.role}">
             <div class="admin-user-avatar" style="${user.avatar_url ? `background-image: url(${user.avatar_url})` : ''}">
                 ${user.avatar_url ? '' : user.username[0].toUpperCase()}
             </div>
@@ -2326,21 +2328,47 @@ function renderAdminUsers(users) {
             </div>
             <div class="admin-user-actions">
                 ${user.id !== state.currentUser.id ? `
-                    <button class="admin-btn admin-btn-admin ${user.role === 'admin' ? 'active' : ''}" onclick="toggleAdmin('${user.id}', '${user.role}')">
+                    <button class="admin-btn admin-btn-admin ${user.role === 'admin' ? 'active' : ''}" data-action="toggle-admin">
                         ${user.role === 'admin' ? 'Снять админа' : 'Админ'}
                     </button>
                 ` : ''}
-                <button class="admin-btn admin-btn-premium" onclick="givePremium('${user.id}')">
+                <button class="admin-btn admin-btn-premium" data-action="give-premium">
                     +Premium
                 </button>
                 ${user.id !== state.currentUser.id ? `
-                    <button class="admin-btn admin-btn-delete" onclick="deleteUserAdmin('${user.id}')">
+                    <button class="admin-btn admin-btn-delete" data-action="delete-user">
                         Удалить
                     </button>
                 ` : ''}
             </div>
         </div>
     `).join('');
+    
+    // Делегирование событий - добавляем только один раз
+    if (!adminListenerAdded) {
+        container.addEventListener('click', handleAdminAction);
+        adminListenerAdded = true;
+    }
+}
+
+async function handleAdminAction(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    
+    const userEl = btn.closest('.admin-user');
+    if (!userEl) return;
+    
+    const userId = userEl.dataset.userId;
+    const userRole = userEl.dataset.userRole;
+    const action = btn.dataset.action;
+    
+    if (action === 'toggle-admin') {
+        await toggleAdmin(userId, userRole);
+    } else if (action === 'give-premium') {
+        await givePremium(userId);
+    } else if (action === 'delete-user') {
+        await deleteUserAdmin(userId);
+    }
 }
 
 async function toggleAdmin(userId, currentRole) {
@@ -3354,4 +3382,3 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
         applyTheme('system');
     }
 });
-Ф
