@@ -256,6 +256,69 @@ function customConfirm({ title = 'Подтверждение', message = 'Вы �
     });
 }
 
+// === CUSTOM PROMPT DIALOG ===
+function customPrompt({ title = 'Введите значение', message = '', icon = '✏️', variant = '', placeholder = '', defaultValue = '', okText = 'OK', cancelText = 'Отмена' }) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('prompt-modal');
+        const content = modal.querySelector('.prompt-modal-content');
+        const iconEl = document.getElementById('prompt-icon');
+        const titleEl = document.getElementById('prompt-title');
+        const messageEl = document.getElementById('prompt-message');
+        const input = document.getElementById('prompt-input');
+        const okBtn = document.getElementById('prompt-ok');
+        const cancelBtn = document.getElementById('prompt-cancel');
+        
+        // Устанавливаем контент
+        iconEl.textContent = icon;
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        messageEl.style.display = message ? 'block' : 'none';
+        input.placeholder = placeholder;
+        input.value = defaultValue;
+        okBtn.textContent = okText;
+        cancelBtn.textContent = cancelText;
+        
+        // Устанавливаем вариант стиля
+        content.className = 'prompt-modal-content';
+        if (variant) content.classList.add(variant);
+        
+        // Показываем модалку
+        modal.classList.remove('hidden');
+        input.focus();
+        input.select();
+        
+        // Обработчики
+        const cleanup = () => {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', handleOk);
+            cancelBtn.removeEventListener('click', handleCancel);
+            modal.querySelector('.modal-overlay').removeEventListener('click', handleCancel);
+            document.removeEventListener('keydown', handleKeydown);
+        };
+        
+        const handleOk = () => {
+            const value = input.value.trim();
+            cleanup();
+            resolve(value || null);
+        };
+        
+        const handleCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+        
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') handleCancel();
+            if (e.key === 'Enter') handleOk();
+        };
+        
+        okBtn.addEventListener('click', handleOk);
+        cancelBtn.addEventListener('click', handleCancel);
+        modal.querySelector('.modal-overlay').addEventListener('click', handleCancel);
+        document.addEventListener('keydown', handleKeydown);
+    });
+}
+
 // === SERVICE WORKER ===
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -1996,20 +2059,21 @@ async function showMyProfile() {
         };
     }
     
-    // Отображаем бейдж роли
-    const badgeEl = document.getElementById('profile-badge');
-    if (badgeEl) {
+    // Отображаем бейджи (несколько рядом как в Discord)
+    const badgesEl = document.getElementById('profile-badges');
+    if (badgesEl) {
         const role = profile?.role || state.currentUser.role;
-        badgeEl.className = 'profile-badge';
+        const isPremium = profile?.isPremium;
+        let badges = '';
+        
         if (role === 'admin') {
-            badgeEl.textContent = 'Админ';
-            badgeEl.classList.add('admin');
-        } else if (role === 'premium' || profile?.isPremium) {
-            badgeEl.textContent = 'Premium';
-            badgeEl.classList.add('premium');
-        } else {
-            badgeEl.textContent = '';
+            badges += '<span class="profile-badge admin">Админ</span>';
         }
+        if (isPremium) {
+            badges += '<span class="profile-badge premium">Premium</span>';
+        }
+        
+        badgesEl.innerHTML = badges;
     }
     
     document.getElementById('profile-bio').textContent = profile?.bio || '';
@@ -2180,19 +2244,17 @@ async function showUserProfile(userId) {
             };
         }
         
-        // Бейдж роли
-        const badgeEl = document.getElementById('user-profile-badge');
-        if (badgeEl) {
-            badgeEl.className = 'profile-badge';
+        // Бейджи (несколько рядом как в Discord)
+        const badgesEl = document.getElementById('user-profile-badges');
+        if (badgesEl) {
+            let badges = '';
             if (profile.role === 'admin') {
-                badgeEl.textContent = 'Админ';
-                badgeEl.classList.add('admin');
-            } else if (profile.role === 'premium' || profile.isPremium) {
-                badgeEl.textContent = 'Premium';
-                badgeEl.classList.add('premium');
-            } else {
-                badgeEl.textContent = '';
+                badges += '<span class="profile-badge admin">Админ</span>';
             }
+            if (profile.isPremium) {
+                badges += '<span class="profile-badge premium">Premium</span>';
+            }
+            badgesEl.innerHTML = badges;
         }
         
         document.getElementById('user-profile-bio').textContent = profile.bio || '';
@@ -2321,8 +2383,10 @@ function renderAdminUsers(users) {
             <div class="admin-user-info">
                 <div class="admin-user-name">
                     ${user.display_name || user.username}
-                    ${user.role === 'admin' ? '<span class="profile-badge admin">Админ</span>' : ''}
-                    ${user.isPremium && user.role !== 'admin' ? '<span class="profile-badge premium">Premium</span>' : ''}
+                    <span class="profile-badges">
+                        ${user.role === 'admin' ? '<span class="profile-badge admin">Админ</span>' : ''}
+                        ${user.isPremium ? '<span class="profile-badge premium">Premium</span>' : ''}
+                    </span>
                 </div>
                 <div class="admin-user-tag">${user.username}#${user.tag || '????'}</div>
             </div>
@@ -2401,7 +2465,16 @@ async function toggleAdmin(userId, currentRole) {
 }
 
 async function givePremium(userId) {
-    const days = prompt('Количество дней премиума:', '30');
+    const days = await customPrompt({
+        title: 'Выдать Premium',
+        message: 'Введите количество дней:',
+        icon: '👑',
+        variant: 'premium',
+        placeholder: 'Дней',
+        defaultValue: '30',
+        okText: 'Выдать',
+        cancelText: 'Отмена'
+    });
     if (!days || isNaN(days)) return;
     
     try {

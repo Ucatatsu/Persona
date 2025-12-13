@@ -185,7 +185,7 @@
       <div class="profile-body">
         <div class="profile-name-row">
           <div class="profile-name" id="profile-name"></div>
-          <span class="profile-badge" id="profile-badge"></span>
+          <div class="profile-badges" id="profile-badges"></div>
         </div>
         <div class="profile-username" id="profile-username"></div>
         <div class="profile-tag" id="profile-tag"></div>
@@ -486,7 +486,7 @@
       <div class="profile-body">
         <div class="profile-name-row">
           <div class="profile-name" id="user-profile-name"></div>
-          <span class="profile-badge" id="user-profile-badge"></span>
+          <div class="profile-badges" id="user-profile-badges"></div>
         </div>
         <div class="profile-username" id="user-profile-username"></div>
         <div class="profile-tag" id="user-profile-tag"></div>
@@ -592,6 +592,7 @@
   </div>
 
   <!-- Кастомное модальное окно подтверждения -->
+  <!-- Кастомное модальное окно подтверждения -->
   <div id="confirm-modal" class="modal hidden" role="alertdialog" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="confirm-modal-content">
@@ -601,6 +602,21 @@
       <div class="confirm-actions">
         <button class="confirm-btn confirm-cancel" id="confirm-cancel">Отмена</button>
         <button class="confirm-btn confirm-ok" id="confirm-ok">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кастомное модальное окно ввода -->
+  <div id="prompt-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="prompt-modal-content">
+      <div class="prompt-icon" id="prompt-icon">✏️</div>
+      <h3 class="prompt-title" id="prompt-title">Введите значение</h3>
+      <p class="prompt-message" id="prompt-message"></p>
+      <input type="text" class="prompt-input" id="prompt-input" autocomplete="off">
+      <div class="prompt-actions">
+        <button class="prompt-btn prompt-cancel" id="prompt-cancel">Отмена</button>
+        <button class="prompt-btn prompt-ok" id="prompt-ok">OK</button>
       </div>
     </div>
   </div>

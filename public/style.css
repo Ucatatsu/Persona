@@ -4145,3 +4145,130 @@ input:focus {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.2); }
 }
+
+
+/* === CUSTOM PROMPT MODAL === */
+.prompt-modal-content {
+  position: relative;
+  background: var(--glass);
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  padding: 32px;
+  width: 380px;
+  max-width: 90%;
+  text-align: center;
+  animation: confirmIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.prompt-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  animation: iconPulse 0.5s ease;
+}
+
+.prompt-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.prompt-message {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.prompt-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid var(--glass-border);
+  border-radius: 12px;
+  background: rgba(10, 22, 40, 0.6);
+  color: var(--text);
+  font-size: 16px;
+  text-align: center;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.prompt-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(79, 195, 247, 0.15);
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.prompt-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.prompt-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+}
+
+.prompt-cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.prompt-ok {
+  background: var(--accent);
+  color: var(--bg-darkest);
+}
+
+.prompt-ok:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* Premium prompt style */
+.prompt-modal-content.premium .prompt-icon {
+  color: #ffd700;
+}
+
+.prompt-modal-content.premium .prompt-ok {
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  color: #1a1a2e;
+}
+
+.prompt-modal-content.premium .prompt-input:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .prompt-modal-content {
+    width: 90%;
+    padding: 24px;
+  }
+}
+
+/* === MULTIPLE BADGES (Discord style) === */
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.admin-user-name .profile-badges {
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: middle;
+}
