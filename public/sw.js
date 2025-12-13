@@ -111,22 +111,34 @@ self.addEventListener('push', (event) => {
         };
     }
     
+    // Определяем тип уведомления
+    const isCall = data.type === 'incoming-call';
+    
     const options = {
-        body: data.body || 'Новое сообщение',
+        body: data.body || (isCall ? 'Входящий звонок' : 'Новое сообщение'),
         icon: '/icon.png',
         badge: '/icon.png',
-        vibrate: [200, 100, 200],
-        tag: data.tag || 'message',
+        vibrate: isCall ? [300, 100, 300, 100, 300] : [200, 100, 200],
+        tag: data.tag || (isCall ? 'call' : 'message'),
         renotify: true,
-        requireInteraction: false,
+        requireInteraction: isCall, // Звонки требуют взаимодействия
+        silent: false,
         data: {
             url: data.url || '/',
-            senderId: data.senderId
+            senderId: data.senderId,
+            type: data.type || 'message',
+            callId: data.callId,
+            isVideo: data.isVideo
         },
-        actions: [
-            { action: 'open', title: 'Открыть' },
-            { action: 'close', title: 'Закрыть' }
-        ]
+        actions: isCall 
+            ? [
+                { action: 'answer', title: '📞 Ответить' },
+                { action: 'decline', title: '❌ Отклонить' }
+            ]
+            : [
+                { action: 'open', title: 'Открыть' },
+                { action: 'close', title: 'Закрыть' }
+            ]
     };
     
     event.waitUntil(
@@ -136,6 +148,57 @@ self.addEventListener('push', (event) => {
 
 // Клик по уведомлению
 self.addEventListener('notificationclick', (event) => {
+    const notificationData = event.notification.data || {};
+    const isCall = notificationData.type === 'incoming-call';
+    
+    // Обработка действий для звонков
+    if (isCall) {
+        if (event.action === 'decline') {
+            event.notification.close();
+            // Отправляем отклонение звонка
+            event.waitUntil(
+                clients.matchAll({ type: 'window', includeUncontrolled: true })
+                    .then((clientList) => {
+                        for (const client of clientList) {
+                            if (client.url.includes(self.location.origin)) {
+                                client.postMessage({
+                                    type: 'call-declined-from-notification',
+                                    senderId: notificationData.senderId,
+                                    callId: notificationData.callId
+                                });
+                                return;
+                            }
+                        }
+                    })
+            );
+            return;
+        }
+        
+        if (event.action === 'answer' || !event.action) {
+            event.notification.close();
+            event.waitUntil(
+                clients.matchAll({ type: 'window', includeUncontrolled: true })
+                    .then((clientList) => {
+                        for (const client of clientList) {
+                            if (client.url.includes(self.location.origin) && 'focus' in client) {
+                                client.postMessage({
+                                    type: 'call-answer-from-notification',
+                                    senderId: notificationData.senderId,
+                                    callId: notificationData.callId,
+                                    isVideo: notificationData.isVideo
+                                });
+                                return client.focus();
+                            }
+                        }
+                        if (clients.openWindow) {
+                            return clients.openWindow('/?answerCall=' + notificationData.callId);
+                        }
+                    })
+            );
+            return;
+        }
+    }
+    
     event.notification.close();
     
     if (event.action === 'close') return;
@@ -149,7 +212,7 @@ self.addEventListener('notificationclick', (event) => {
                         // Отправляем сообщение клиенту
                         client.postMessage({
                             type: 'notification-click',
-                            senderId: event.notification.data?.senderId
+                            senderId: notificationData.senderId
                         });
                         return client.focus();
                     }

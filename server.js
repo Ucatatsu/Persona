@@ -903,21 +903,21 @@ io.on('connection', async (socket) => {
 
     // === ЗВОНКИ ===
     
-    socket.on('call-user', (data) => {
+    socket.on('call-user', async (data) => {
         const { to, offer, isVideo } = data;
         const receiverData = onlineUsers.get(to);
         
+        const callId = `${userId}-${to}-${Date.now()}`;
+        activeCalls.set(callId, {
+            callId,
+            participants: [userId, to],
+            caller: userId,
+            callerName: socket.user.username,
+            startTime: null,
+            isVideo
+        });
+        
         if (receiverData) {
-            const callId = `${userId}-${to}-${Date.now()}`;
-            activeCalls.set(callId, {
-                callId,
-                participants: [userId, to],
-                caller: userId,
-                callerName: socket.user.username,
-                startTime: null,
-                isVideo
-            });
-            
             io.to(receiverData.socketId).emit('incoming-call', { 
                 from: userId, 
                 fromName: socket.user.username, 
@@ -927,7 +927,37 @@ io.on('connection', async (socket) => {
             });
             socket.emit('call-initiated', { callId });
         } else {
-            socket.emit('call-failed', { reason: 'Пользователь не в сети' });
+            // Пользователь оффлайн - отправляем push-уведомление о звонке
+            const callType = isVideo ? 'Видеозвонок' : 'Звонок';
+            sendPushNotification(to, {
+                title: `📞 ${callType} от ${socket.user.username}`,
+                body: 'Нажмите, чтобы открыть приложение',
+                tag: `call-${callId}`,
+                data: {
+                    type: 'incoming-call',
+                    callId,
+                    from: userId,
+                    fromName: socket.user.username,
+                    isVideo
+                },
+                requireInteraction: true,
+                actions: [
+                    { action: 'answer', title: 'Ответить' },
+                    { action: 'decline', title: 'Отклонить' }
+                ]
+            });
+            
+            // Даём время на получение push и открытие приложения
+            socket.emit('call-initiated', { callId, waitingForUser: true });
+            
+            // Автоматически завершаем звонок через 30 секунд если не ответили
+            setTimeout(() => {
+                const call = activeCalls.get(callId);
+                if (call && !call.startTime) {
+                    activeCalls.delete(callId);
+                    socket.emit('call-failed', { reason: 'Пользователь не ответил', callId });
+                }
+            }, 30000);
         }
     });
 

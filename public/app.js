@@ -31,46 +31,64 @@ const sounds = {
 function initSounds() {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // Функция для создания звука уведомления
+    // Функция для создания звука уведомления (громче и длиннее)
     function createNotificationSound() {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        const now = audioContext.currentTime;
         
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
-    }
-    
-    // Функция для создания звука звонка
-    function createCallSound() {
-        let isPlaying = true;
-        const playRing = () => {
-            if (!isPlaying) return;
-            
+        // Два тона для более заметного звука
+        [800, 1000].forEach((freq, i) => {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
             
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
-            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
-            oscillator.frequency.setValueAtTime(480, audioContext.currentTime + 0.2);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(freq, now + i * 0.15);
             
-            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            gainNode.gain.setValueAtTime(0.8, now + i * 0.15);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.2);
             
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.4);
+            oscillator.start(now + i * 0.15);
+            oscillator.stop(now + i * 0.15 + 0.2);
+        });
+    }
+    
+    // Функция для создания звука звонка (громче и мелодичнее)
+    function createCallSound() {
+        let isPlaying = true;
+        let ringCount = 0;
+        
+        const playRing = () => {
+            if (!isPlaying) return;
             
-            setTimeout(playRing, 1000);
+            const now = audioContext.currentTime;
+            
+            // Двойной звонок как у телефона
+            [0, 0.15].forEach((delay) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.type = 'sine';
+                // Чередуем частоты для мелодичности
+                oscillator.frequency.setValueAtTime(440, now + delay);
+                oscillator.frequency.setValueAtTime(520, now + delay + 0.1);
+                
+                // Громкость 1.0 (максимум)
+                gainNode.gain.setValueAtTime(1.0, now + delay);
+                gainNode.gain.exponentialRampToValueAtTime(0.3, now + delay + 0.15);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.25);
+                
+                oscillator.start(now + delay);
+                oscillator.stop(now + delay + 0.25);
+            });
+            
+            ringCount++;
+            // Пауза между звонками
+            setTimeout(playRing, ringCount % 2 === 0 ? 1500 : 400);
         };
         
         playRing();
@@ -325,6 +343,35 @@ async function registerServiceWorker() {
         try {
             state.swRegistration = await navigator.serviceWorker.register('/sw.js');
             console.log('Service Worker зарегистрирован');
+            
+            // Обработка сообщений от Service Worker (для звонков из уведомлений)
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                const data = event.data;
+                
+                if (data.type === 'call-answer-from-notification') {
+                    // Пользователь ответил на звонок из уведомления
+                    console.log('Answer call from notification:', data);
+                    // Звонок уже должен быть в incomingCallData, просто принимаем
+                    if (incomingCallData && incomingCallData.callId === data.callId) {
+                        acceptCall();
+                    }
+                }
+                
+                if (data.type === 'call-declined-from-notification') {
+                    // Пользователь отклонил звонок из уведомления
+                    console.log('Decline call from notification:', data);
+                    if (incomingCallData && incomingCallData.callId === data.callId) {
+                        declineCall();
+                    }
+                }
+                
+                if (data.type === 'notification-click') {
+                    // Открыть чат с отправителем
+                    if (data.senderId) {
+                        openChatWithUser(data.senderId);
+                    }
+                }
+            });
         } catch (e) {
             console.error('Ошибка регистрации SW:', e);
         }
