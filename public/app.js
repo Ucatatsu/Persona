@@ -2447,8 +2447,13 @@ function showEditProfile() {
     const bannerPreview = document.getElementById('edit-banner-preview');
     if (state.currentUserProfile?.banner_url) {
         bannerPreview.style.backgroundImage = `url(${state.currentUserProfile.banner_url})`;
+        bannerPreview.style.background = '';
+    } else if (state.currentUserProfile?.profile_color) {
+        bannerPreview.style.backgroundImage = '';
+        bannerPreview.style.background = state.currentUserProfile.profile_color;
     } else {
         bannerPreview.style.backgroundImage = '';
+        bannerPreview.style.background = 'linear-gradient(135deg, #4fc3f7, #1976d2)';
     }
     
     pendingAvatarFile = null;
@@ -3697,6 +3702,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Сброс цвета профиля
     document.getElementById('reset-profile-color')?.addEventListener('click', () => {
         document.getElementById('edit-profile-color').value = '#1976d2';
+        document.getElementById('edit-banner-preview').style.background = '#1976d2';
+    });
+    
+    // Превью цвета баннера при изменении
+    document.getElementById('edit-profile-color')?.addEventListener('input', (e) => {
+        const bannerPreview = document.getElementById('edit-banner-preview');
+        if (bannerPreview && !bannerPreview.style.backgroundImage) {
+            bannerPreview.style.background = e.target.value;
+        }
     });
     
     // Фон чата
