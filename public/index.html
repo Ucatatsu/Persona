@@ -287,10 +287,10 @@
         
         <div class="settings-sidebar-footer">
           <button class="settings-admin-btn hidden" id="admin-btn">
-            <span aria-hidden="true">👑</span> Админ-панель
+            👑 Админ-панель
           </button>
           <button class="settings-logout-btn" id="logout-btn">
-            <span aria-hidden="true">🚪</span> Выйти
+            Выйти
           </button>
         </div>
       </div>
@@ -587,6 +587,20 @@
         <div class="search-empty">
           <div class="search-empty-text">Начните вводить для поиска</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кастомное модальное окно подтверждения -->
+  <div id="confirm-modal" class="modal hidden" role="alertdialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="confirm-modal-content">
+      <div class="confirm-icon" id="confirm-icon">⚠️</div>
+      <h3 class="confirm-title" id="confirm-title">Подтверждение</h3>
+      <p class="confirm-message" id="confirm-message">Вы уверены?</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn confirm-cancel" id="confirm-cancel">Отмена</button>
+        <button class="confirm-btn confirm-ok" id="confirm-ok">Подтвердить</button>
       </div>
     </div>
   </div>

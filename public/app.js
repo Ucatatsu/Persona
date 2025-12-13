@@ -78,6 +78,63 @@ const api = {
     }
 };
 
+// === CUSTOM CONFIRM DIALOG ===
+function customConfirm({ title = 'Подтверждение', message = 'Вы уверены?', icon = '⚠️', variant = '', okText = 'Подтвердить', cancelText = 'Отмена' }) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const content = modal.querySelector('.confirm-modal-content');
+        const iconEl = document.getElementById('confirm-icon');
+        const titleEl = document.getElementById('confirm-title');
+        const messageEl = document.getElementById('confirm-message');
+        const okBtn = document.getElementById('confirm-ok');
+        const cancelBtn = document.getElementById('confirm-cancel');
+        
+        // Устанавливаем контент
+        iconEl.textContent = icon;
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        okBtn.textContent = okText;
+        cancelBtn.textContent = cancelText;
+        
+        // Устанавливаем вариант стиля
+        content.className = 'confirm-modal-content';
+        if (variant) content.classList.add(variant);
+        
+        // Показываем модалку
+        modal.classList.remove('hidden');
+        okBtn.focus();
+        
+        // Обработчики
+        const cleanup = () => {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', handleOk);
+            cancelBtn.removeEventListener('click', handleCancel);
+            modal.querySelector('.modal-overlay').removeEventListener('click', handleCancel);
+            document.removeEventListener('keydown', handleKeydown);
+        };
+        
+        const handleOk = () => {
+            cleanup();
+            resolve(true);
+        };
+        
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+        
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') handleCancel();
+            if (e.key === 'Enter') handleOk();
+        };
+        
+        okBtn.addEventListener('click', handleOk);
+        cancelBtn.addEventListener('click', handleCancel);
+        modal.querySelector('.modal-overlay').addEventListener('click', handleCancel);
+        document.addEventListener('keydown', handleKeydown);
+    });
+}
+
 // === SERVICE WORKER ===
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -1451,10 +1508,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('settings-modal').classList.add('hidden');
     });
     
-    document.getElementById('logout-btn')?.addEventListener('click', () => {
-        if (confirm('Вы уверены, что хотите выйти?')) {
-            logout();
-        }
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        const confirmed = await customConfirm({
+            title: 'Выход из аккаунта',
+            message: 'Вы уверены, что хотите выйти?',
+            icon: '🚪',
+            variant: 'warning',
+            okText: 'Выйти',
+            cancelText: 'Остаться'
+        });
+        if (confirmed) logout();
     });
     
     // Кнопка админ-панели
@@ -2053,9 +2116,11 @@ function renderAdminUsers(users) {
                 <div class="admin-user-tag">${user.username}#${user.tag || '????'}</div>
             </div>
             <div class="admin-user-actions">
-                <button class="admin-btn admin-btn-role" onclick="changeUserRole('${user.id}', '${user.role}')">
-                    Роль
-                </button>
+                ${user.id !== state.currentUser.id ? `
+                    <button class="admin-btn admin-btn-admin ${user.role === 'admin' ? 'active' : ''}" onclick="toggleAdmin('${user.id}', '${user.role}')">
+                        ${user.role === 'admin' ? 'Снять админа' : 'Админ'}
+                    </button>
+                ` : ''}
                 <button class="admin-btn admin-btn-premium" onclick="givePremium('${user.id}')">
                     +Premium
                 </button>
@@ -2069,20 +2134,27 @@ function renderAdminUsers(users) {
     `).join('');
 }
 
-async function changeUserRole(userId, currentRole) {
-    const roles = ['user', 'premium', 'admin'];
-    const currentIndex = roles.indexOf(currentRole);
-    const newRole = roles[(currentIndex + 1) % roles.length];
+async function toggleAdmin(userId, currentRole) {
+    const isAdmin = currentRole === 'admin';
+    const newRole = isAdmin ? 'user' : 'admin';
     
-    if (!confirm(`Изменить роль на "${newRole}"?`)) return;
+    const confirmed = await customConfirm({
+        title: isAdmin ? 'Снять админа' : 'Назначить админом',
+        message: isAdmin ? 'Снять права администратора?' : 'Назначить пользователя администратором?',
+        icon: '👑',
+        variant: isAdmin ? 'warning' : 'info',
+        okText: isAdmin ? 'Снять' : 'Назначить',
+        cancelText: 'Отмена'
+    });
+    if (!confirmed) return;
     
     try {
         const res = await api.put(`/api/admin/user/${userId}/role`, { role: newRole });
         const data = await res.json();
         
         if (data.success) {
-            showToast(`Роль изменена на ${newRole}`);
-            showAdminPanel(); // Обновляем
+            showToast(isAdmin ? 'Права админа сняты' : 'Назначен администратором');
+            showAdminPanel();
         } else {
             showToast(data.error || 'Ошибка', 'error');
         }
@@ -2111,7 +2183,15 @@ async function givePremium(userId) {
 }
 
 async function deleteUserAdmin(userId) {
-    if (!confirm('Удалить пользователя? Это действие необратимо!')) return;
+    const confirmed = await customConfirm({
+        title: 'Удаление пользователя',
+        message: 'Удалить пользователя? Это действие необратимо!',
+        icon: '🗑️',
+        variant: 'danger',
+        okText: 'Удалить',
+        cancelText: 'Отмена'
+    });
+    if (!confirmed) return;
     
     try {
         const res = await api.request(`/api/admin/user/${userId}`, { method: 'DELETE' });
@@ -2969,12 +3049,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('settings-modal').classList.add('hidden');
     });
     
-    // Выход из аккаунта
-    document.getElementById('logout-btn')?.addEventListener('click', () => {
-        if (confirm('Выйти из аккаунта?')) {
-            logout();
-        }
-    });
 });
 
 // Функции сохранения и применения настроек
