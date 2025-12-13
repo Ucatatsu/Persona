@@ -69,14 +69,56 @@
                aria-label="Поиск пользователей">
       </div>
       <div class="users-list" id="users-list" role="list" aria-label="Список контактов"></div>
-      <div class="sidebar-footer">
-        <div class="current-user-avatar" id="current-user-avatar" role="button" 
-             tabindex="0" aria-label="Открыть профиль"></div>
+      <div class="sidebar-footer" id="user-panel" role="button" tabindex="0" aria-label="Открыть карточку профиля">
+        <div class="current-user-avatar" id="current-user-avatar"></div>
         <div class="current-user-details">
           <span class="current-user"></span>
-          <span class="current-user-status">В сети</span>
+          <span class="current-user-status" id="current-user-status">
+            <span class="status-dot online"></span>
+            <span class="status-text">В сети</span>
+          </span>
         </div>
-        <button id="settings-btn" class="icon-btn" title="Настройки" aria-label="Открыть настройки">⚙️</button>
+        <div class="user-panel-actions">
+          <button class="panel-action-btn" id="panel-mic-btn" title="Микрофон" aria-label="Микрофон">🎤</button>
+          <button class="panel-action-btn" id="panel-cam-btn" title="Камера" aria-label="Камера">📹</button>
+        </div>
+      </div>
+      
+      <!-- Popup карточка профиля -->
+      <div class="user-card-popup hidden" id="user-card-popup">
+        <div class="user-card-banner" id="user-card-banner"></div>
+        <div class="user-card-avatar" id="user-card-avatar"></div>
+        <button class="user-card-settings" id="user-card-settings" title="Настройки">⚙️</button>
+        <div class="user-card-body">
+          <div class="user-card-name" id="user-card-name"></div>
+          <div class="user-card-status-selector" id="status-selector">
+            <div class="status-current" id="status-current">
+              <span class="status-dot online" id="status-dot"></span>
+              <span class="status-text" id="status-text">В сети</span>
+              <span class="status-arrow">▼</span>
+            </div>
+            <div class="status-dropdown hidden" id="status-dropdown">
+              <div class="status-option" data-status="online">
+                <span class="status-dot online"></span>
+                <span>В сети</span>
+              </div>
+              <div class="status-option" data-status="idle">
+                <span class="status-dot idle"></span>
+                <span>Неактивен</span>
+              </div>
+              <div class="status-option" data-status="dnd">
+                <span class="status-dot dnd"></span>
+                <span>Не беспокоить</span>
+              </div>
+              <div class="status-option" data-status="invisible">
+                <span class="status-dot invisible"></span>
+                <span>Невидимый</span>
+              </div>
+            </div>
+          </div>
+          <div class="user-card-bio" id="user-card-bio"></div>
+          <button class="user-card-profile-btn" id="user-card-profile-btn">Открыть профиль</button>
+        </div>
       </div>
     </aside>
     

@@ -76,6 +76,17 @@ async function initDB() {
         
         // Создаём индекс для tag
         await client.query('CREATE INDEX IF NOT EXISTS idx_users_tag ON users(tag)').catch(() => {});
+        
+        // Очищаем локальные URL аватарок/баннеров (они не работают после редеплоя)
+        // Оставляем только Cloudinary URL (начинаются с https://)
+        await client.query(`
+            UPDATE users SET avatar_url = NULL 
+            WHERE avatar_url IS NOT NULL AND avatar_url NOT LIKE 'https://%'
+        `).catch(() => {});
+        await client.query(`
+            UPDATE users SET banner_url = NULL 
+            WHERE banner_url IS NOT NULL AND banner_url NOT LIKE 'https://%'
+        `).catch(() => {});
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS messages (

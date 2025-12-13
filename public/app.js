@@ -12,7 +12,10 @@ const state = {
     socket: null,
     notificationsEnabled: localStorage.getItem('notifications') !== 'false',
     swRegistration: null,
-    settings: JSON.parse(localStorage.getItem('kvant_settings') || '{}')
+    settings: JSON.parse(localStorage.getItem('kvant_settings') || '{}'),
+    userStatus: localStorage.getItem('kvant_status') || 'online',
+    micMuted: false,
+    camMuted: false
 };
 
 // === API КЛИЕНТ ===
@@ -1372,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // === ПРОФИЛЬ ===
     
-    document.getElementById('current-user-avatar')?.addEventListener('click', showMyProfile);
+    // Аватарка теперь часть user-panel, обработчик там
     document.getElementById('close-profile')?.addEventListener('click', () => {
         document.getElementById('profile-modal').classList.add('hidden');
     });
@@ -2110,4 +2113,184 @@ document.getElementById('admin-search')?.addEventListener('input', async (e) => 
 // Закрытие админки
 document.getElementById('close-admin')?.addEventListener('click', () => {
     document.getElementById('admin-modal').classList.add('hidden');
+});
+
+
+// === USER CARD POPUP & STATUS ===
+
+const statusLabels = {
+    online: 'В сети',
+    idle: 'Неактивен',
+    dnd: 'Не беспокоить',
+    invisible: 'Невидимый'
+};
+
+function showUserCardPopup() {
+    const popup = document.getElementById('user-card-popup');
+    const profile = state.currentUserProfile;
+    
+    // Аватарка
+    const avatarEl = document.getElementById('user-card-avatar');
+    if (profile?.avatar_url) {
+        avatarEl.style.backgroundImage = `url(${profile.avatar_url})`;
+        avatarEl.textContent = '';
+    } else {
+        avatarEl.style.backgroundImage = '';
+        avatarEl.textContent = state.currentUser.username[0].toUpperCase();
+    }
+    
+    // Баннер
+    const bannerEl = document.getElementById('user-card-banner');
+    if (profile?.banner_url) {
+        bannerEl.style.backgroundImage = `url(${profile.banner_url})`;
+    } else {
+        bannerEl.style.backgroundImage = '';
+        bannerEl.style.background = 'linear-gradient(135deg, #4fc3f7, #1976d2)';
+    }
+    
+    // Имя
+    document.getElementById('user-card-name').textContent = profile?.display_name || state.currentUser.username;
+    
+    // Bio
+    document.getElementById('user-card-bio').textContent = profile?.bio || '';
+    
+    // Статус
+    updateStatusDisplay();
+    
+    popup.classList.remove('hidden');
+}
+
+function hideUserCardPopup() {
+    document.getElementById('user-card-popup').classList.add('hidden');
+    document.getElementById('status-dropdown').classList.add('hidden');
+}
+
+function toggleUserCardPopup(e) {
+    e.stopPropagation();
+    const popup = document.getElementById('user-card-popup');
+    if (popup.classList.contains('hidden')) {
+        showUserCardPopup();
+    } else {
+        hideUserCardPopup();
+    }
+}
+
+function updateStatusDisplay() {
+    const status = state.userStatus;
+    const label = statusLabels[status] || 'В сети';
+    
+    // В popup
+    const dotEl = document.getElementById('status-dot');
+    const textEl = document.getElementById('status-text');
+    if (dotEl) {
+        dotEl.className = `status-dot ${status}`;
+    }
+    if (textEl) {
+        textEl.textContent = label;
+    }
+    
+    // В нижней панели
+    const panelStatus = document.getElementById('current-user-status');
+    if (panelStatus) {
+        const panelDot = panelStatus.querySelector('.status-dot');
+        const panelText = panelStatus.querySelector('.status-text');
+        if (panelDot) panelDot.className = `status-dot ${status}`;
+        if (panelText) panelText.textContent = label;
+    }
+    
+    // Отмечаем активный в dropdown
+    document.querySelectorAll('.status-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.status === status);
+    });
+}
+
+function setUserStatus(newStatus) {
+    state.userStatus = newStatus;
+    localStorage.setItem('kvant_status', newStatus);
+    updateStatusDisplay();
+    
+    // Скрываем dropdown
+    document.getElementById('status-dropdown').classList.add('hidden');
+    
+    // Можно отправить на сервер если нужно
+    // state.socket?.emit('status-change', { status: newStatus });
+}
+
+function toggleStatusDropdown(e) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('status-dropdown');
+    dropdown.classList.toggle('hidden');
+}
+
+function togglePanelMic() {
+    state.micMuted = !state.micMuted;
+    const btn = document.getElementById('panel-mic-btn');
+    btn.classList.toggle('muted', state.micMuted);
+    btn.textContent = state.micMuted ? '🔇' : '🎤';
+}
+
+function togglePanelCam() {
+    state.camMuted = !state.camMuted;
+    const btn = document.getElementById('panel-cam-btn');
+    btn.classList.toggle('muted', state.camMuted);
+    btn.textContent = state.camMuted ? '📷' : '📹';
+}
+
+// Инициализация событий для карточки
+document.addEventListener('DOMContentLoaded', () => {
+    // Клик на панель пользователя
+    const userPanel = document.getElementById('user-panel');
+    userPanel?.addEventListener('click', (e) => {
+        // Не открываем popup если кликнули на кнопки
+        if (e.target.closest('.panel-action-btn')) return;
+        toggleUserCardPopup(e);
+    });
+    
+    // Кнопки микрофона и камеры
+    document.getElementById('panel-mic-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePanelMic();
+    });
+    
+    document.getElementById('panel-cam-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePanelCam();
+    });
+    
+    // Кнопка настроек в карточке
+    document.getElementById('user-card-settings')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideUserCardPopup();
+        showSettings();
+    });
+    
+    // Кнопка открытия полного профиля
+    document.getElementById('user-card-profile-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideUserCardPopup();
+        showMyProfile();
+    });
+    
+    // Клик на статус для открытия dropdown
+    document.getElementById('status-current')?.addEventListener('click', toggleStatusDropdown);
+    
+    // Выбор статуса
+    document.querySelectorAll('.status-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setUserStatus(opt.dataset.status);
+        });
+    });
+    
+    // Закрытие popup при клике вне
+    document.addEventListener('click', (e) => {
+        const popup = document.getElementById('user-card-popup');
+        const panel = document.getElementById('user-panel');
+        if (popup && !popup.contains(e.target) && !panel?.contains(e.target)) {
+            hideUserCardPopup();
+        }
+    });
+    
+    // Применяем сохранённый статус
+    updateStatusDisplay();
 });

@@ -29,6 +29,9 @@ if (process.env.CLOUDINARY_URL || process.env.CLOUDINARY_CLOUD_NAME) {
 
 const app = express();
 
+// Доверяем прокси (Render, Heroku и т.д.)
+app.set('trust proxy', 1);
+
 // === БЕЗОПАСНОСТЬ ===
 
 // Helmet для HTTP заголовков безопасности
