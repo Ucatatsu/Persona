@@ -122,17 +122,26 @@
       </div>
     </aside>
     
+    <!-- Resizer для изменения ширины sidebar -->
+    <div class="sidebar-resizer" id="sidebar-resizer"></div>
+    
     <!-- Область чата -->
     <header class="chat-header" id="chat-header">
       <button class="back-btn" id="back-btn" aria-label="Назад к списку чатов">←</button>
-      <div class="chat-user-info" id="chat-user-info-btn" role="button" tabindex="0" 
+      
+      <!-- Pill-контейнер по центру -->
+      <div class="chat-header-pill" id="chat-user-info-btn" role="button" tabindex="0" 
            aria-label="Информация о собеседнике">
-        <span class="chat-user-name">Выберите чат</span>
-        <span class="chat-user-status"></span>
-      </div>
-      <div class="chat-actions">
-        <button class="action-btn" title="Аудиозвонок" aria-label="Начать аудиозвонок">📞</button>
-        <button class="action-btn" title="Видеозвонок" aria-label="Начать видеозвонок">📹</button>
+        <div class="chat-header-avatar" id="chat-header-avatar"></div>
+        <div class="chat-header-info">
+          <span class="chat-user-name">Выберите чат</span>
+          <span class="chat-user-status"></span>
+        </div>
+        <div class="chat-header-actions">
+          <button class="header-action-btn" title="Аудиозвонок" aria-label="Начать аудиозвонок">📞</button>
+          <button class="header-action-btn" title="Видеозвонок" aria-label="Начать видеозвонок">📹</button>
+          <button class="header-action-btn header-menu-btn" title="Меню" aria-label="Меню">⋮</button>
+        </div>
       </div>
     </header>
     

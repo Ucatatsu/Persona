@@ -453,6 +453,7 @@ async function selectUser(userId, username) {
     const displayName = state.selectedUserProfile?.display_name || username;
     document.querySelector('.chat-user-name').textContent = displayName;
     updateChatStatus();
+    updateChatHeaderAvatar();
     
     document.getElementById('message-input').disabled = false;
     document.querySelector('.send-btn').disabled = false;
@@ -2293,4 +2294,123 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Применяем сохранённый статус
     updateStatusDisplay();
+});
+
+
+// === RESIZABLE SIDEBAR ===
+
+function initSidebarResizer() {
+    const resizer = document.getElementById('sidebar-resizer');
+    const chatScreen = document.getElementById('chat-screen');
+    
+    if (!resizer || !chatScreen) return;
+    
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    
+    // Загружаем сохранённую ширину
+    const savedWidth = localStorage.getItem('kvant_sidebar_width');
+    if (savedWidth) {
+        chatScreen.style.setProperty('--sidebar-width', savedWidth + 'px');
+    }
+    
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = parseInt(getComputedStyle(chatScreen).getPropertyValue('--sidebar-width')) || 320;
+        
+        resizer.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const diff = e.clientX - startX;
+        let newWidth = startWidth + diff;
+        
+        // Ограничения: минимум 200px, максимум 500px
+        newWidth = Math.max(200, Math.min(500, newWidth));
+        
+        chatScreen.style.setProperty('--sidebar-width', newWidth + 'px');
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        
+        isResizing = false;
+        resizer.classList.remove('resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        // Сохраняем ширину
+        const currentWidth = parseInt(getComputedStyle(chatScreen).getPropertyValue('--sidebar-width')) || 320;
+        localStorage.setItem('kvant_sidebar_width', currentWidth);
+    });
+    
+    // Touch support для мобильных
+    resizer.addEventListener('touchstart', (e) => {
+        isResizing = true;
+        startX = e.touches[0].clientX;
+        startWidth = parseInt(getComputedStyle(chatScreen).getPropertyValue('--sidebar-width')) || 320;
+        resizer.classList.add('resizing');
+    });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (!isResizing) return;
+        
+        const diff = e.touches[0].clientX - startX;
+        let newWidth = startWidth + diff;
+        newWidth = Math.max(200, Math.min(500, newWidth));
+        chatScreen.style.setProperty('--sidebar-width', newWidth + 'px');
+    });
+    
+    document.addEventListener('touchend', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        resizer.classList.remove('resizing');
+        
+        const currentWidth = parseInt(getComputedStyle(chatScreen).getPropertyValue('--sidebar-width')) || 320;
+        localStorage.setItem('kvant_sidebar_width', currentWidth);
+    });
+}
+
+// Обновление аватарки в хедере чата
+function updateChatHeaderAvatar() {
+    const avatarEl = document.getElementById('chat-header-avatar');
+    if (!avatarEl || !state.selectedUserProfile) return;
+    
+    if (state.selectedUserProfile.avatar_url) {
+        avatarEl.style.backgroundImage = `url(${state.selectedUserProfile.avatar_url})`;
+        avatarEl.textContent = '';
+    } else {
+        avatarEl.style.backgroundImage = '';
+        avatarEl.textContent = state.selectedUser?.username?.[0]?.toUpperCase() || '?';
+    }
+}
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    initSidebarResizer();
+    
+    // Обработчики для кнопок в хедере
+    document.querySelectorAll('.header-action-btn').forEach((btn, index) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!state.selectedUser) return;
+            
+            if (index === 0) {
+                startCall(false); // Аудио
+            } else if (index === 1) {
+                startCall(true); // Видео
+            } else if (index === 2) {
+                // Меню - можно добавить dropdown
+                showUserProfile(state.selectedUser.id);
+            }
+        });
+    });
 });
