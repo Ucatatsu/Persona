@@ -15,8 +15,43 @@ const state = {
     settings: JSON.parse(localStorage.getItem('kvant_settings') || '{}'),
     userStatus: localStorage.getItem('kvant_status') || 'online',
     micMuted: false,
-    camMuted: false
+    camMuted: false,
+    // Кэш DOM элементов
+    dom: {}
 };
+
+// === УТИЛИТЫ ОПТИМИЗАЦИИ ===
+function debounce(fn, delay) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn(...args), delay);
+    };
+}
+
+function throttle(fn, limit) {
+    let inThrottle;
+    return (...args) => {
+        if (!inThrottle) {
+            fn(...args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// Кэширование DOM элементов
+function $(id) {
+    if (!state.dom[id]) {
+        state.dom[id] = document.getElementById(id);
+    }
+    return state.dom[id];
+}
+
+// Очистка кэша при необходимости
+function clearDomCache() {
+    state.dom = {};
+}
 
 // === API КЛИЕНТ ===
 const api = {
@@ -439,50 +474,68 @@ async function searchUsers(query) {
     }
 }
 
-function updateContactsList() {
+// Debounced версия для предотвращения частых обновлений
+const updateContactsList = debounce(() => {
     const query = document.querySelector('.search-input')?.value.trim();
     if (query) {
         searchUsers(query);
     } else {
         loadContacts();
     }
-}
+}, 150);
 
+// Оптимизированный рендеринг с DocumentFragment и делегированием событий
 function renderUsers(users) {
-    const usersList = document.getElementById('users-list');
+    const usersList = $('users-list');
     
     if (!users.length) {
         usersList.innerHTML = '<div class="empty-list">Нет контактов<br>Найдите пользователя через поиск</div>';
         return;
     }
     
-    usersList.innerHTML = users.map(user => {
+    const fragment = document.createDocumentFragment();
+    
+    users.forEach(user => {
         const isOnline = state.onlineUsers.includes(user.id);
-        const unread = user.unread_count || 0;
+        const unread = parseInt(user.unread_count) || 0;
+        
+        const item = document.createElement('div');
+        item.className = `user-item ${isOnline ? '' : 'offline'} ${state.selectedUser?.id === user.id ? 'active' : ''}`;
+        item.dataset.id = user.id;
+        item.dataset.name = user.username;
+        
         const avatarStyle = user.avatar_url 
             ? `background-image: url(${escapeAttr(user.avatar_url)}); background-size: cover; background-position: center;`
-            : `background: var(--message-sent);`;
-        const avatarContent = user.avatar_url ? '' : escapeHtml(user.username[0].toUpperCase());
-        const displayName = escapeHtml(user.display_name || user.username);
+            : 'background: var(--message-sent);';
+        const avatarContent = user.avatar_url ? '' : user.username[0].toUpperCase();
+        const displayName = user.display_name || user.username;
         
-        return `
-            <div class="user-item ${isOnline ? '' : 'offline'} ${state.selectedUser?.id === user.id ? 'active' : ''}" 
-                 data-id="${escapeAttr(user.id)}" data-name="${escapeAttr(user.username)}">
-                <div class="user-avatar" style="${avatarStyle}">
-                    ${avatarContent}
-                    <div class="online-indicator"></div>
-                </div>
-                <div class="user-info">
-                    <div class="user-name">${displayName}</div>
-                    <div class="user-last-message">${isOnline ? 'В сети' : 'Не в сети'}</div>
-                </div>
-                ${unread > 0 ? `<div class="unread-badge">${unread}</div>` : ''}
+        item.innerHTML = `
+            <div class="user-avatar" style="${avatarStyle}">
+                ${avatarContent}
+                <div class="online-indicator"></div>
             </div>
+            <div class="user-info">
+                <div class="user-name">${escapeHtml(displayName)}</div>
+                <div class="user-last-message">${isOnline ? 'В сети' : 'Не в сети'}</div>
+            </div>
+            ${unread > 0 ? `<div class="unread-badge">${unread}</div>` : ''}
         `;
-    }).join('');
+        
+        fragment.appendChild(item);
+    });
+    
+    usersList.innerHTML = '';
+    usersList.appendChild(fragment);
+}
 
-    document.querySelectorAll('.user-item').forEach(item => {
-        item.addEventListener('click', () => selectUser(item.dataset.id, item.dataset.name));
+// Делегирование событий для списка пользователей (один раз при инициализации)
+function initUserListEvents() {
+    $('users-list')?.addEventListener('click', (e) => {
+        const item = e.target.closest('.user-item');
+        if (item) {
+            selectUser(item.dataset.id, item.dataset.name);
+        }
     });
 }
 
@@ -533,51 +586,66 @@ async function loadMessages() {
     }
 }
 
+// Оптимизированный рендеринг сообщений
 function renderMessages(messages) {
-    const messagesDiv = document.getElementById('messages');
+    const messagesDiv = $('messages');
+    const fragment = document.createDocumentFragment();
     
-    messagesDiv.innerHTML = messages.map(msg => {
+    messages.forEach(msg => {
         const isSent = msg.sender_id === state.currentUser.id;
-        const avatarHtml = getAvatarHtml(isSent);
         
         if (msg.message_type === 'audio_call' || msg.message_type === 'video_call') {
-            return renderCallMessage(msg, isSent);
+            fragment.appendChild(createCallMessageElement(msg, isSent));
+        } else {
+            fragment.appendChild(createMessageElement(msg, isSent));
         }
-        
-        return `
-            <div class="message ${isSent ? 'sent' : 'received'}">
-                ${avatarHtml}
-                <div class="message-content">
-                    <div class="message-bubble">${escapeHtml(msg.text)}</div>
-                    <div class="message-time">${formatTime(msg.created_at)}</div>
-                </div>
-            </div>
-        `;
-    }).join('');
+    });
     
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messagesDiv.innerHTML = '';
+    messagesDiv.appendChild(fragment);
+    
+    // Используем requestAnimationFrame для плавной прокрутки
+    requestAnimationFrame(() => {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
 }
 
-function renderCallMessage(msg, isSent) {
+function createMessageElement(msg, isSent) {
+    const div = document.createElement('div');
+    div.className = `message ${isSent ? 'sent' : 'received'}`;
+    div.innerHTML = `
+        ${getAvatarHtml(isSent)}
+        <div class="message-content">
+            <div class="message-bubble">${escapeHtml(msg.text)}</div>
+            <div class="message-time">${formatTime(msg.created_at)}</div>
+        </div>
+    `;
+    return div;
+}
+
+function createCallMessageElement(msg, isSent) {
     const duration = msg.call_duration || 0;
     const mins = Math.floor(duration / 60);
     const secs = duration % 60;
     const durationText = duration > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : '';
     const icon = msg.message_type === 'video_call' ? '📹' : '📞';
     
-    return `
-        <div class="message ${isSent ? 'sent' : 'received'} call-message">
-            <div class="message-content">
-                <div class="message-bubble call-bubble">
-                    <span class="call-icon">${icon}</span>
-                    <span class="call-text">${escapeHtml(msg.text)}</span>
-                    ${durationText ? `<span class="call-duration">${durationText}</span>` : ''}
-                </div>
-                <div class="message-time">${formatTime(msg.created_at)}</div>
+    const div = document.createElement('div');
+    div.className = `message ${isSent ? 'sent' : 'received'} call-message`;
+    div.innerHTML = `
+        <div class="message-content">
+            <div class="message-bubble call-bubble">
+                <span class="call-icon">${icon}</span>
+                <span class="call-text">${escapeHtml(msg.text)}</span>
+                ${durationText ? `<span class="call-duration">${durationText}</span>` : ''}
             </div>
+            <div class="message-time">${formatTime(msg.created_at)}</div>
         </div>
     `;
+    return div;
 }
+
+
 
 function getAvatarHtml(isSent) {
     if (isSent) {
@@ -594,21 +662,14 @@ function getAvatarHtml(isSent) {
 }
 
 function appendMessage(msg) {
-    const messagesDiv = document.getElementById('messages');
+    const messagesDiv = $('messages');
     const isSent = msg.sender_id === state.currentUser.id;
-    const avatarHtml = getAvatarHtml(isSent);
     
-    const div = document.createElement('div');
-    div.className = `message ${isSent ? 'sent' : 'received'}`;
-    div.innerHTML = `
-        ${avatarHtml}
-        <div class="message-content">
-            <div class="message-bubble">${escapeHtml(msg.text)}</div>
-            <div class="message-time">${formatTime(msg.created_at)}</div>
-        </div>
-    `;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messagesDiv.appendChild(createMessageElement(msg, isSent));
+    
+    requestAnimationFrame(() => {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
 }
 
 function sendMessage() {
@@ -660,10 +721,13 @@ function stopTyping() {
     clearTimeout(typingTimeout);
 }
 
-function updateChatStatus() {
+// Throttled для предотвращения частых обновлений DOM
+const updateChatStatus = throttle(() => {
     if (!state.selectedUser) return;
     
     const statusEl = document.querySelector('.chat-user-status');
+    if (!statusEl) return;
+    
     const isOnline = state.onlineUsers.includes(state.selectedUser.id);
     const isUserTyping = state.typingUsers.has(state.selectedUser.id);
     
@@ -677,7 +741,7 @@ function updateChatStatus() {
         statusEl.textContent = 'Не в сети';
         statusEl.style.color = 'var(--text-muted)';
     }
-}
+}, 100);
 
 // === ПРОФИЛЬ ===
 async function loadMyProfile() {
@@ -1349,6 +1413,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Регистрация Service Worker
     registerServiceWorker();
     
+    // Инициализация делегирования событий
+    initUserListEvents();
+    
     // Восстановление сессии
     if (restoreSession()) {
         showChat();
@@ -1359,10 +1426,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // === ФОРМЫ АВТОРИЗАЦИИ ===
     
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
-    const loginError = document.getElementById('login-error');
-    const registerError = document.getElementById('register-error');
+    const loginForm = $('login-form');
+    const registerForm = $('register-form');
+    const loginError = $('login-error');
+    const registerError = $('register-error');
     
     // Переключение форм
     document.getElementById('to-register-btn')?.addEventListener('click', () => {
@@ -3145,3 +3212,4 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
         applyTheme('system');
     }
 });
+Ф

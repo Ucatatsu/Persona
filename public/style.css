@@ -4,6 +4,35 @@
   box-sizing: border-box;
 }
 
+/* === PERFORMANCE OPTIMIZATIONS === */
+.sidebar,
+.messages,
+.users-list,
+.modal-content,
+.settings-content {
+  will-change: transform;
+  contain: layout style;
+}
+
+/* Отключаем тяжёлые эффекты на слабых устройствах */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* GPU ускорение для анимаций */
+.message,
+.user-item,
+.modal {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 :root {
   --bg-darkest: #0a1628;
   --bg-dark: #0f2140;
@@ -3531,4 +3560,46 @@ body,
   .confirm-actions {
     flex-direction: column-reverse;
   }
+}
+
+/* === MOBILE PERFORMANCE OPTIMIZATIONS === */
+@media (max-width: 768px) {
+  /* Отключаем backdrop-filter на мобильных для производительности */
+  .sidebar,
+  .message-form,
+  .modal-content,
+  .chat-header-pill,
+  .emoji-picker {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  /* Упрощаем тени */
+  .modal-content,
+  .emoji-picker,
+  .user-card-popup {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Отключаем сложные градиенты на слабых устройствах */
+  .screen:not(#chat-screen) {
+    background: var(--bg-darkest);
+  }
+}
+
+/* Оптимизация скролла */
+.messages,
+.users-list,
+.settings-content,
+.admin-users,
+.search-results {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+}
+
+/* Ленивая загрузка изображений */
+.user-avatar[style*="background-image"],
+.message-avatar[style*="background-image"],
+.profile-avatar-large[style*="background-image"] {
+  background-color: var(--bg-medium);
 }
