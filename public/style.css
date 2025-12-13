@@ -4389,64 +4389,6 @@ input:focus {
   opacity: 0.8;
 }
 
-/* === MESSAGE REACTIONS === */
-.message-reactions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-  padding: 0 4px;
-}
-
-.reaction-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: rgba(79, 195, 247, 0.15);
-  border: 1px solid rgba(79, 195, 247, 0.3);
-  border-radius: 12px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reaction-badge:hover {
-  background: rgba(79, 195, 247, 0.25);
-  transform: scale(1.05);
-}
-
-.reaction-badge.own {
-  background: rgba(79, 195, 247, 0.3);
-  border-color: var(--accent);
-}
-
-.reaction-badge .reaction-count {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.add-reaction-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  font-size: 12px;
-  cursor: pointer;
-  opacity: 0;
-  transition: all 0.2s;
-}
-
-.message:hover .add-reaction-btn {
-  opacity: 1;
-}
-
-.add-reaction-btn:hover {
-  background: rgba(79, 195, 247, 0.2);
-  border-color: var(--accent);
-}
-
 /* === MESSAGE CONTEXT MENU === */
 .message-context-menu {
   position: fixed;
@@ -4804,20 +4746,27 @@ input:focus {
 }
 
 /* Кнопка добавления реакции */
+.message-content {
+  position: relative;
+}
+
 .add-reaction-btn {
   position: absolute;
-  right: -30px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
+  bottom: 0;
+  right: -32px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: rgba(79, 195, 247, 0.2);
-  border: none;
-  font-size: 12px;
+  background: var(--bg-medium);
+  border: 1px solid var(--glass-border);
+  font-size: 14px;
   cursor: pointer;
   opacity: 0;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .message:hover .add-reaction-btn {
@@ -4826,12 +4775,13 @@ input:focus {
 
 .message.sent .add-reaction-btn {
   right: auto;
-  left: -30px;
+  left: -32px;
 }
 
 .add-reaction-btn:hover {
-  background: rgba(79, 195, 247, 0.4);
-  transform: translateY(-50%) scale(1.1);
+  background: var(--accent);
+  transform: scale(1.15);
+  border-color: var(--accent);
 }
 
 /* Контекстное меню сообщения */
@@ -5269,40 +5219,84 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.2s ease;
+  animation: mediaViewerIn 0.25s ease;
+}
+
+@keyframes mediaViewerIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .media-viewer-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.95);
   cursor: pointer;
+  backdrop-filter: blur(10px);
 }
 
 .media-viewer-content {
   position: relative;
   max-width: 90vw;
-  max-height: 90vh;
+  max-height: 85vh;
   border-radius: 8px;
   z-index: 1;
+  object-fit: contain;
+  animation: mediaZoomIn 0.3s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes mediaZoomIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 .media-viewer-close {
   position: absolute;
   top: 20px;
   right: 20px;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.1);
+}
+
+.media-viewer-download {
+  position: absolute;
+  top: 20px;
+  right: 80px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
   font-size: 20px;
   cursor: pointer;
   z-index: 2;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
-.media-viewer-close:hover {
-  background: rgba(255, 255, 255, 0.3);
+.media-viewer-download:hover {
+  background: rgba(79, 195, 247, 0.3);
+  border-color: var(--accent);
+  transform: scale(1.1);
 }

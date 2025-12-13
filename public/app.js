@@ -897,8 +897,8 @@ function createMessageElement(msg, isSent) {
             <div class="message-bubble">${bubbleContent}</div>
             <div class="message-time">${formatTime(msg.created_at)}${editedMark}</div>
             ${reactionsHtml}
+            <button class="add-reaction-btn" title="Добавить реакцию">😊</button>
         </div>
-        <button class="add-reaction-btn" title="Добавить реакцию">➕</button>
     `;
     
     // Контекстное меню по правому клику
@@ -915,15 +915,36 @@ function createMessageElement(msg, isSent) {
 
 // Просмотр медиа в полном размере
 function openMediaViewer(url) {
+    // Удаляем старый просмотрщик если есть
+    document.querySelector('.media-viewer')?.remove();
+    
     const viewer = document.createElement('div');
     viewer.className = 'media-viewer';
     viewer.innerHTML = `
-        <div class="media-viewer-overlay" onclick="this.parentElement.remove()"></div>
-        <img src="${url}" class="media-viewer-content" onclick="event.stopPropagation()">
-        <button class="media-viewer-close" onclick="this.parentElement.remove()">✕</button>
+        <div class="media-viewer-overlay"></div>
+        <img src="${escapeAttr(url)}" class="media-viewer-content" alt="Просмотр">
+        <button class="media-viewer-close">✕</button>
+        <a class="media-viewer-download" href="${escapeAttr(url)}" download target="_blank">⬇️</a>
     `;
+    
+    // Закрытие по клику на оверлей или кнопку
+    viewer.querySelector('.media-viewer-overlay').addEventListener('click', () => viewer.remove());
+    viewer.querySelector('.media-viewer-close').addEventListener('click', () => viewer.remove());
+    
+    // Закрытие по Escape
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            viewer.remove();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+    
     document.body.appendChild(viewer);
 }
+
+// Делаем функцию глобальной для onclick в HTML
+window.openMediaViewer = openMediaViewer;
 
 function renderReactions(reactions, messageId) {
     if (!reactions || reactions.length === 0) return '';
