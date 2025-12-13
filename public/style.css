@@ -2541,16 +2541,41 @@ body,
   position: relative;
   cursor: pointer;
   transition: background 0.2s;
+  overflow: hidden;
 }
 
 .sidebar-footer:hover {
   background: rgba(79, 195, 247, 0.1);
 }
 
+.current-user-details {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.current-user {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .user-panel-actions {
   display: flex;
   gap: 4px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Скрываем кнопки когда sidebar узкий */
+@container sidebar (max-width: 250px) {
+  .user-panel-actions {
+    display: none;
+  }
+}
+
+/* Fallback для браузеров без container queries */
+.sidebar[style*="--sidebar-width: 2"] .user-panel-actions {
+  display: none;
 }
 
 .panel-action-btn {
@@ -2613,16 +2638,16 @@ body,
 
 /* User Card Popup */
 .user-card-popup {
-  position: absolute;
-  bottom: calc(var(--panel-height) + 8px);
-  left: 8px;
+  position: fixed;
+  bottom: 90px;
+  left: 20px;
   width: 300px;
   background: var(--bg-dark);
   border-radius: 12px;
   border: 1px solid var(--glass-border);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   overflow: visible;
-  z-index: 100;
+  z-index: 1000;
   animation: cardPopup 0.2s ease;
 }
 

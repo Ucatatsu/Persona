@@ -2766,3 +2766,74 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+
+// === RESIZABLE SIDEBAR ===
+
+function initSidebarResizer() {
+    const resizer = document.getElementById('sidebar-resizer');
+    const chatScreen = document.getElementById('chat-screen');
+    const panelActions = document.querySelector('.user-panel-actions');
+    
+    if (!resizer || !chatScreen) return;
+    
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    
+    // Загружаем сохранённую ширину
+    const savedWidth = localStorage.getItem('kvant_sidebar_width');
+    if (savedWidth) {
+        chatScreen.style.setProperty('--sidebar-width', savedWidth + 'px');
+        updatePanelButtons(parseInt(savedWidth));
+    }
+    
+    function updatePanelButtons(width) {
+        if (panelActions) {
+            panelActions.style.display = width < 250 ? 'none' : 'flex';
+        }
+    }
+    
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = parseInt(getComputedStyle(chatScreen).getPropertyValue('--sidebar-width')) || 320;
+        
+        resizer.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const diff = e.clientX - startX;
+        let newWidth = startWidth + diff;
+        
+        // Ограничения: минимум 200px, максимум 500px
+        newWidth = Math.max(200, Math.min(500, newWidth));
+        
+        chatScreen.style.setProperty('--sidebar-width', newWidth + 'px');
+        updatePanelButtons(newWidth);
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        
+        isResizing = false;
+        resizer.classList.remove('resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        // Сохраняем ширину
+        const currentWidth = parseInt(getComputedStyle(chatScreen).getPropertyValue('--sidebar-width')) || 320;
+        localStorage.setItem('kvant_sidebar_width', currentWidth);
+    });
+}
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    initSidebarResizer();
+});
