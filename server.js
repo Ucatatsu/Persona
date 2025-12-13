@@ -86,20 +86,40 @@ const storage = process.env.CLOUDINARY_CLOUD_NAME
         }
     });
 
+// Лимиты файлов
+const FILE_LIMITS = {
+    regular: 5 * 1024 * 1024,   // 5MB для обычных
+    premium: 25 * 1024 * 1024   // 25MB для премиум
+};
+
+// Базовый upload (лимит проверяется отдельно)
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: FILE_LIMITS.premium }, // Максимальный лимит, проверка ниже
     fileFilter: (_req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const allowedTypes = /jpeg|jpg|png|gif|webp|mp4/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
+        const mimetype = /image\/(jpeg|jpg|png|gif|webp)|video\/mp4/.test(file.mimetype);
         if (extname && mimetype) {
             cb(null, true);
         } else {
-            cb(new Error('Только изображения (jpg, png, gif, webp)'));
+            cb(new Error('Только изображения (jpg, png, gif, webp) и видео (mp4)'));
         }
     }
 });
+
+// Проверка премиум-статуса пользователя
+async function checkPremiumStatus(userId) {
+    const user = await db.getUser(userId);
+    if (!user) return false;
+    return user.role === 'admin' || user.isPremium;
+}
+
+// Проверка разрешённых форматов для аватарки/баннера
+function isAnimatedFormat(file) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    return ext === '.gif' || ext === '.mp4';
+}
 
 // Функция загрузки в Cloudinary
 async function uploadToCloudinary(buffer, folder) {
@@ -334,12 +354,29 @@ app.post('/api/user/:userId/avatar', authMiddleware, ownerMiddleware('userId'), 
             return res.status(400).json({ success: false, error: 'Файл не загружен' });
         }
         
+        // Проверка премиума для анимированных форматов
+        const isPremium = await checkPremiumStatus(req.user.id);
+        if (isAnimatedFormat(req.file) && !isPremium) {
+            return res.status(403).json({ 
+                success: false, 
+                error: 'GIF и MP4 аватарки доступны только для Premium' 
+            });
+        }
+        
+        // Проверка лимита размера
+        const maxSize = isPremium ? FILE_LIMITS.premium : FILE_LIMITS.regular;
+        if (req.file.size > maxSize) {
+            const limitMB = maxSize / (1024 * 1024);
+            return res.status(400).json({ 
+                success: false, 
+                error: `Максимальный размер файла: ${limitMB}MB` 
+            });
+        }
+        
         let avatarUrl;
         if (process.env.CLOUDINARY_CLOUD_NAME) {
-            // Загружаем в Cloudinary
             avatarUrl = await uploadToCloudinary(req.file.buffer, 'avatars');
         } else {
-            // Локальное хранение
             avatarUrl = `/uploads/${req.file.filename}`;
         }
         
@@ -358,12 +395,29 @@ app.post('/api/user/:userId/banner', authMiddleware, ownerMiddleware('userId'), 
             return res.status(400).json({ success: false, error: 'Файл не загружен' });
         }
         
+        // Проверка премиума для анимированных форматов
+        const isPremium = await checkPremiumStatus(req.user.id);
+        if (isAnimatedFormat(req.file) && !isPremium) {
+            return res.status(403).json({ 
+                success: false, 
+                error: 'GIF и MP4 баннеры доступны только для Premium' 
+            });
+        }
+        
+        // Проверка лимита размера
+        const maxSize = isPremium ? FILE_LIMITS.premium : FILE_LIMITS.regular;
+        if (req.file.size > maxSize) {
+            const limitMB = maxSize / (1024 * 1024);
+            return res.status(400).json({ 
+                success: false, 
+                error: `Максимальный размер файла: ${limitMB}MB` 
+            });
+        }
+        
         let bannerUrl;
         if (process.env.CLOUDINARY_CLOUD_NAME) {
-            // Загружаем в Cloudinary (баннер шире)
             bannerUrl = await uploadToCloudinary(req.file.buffer, 'banners');
         } else {
-            // Локальное хранение
             bannerUrl = `/uploads/${req.file.filename}`;
         }
         

@@ -677,9 +677,40 @@ function formatTime(dateStr) {
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+// === УТИЛИТЫ ===
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function escapeAttr(text) {
+    return String(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function formatTime(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
 function showToast(message, type = 'info') {
-    // Простой toast - можно улучшить
-    console.log(`[${type}] ${message}`);
+    // Создаём контейнер если его нет
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
 }
 
 // === МОБИЛЬНАЯ НАВИГАЦИЯ ===
@@ -2752,8 +2783,8 @@ function renderAdminUsers(users) {
                 <div class="admin-user-tag">${user.username}#${user.tag || '????'}</div>
             </div>
             <div class="admin-user-actions">
-                <button class="admin-btn admin-btn-role" data-action="role" data-user-id="${user.id}" data-role="${user.role}">
-                    Роль
+                <button class="admin-btn admin-btn-role ${user.role === 'admin' ? 'active' : ''}" data-action="admin" data-user-id="${user.id}" data-role="${user.role}">
+                    ${user.role === 'admin' ? '👑 Админ' : 'Сделать админом'}
                 </button>
                 <button class="admin-btn admin-btn-premium" data-action="premium" data-user-id="${user.id}">
                     +Premium
@@ -2777,20 +2808,19 @@ async function handleAdminAction(e) {
     const action = e.target.dataset.action;
     const userId = e.target.dataset.userId;
     
-    if (action === 'role') {
+    if (action === 'admin') {
         const currentRole = e.target.dataset.role;
-        const roles = ['user', 'premium', 'admin'];
-        const currentIndex = roles.indexOf(currentRole);
-        const newRole = roles[(currentIndex + 1) % roles.length];
+        const newRole = currentRole === 'admin' ? 'user' : 'admin';
+        const actionText = newRole === 'admin' ? 'Сделать админом' : 'Снять права админа';
         
-        if (!confirm(`Изменить роль на "${newRole}"?`)) return;
+        if (!confirm(`${actionText}?`)) return;
         
         try {
             const res = await api.put(`/api/admin/user/${userId}/role`, { role: newRole });
             const data = await res.json();
             
             if (data.success) {
-                showToast(`Роль изменена на ${newRole}`);
+                showToast(newRole === 'admin' ? 'Пользователь стал админом' : 'Права админа сняты');
                 showAdminPanel();
             } else {
                 showToast(data.error || 'Ошибка', 'error');
@@ -2871,4 +2901,41 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('settings-modal').classList.add('hidden');
         showAdminPanel();
     });
+});
+
+
+// === PREMIUM FEATURES ===
+
+function updatePremiumHints() {
+    const isPremium = state.currentUserProfile?.isPremium || state.currentUser?.role === 'admin';
+    const hint = document.getElementById('avatar-premium-hint');
+    
+    if (hint) {
+        if (isPremium) {
+            hint.textContent = '✨ GIF/MP4 доступны (Premium)';
+            hint.className = 'edit-premium-hint premium';
+        } else {
+            hint.textContent = 'GIF/MP4 доступны только для Premium';
+            hint.className = 'edit-premium-hint';
+        }
+    }
+}
+
+// Вызываем при открытии редактирования профиля
+const originalShowEditProfile = window.showEditProfile;
+if (typeof originalShowEditProfile === 'function') {
+    window.showEditProfile = function() {
+        originalShowEditProfile();
+        updatePremiumHints();
+    };
+}
+
+// Обновляем подсказку при загрузке профиля
+document.addEventListener('DOMContentLoaded', () => {
+    const editProfileBtn = document.getElementById('edit-profile-btn');
+    if (editProfileBtn) {
+        editProfileBtn.addEventListener('click', () => {
+            setTimeout(updatePremiumHints, 100);
+        });
+    }
 });

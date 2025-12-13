@@ -3141,3 +3141,25 @@ body,
     padding: 16px;
   }
 }
+
+
+/* Admin button active state */
+.admin-btn-role.active {
+  background: rgba(255, 215, 0, 0.3);
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  color: #ffd700;
+}
+
+
+/* Premium hint for uploads */
+.edit-premium-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  display: block;
+  margin-top: 4px;
+}
+
+.edit-premium-hint.premium {
+  color: #ffd700;
+}
