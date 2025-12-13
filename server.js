@@ -1010,6 +1010,23 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Уведомление о демонстрации экрана
+    socket.on('screen-share-started', (data) => {
+        const { to } = data;
+        const otherData = onlineUsers.get(to);
+        if (otherData) {
+            io.to(otherData.socketId).emit('screen-share-started', { from: userId });
+        }
+    });
+
+    socket.on('screen-share-stopped', (data) => {
+        const { to } = data;
+        const otherData = onlineUsers.get(to);
+        if (otherData) {
+            io.to(otherData.socketId).emit('screen-share-stopped', { from: userId });
+        }
+    });
+
     // Отключение
     socket.on('disconnect', () => {
         onlineUsers.delete(userId);

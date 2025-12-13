@@ -480,6 +480,8 @@ function initSocket() {
     state.socket.on('call-message', handleCallMessage);
     state.socket.on('video-renegotiate', handleVideoRenegotiate);
     state.socket.on('video-renegotiate-answer', handleVideoRenegotiateAnswer);
+    state.socket.on('screen-share-started', handleScreenShareStarted);
+    state.socket.on('screen-share-stopped', handleScreenShareStopped);
     
     // Редактирование и удаление сообщений
     state.socket.on('message-edited', (data) => {
@@ -1474,8 +1476,28 @@ let incomingCallData = null;
 const iceServers = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // Бесплатные TURN серверы для NAT traversal
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ],
+    iceCandidatePoolSize: 10
 };
 
 function startCall(video = false) {
@@ -1519,10 +1541,27 @@ async function initCall(video) {
         });
         
         peerConnection.ontrack = (event) => {
-            document.getElementById('remote-video').srcObject = event.streams[0];
-            if (event.streams[0].getVideoTracks().length > 0) {
+            const remoteVideo = document.getElementById('remote-video');
+            // Всегда обновляем srcObject при получении нового трека
+            if (event.streams && event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+            } else {
+                // Fallback: создаём новый MediaStream если streams пустой
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = new MediaStream();
+                }
+                remoteVideo.srcObject.addTrack(event.track);
+            }
+            
+            // Показываем видео контейнер если есть видео трек
+            if (event.track.kind === 'video') {
                 document.getElementById('call-videos').classList.remove('hidden');
             }
+            
+            // Обработка завершения трека
+            event.track.onended = () => {
+                checkHideVideos();
+            };
         };
         
         peerConnection.onicecandidate = (event) => {
@@ -1531,6 +1570,15 @@ async function initCall(video) {
                     to: currentCallUser.id,
                     candidate: event.candidate
                 });
+            }
+        };
+        
+        // Обработка изменения состояния ICE соединения
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE state:', peerConnection.iceConnectionState);
+            if (peerConnection.iceConnectionState === 'failed') {
+                // Попытка перезапуска ICE
+                peerConnection.restartIce();
             }
         };
         
@@ -1604,10 +1652,27 @@ async function acceptCall() {
         });
         
         peerConnection.ontrack = (event) => {
-            document.getElementById('remote-video').srcObject = event.streams[0];
-            if (event.streams[0].getVideoTracks().length > 0) {
+            const remoteVideo = document.getElementById('remote-video');
+            // Всегда обновляем srcObject при получении нового трека
+            if (event.streams && event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+            } else {
+                // Fallback: создаём новый MediaStream если streams пустой
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = new MediaStream();
+                }
+                remoteVideo.srcObject.addTrack(event.track);
+            }
+            
+            // Показываем видео контейнер если есть видео трек
+            if (event.track.kind === 'video') {
                 document.getElementById('call-videos').classList.remove('hidden');
             }
+            
+            // Обработка завершения трека
+            event.track.onended = () => {
+                checkHideVideos();
+            };
         };
         
         peerConnection.onicecandidate = (event) => {
@@ -1616,6 +1681,15 @@ async function acceptCall() {
                     to: currentCallUser.id,
                     candidate: event.candidate
                 });
+            }
+        };
+        
+        // Обработка изменения состояния ICE соединения
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE state:', peerConnection.iceConnectionState);
+            if (peerConnection.iceConnectionState === 'failed') {
+                // Попытка перезапуска ICE
+                peerConnection.restartIce();
             }
         };
         
@@ -1653,9 +1727,16 @@ function declineCall() {
     incomingCallData = null;
 }
 
-function handleCallAnswered(data) {
+async function handleCallAnswered(data) {
     currentCallId = data.callId;
-    peerConnection?.setRemoteDescription(data.answer);
+    if (peerConnection) {
+        try {
+            const answer = new RTCSessionDescription(data.answer);
+            await peerConnection.setRemoteDescription(answer);
+        } catch (e) {
+            console.error('Error setting remote description:', e);
+        }
+    }
     document.getElementById('call-status').textContent = 'Соединено';
     startCallTimer();
 }
@@ -1677,11 +1758,15 @@ function handleCallFailed(data) {
 }
 
 async function handleIceCandidate(data) {
-    if (peerConnection) {
+    if (peerConnection && data.candidate) {
         try {
-            await peerConnection.addIceCandidate(data.candidate);
+            const candidate = new RTCIceCandidate(data.candidate);
+            await peerConnection.addIceCandidate(candidate);
         } catch (e) {
-            console.error('ICE candidate error:', e);
+            // Игнорируем ошибки если remote description ещё не установлен
+            if (e.name !== 'InvalidStateError') {
+                console.error('ICE candidate error:', e);
+            }
         }
     }
 }
@@ -1694,10 +1779,13 @@ function handleCallMessage(message) {
 }
 
 async function handleVideoRenegotiate(data) {
-    if (!peerConnection) return;
+    if (!peerConnection || !currentCallUser) return;
     
     try {
-        await peerConnection.setRemoteDescription(data.offer);
+        // Создаём RTCSessionDescription из полученных данных
+        const offer = new RTCSessionDescription(data.offer);
+        await peerConnection.setRemoteDescription(offer);
+        
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         
@@ -1714,10 +1802,24 @@ async function handleVideoRenegotiateAnswer(data) {
     if (!peerConnection) return;
     
     try {
-        await peerConnection.setRemoteDescription(data.answer);
+        const answer = new RTCSessionDescription(data.answer);
+        await peerConnection.setRemoteDescription(answer);
     } catch (e) {
         console.error('Renegotiate answer error:', e);
     }
+}
+
+function handleScreenShareStarted(data) {
+    // Собеседник начал демонстрацию экрана
+    console.log('Screen share started by:', data.from);
+    // Показываем видео контейнер
+    document.getElementById('call-videos').classList.remove('hidden');
+}
+
+function handleScreenShareStopped(data) {
+    // Собеседник закончил демонстрацию экрана
+    console.log('Screen share stopped by:', data.from);
+    checkHideVideos();
 }
 
 function startCallTimer() {
@@ -1783,12 +1885,21 @@ function toggleMute() {
 }
 
 async function toggleVideo() {
-    if (!localStream || !peerConnection) return;
+    if (!localStream || !peerConnection || !currentCallUser) return;
     
     const videoTrack = localStream.getVideoTracks()[0];
     
     if (videoTrack) {
+        // Переключаем существующий видео трек
         videoTrack.enabled = !videoTrack.enabled;
+        
+        // Находим sender и обновляем трек
+        const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+            // Заменяем трек на null или обратно для синхронизации с собеседником
+            await sender.replaceTrack(videoTrack.enabled ? videoTrack : null);
+        }
+        
         if (videoTrack.enabled) {
             document.getElementById('call-videos').classList.remove('hidden');
             document.getElementById('local-video').srcObject = localStream;
@@ -1796,6 +1907,7 @@ async function toggleVideo() {
             checkHideVideos();
         }
     } else {
+        // Добавляем новый видео трек
         try {
             const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
             const newVideoTrack = newStream.getVideoTracks()[0];
@@ -1804,15 +1916,22 @@ async function toggleVideo() {
             document.getElementById('local-video').srcObject = localStream;
             document.getElementById('call-videos').classList.remove('hidden');
             
-            peerConnection.addTrack(newVideoTrack, localStream);
-            
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            
-            state.socket.emit('video-renegotiate', {
-                to: currentCallUser.id,
-                offer: offer
-            });
+            // Проверяем есть ли уже video sender
+            const existingSender = peerConnection.getSenders().find(s => s.track === null || s.track?.kind === 'video');
+            if (existingSender) {
+                await existingSender.replaceTrack(newVideoTrack);
+            } else {
+                peerConnection.addTrack(newVideoTrack, localStream);
+                
+                // Нужен renegotiation только если добавили новый трек
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                state.socket.emit('video-renegotiate', {
+                    to: currentCallUser.id,
+                    offer: offer
+                });
+            }
         } catch (e) {
             console.error('Не удалось включить видео:', e);
             alert('Не удалось получить доступ к камере');
@@ -1844,36 +1963,56 @@ function checkHideVideos() {
 }
 
 async function toggleScreenShare() {
-    if (!peerConnection) return;
+    if (!peerConnection || !currentCallUser) return;
     
     const screenShareBtn = document.getElementById('screen-share-btn');
     
     if (isScreenSharing) {
-        stopScreenShare();
+        await stopScreenShare();
     } else {
         try {
             screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
+                video: {
+                    cursor: 'always',
+                    displaySurface: 'monitor'
+                },
                 audio: true
             });
             
             const screenTrack = screenStream.getVideoTracks()[0];
             
+            // Находим видео sender и заменяем трек
             const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
             if (sender) {
-                sender.replaceTrack(screenTrack);
+                await sender.replaceTrack(screenTrack);
             } else {
+                // Если нет видео трека, добавляем новый и делаем renegotiation
                 peerConnection.addTrack(screenTrack, screenStream);
+                
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                state.socket.emit('video-renegotiate', {
+                    to: currentCallUser.id,
+                    offer: offer
+                });
             }
+            
+            // Уведомляем собеседника о начале демонстрации
+            state.socket.emit('screen-share-started', { to: currentCallUser.id });
             
             document.getElementById('local-video').srcObject = screenStream;
             document.getElementById('call-videos').classList.remove('hidden');
             isScreenSharing = true;
             screenShareBtn?.classList.add('active');
             
+            // Когда пользователь останавливает демонстрацию через браузер
             screenTrack.onended = () => stopScreenShare();
         } catch (e) {
             console.error('Ошибка демонстрации экрана:', e);
+            if (e.name !== 'NotAllowedError') {
+                alert('Не удалось начать демонстрацию экрана');
+            }
         }
     }
 }
@@ -1887,14 +2026,23 @@ async function stopScreenShare() {
     }
     
     const videoTrack = localStream?.getVideoTracks()[0];
-    if (videoTrack && videoTrack.enabled) {
-        const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-            sender.replaceTrack(videoTrack);
-        }
+    const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+    
+    if (videoTrack && videoTrack.enabled && sender) {
+        // Возвращаем камеру
+        await sender.replaceTrack(videoTrack);
         document.getElementById('local-video').srcObject = localStream;
+    } else if (sender) {
+        // Если камеры нет, отправляем null трек
+        await sender.replaceTrack(null);
+        checkHideVideos();
     } else {
         checkHideVideos();
+    }
+    
+    // Уведомляем собеседника об окончании демонстрации
+    if (currentCallUser && state.socket) {
+        state.socket.emit('screen-share-stopped', { to: currentCallUser.id });
     }
     
     isScreenSharing = false;
