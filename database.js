@@ -500,7 +500,7 @@ async function saveMessage(senderId, receiverId, text, messageType = 'text', cal
 async function getMessages(userId1, userId2, limit = 50, before = null) {
     try {
         let query = `
-            SELECT id, sender_id, receiver_id, text, message_type, call_duration, created_at 
+            SELECT id, sender_id, receiver_id, text, message_type, call_duration, created_at, updated_at
             FROM messages 
             WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
         `;
@@ -515,7 +515,25 @@ async function getMessages(userId1, userId2, limit = 50, before = null) {
         params.push(Math.min(limit, 100)); // Максимум 100
         
         const result = await pool.query(query, params);
-        return result.rows.reverse(); // Возвращаем в хронологическом порядке
+        const messages = result.rows.reverse();
+        
+        // Загружаем реакции
+        if (messages.length > 0) {
+            const messageIds = messages.map(m => m.id);
+            const reactionsResult = await pool.query(
+                `SELECT message_id, emoji, COUNT(*) as count, array_agg(user_id) as user_ids
+                 FROM message_reactions WHERE message_id = ANY($1) GROUP BY message_id, emoji`,
+                [messageIds]
+            );
+            const reactionsMap = {};
+            for (const r of reactionsResult.rows) {
+                if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
+                reactionsMap[r.message_id].push({ emoji: r.emoji, count: parseInt(r.count), user_ids: r.user_ids });
+            }
+            for (const msg of messages) msg.reactions = reactionsMap[msg.id] || [];
+        }
+        
+        return messages;
     } catch (error) {
         console.error('Get messages error:', error);
         return [];
