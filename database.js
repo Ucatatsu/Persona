@@ -772,7 +772,6 @@ module.exports = {
     globalSearch,
     // Premium
     updatePremiumSettings,
-    isCustomTagAvailable,
     isCustomIdAvailable,
     // Сообщения
     editMessage,
