@@ -7430,115 +7430,7 @@ input[type="range"]:focus::-moz-range-thumb {
 }
 
 
-/* === SIDEBAR DOCK NAVIGATION === */
-.sidebar-dock {
-  padding: 12px 16px;
-  display: flex;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.dock-outer {
-  display: flex;
-  justify-content: center;
-}
-
-.dock-panel {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 12px 16px 16px;
-  background: rgba(10, 22, 40, 0.8);
-  border-radius: 16px;
-  border: 1px solid var(--glass-border);
-}
-
-.dock-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: center bottom;
-  outline: none;
-  min-width: 50px;
-}
-
-.dock-item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 12px;
-}
-
-.dock-icon {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  background: var(--bg-medium);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.dock-item:hover .dock-icon {
-  background: var(--bg-light);
-  transform: scale(1.05);
-}
-
-.dock-item.active .dock-icon {
-  background: var(--accent);
-  box-shadow: 0 4px 12px rgba(79, 195, 247, 0.4);
-}
-
-.dock-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  text-align: center;
-}
-
-.dock-item:hover .dock-label {
-  color: var(--text);
-}
-
-.dock-item.active .dock-label {
-  color: var(--accent);
-  font-weight: 500;
-}
-
-/* Кнопка создания */
-.dock-item[data-index="4"] .dock-icon {
-  background: linear-gradient(135deg, var(--accent), var(--blue));
-}
-
-.dock-item[data-index="4"]:hover .dock-icon {
-  transform: scale(1.05) rotate(90deg);
-}
-
-/* Mobile dock */
-@media (max-width: 768px) {
-  .sidebar-dock {
-    padding: 8px 12px;
-  }
-
-  .dock-panel {
-    gap: 6px;
-    padding: 8px 12px 12px;
-  }
-
-  .dock-icon {
-    width: 38px;
-    height: 38px;
-    font-size: 18px;
-  }
-
-  .dock-label {
-    font-size: 10px;
-  }
-}
+/* Dock стили перенесены ниже для избежания дублирования */
 
 
 /* === STYLED RANGE SLIDER === */
@@ -7627,7 +7519,7 @@ input[type="range"]:focus::-moz-range-thumb {
 
 /* === SIDEBAR DOCK NAVIGATION === */
 .sidebar-dock {
-  padding: 12px 16px;
+  padding: 12px 8px;
   display: flex;
   justify-content: center;
   flex-shrink: 0;
@@ -7636,16 +7528,21 @@ input[type="range"]:focus::-moz-range-thumb {
 .dock-outer {
   display: flex;
   justify-content: center;
+  width: 100%;
 }
 
 .dock-panel {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: flex-start;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 8px;
   background: rgba(10, 22, 40, 0.6);
   border-radius: 16px;
   border: 1px solid var(--glass-border);
+  width: 100%;
+  max-width: 100%;
 }
 
 .dock-item {
@@ -7657,6 +7554,7 @@ input[type="range"]:focus::-moz-range-thumb {
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: center top;
   outline: none;
+  flex: 0 0 auto;
 }
 
 .dock-item:focus-visible {
@@ -7710,24 +7608,29 @@ input[type="range"]:focus::-moz-range-thumb {
   color: var(--accent);
 }
 
-/* Кнопка создания */
+/* Кнопка подписки */
 .dock-item[data-index="4"] .dock-icon {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+}
+
+/* Кнопка создания */
+.dock-item[data-index="5"] .dock-icon {
   background: linear-gradient(135deg, var(--accent), var(--blue));
 }
 
-.dock-item[data-index="4"]:hover .dock-icon {
+.dock-item[data-index="5"]:hover .dock-icon {
   transform: rotate(90deg);
 }
 
-/* Mobile dock */
+/* Адаптивность dock при узком сайдбаре */
 @media (max-width: 768px) {
   .sidebar-dock {
-    padding: 8px 12px;
+    padding: 8px 6px;
   }
   
   .dock-panel {
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 6px;
+    padding: 6px;
   }
   
   .dock-icon {
@@ -7739,6 +7642,27 @@ input[type="range"]:focus::-moz-range-thumb {
   .dock-label {
     display: none;
   }
+}
+
+/* Очень узкий сайдбар - компактный режим */
+.sidebar.narrow .dock-panel,
+.sidebar[style*="width: 1"] .dock-panel,
+.sidebar[style*="width: 2"] .dock-panel {
+  gap: 4px;
+  padding: 6px;
+}
+
+.sidebar.narrow .dock-icon,
+.sidebar[style*="width: 1"] .dock-icon,
+.sidebar[style*="width: 2"] .dock-icon {
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  border-radius: 10px;
+}
+
+.sidebar.narrow .dock-label {
+  display: none;
 }
 
 
@@ -8752,4 +8676,118 @@ input[type="range"]:focus::-moz-range-thumb {
 
 .subscription-modal-content .subscription-card:nth-child(2) {
   animation-delay: 0.1s;
+}
+
+
+/* === ELECTRIC BORDER EFFECT === */
+.electric-border {
+  --electric-border-color: #FFD700;
+  --eb-border-width: 2px;
+  position: relative;
+  border-radius: inherit;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.electric-border.premium {
+  --electric-border-color: #FFD700;
+}
+
+.electric-border.premium-plus {
+  --electric-border-color: #a855f7;
+}
+
+.eb-svg {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  width: 10px;
+  height: 10px;
+  opacity: 0.001;
+  pointer-events: none;
+}
+
+.eb-content {
+  position: relative;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.eb-layers {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.eb-stroke,
+.eb-glow-1,
+.eb-glow-2,
+.eb-background-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.eb-stroke {
+  border: var(--eb-border-width) solid var(--electric-border-color);
+}
+
+.eb-glow-1 {
+  border: var(--eb-border-width) solid var(--electric-border-color);
+  opacity: 0.5;
+  filter: blur(calc(0.5px + (var(--eb-border-width) * 0.25)));
+}
+
+.eb-glow-2 {
+  border: var(--eb-border-width) solid var(--electric-border-color);
+  opacity: 0.5;
+  filter: blur(calc(2px + (var(--eb-border-width) * 0.5)));
+}
+
+.eb-background-glow {
+  z-index: -1;
+  transform: scale(1.08);
+  filter: blur(32px);
+  opacity: 0.3;
+  background: linear-gradient(-30deg, var(--electric-border-color), transparent, var(--electric-border-color));
+}
+
+/* Обновлённые карточки подписки с электрическим эффектом */
+.subscription-card {
+  position: relative;
+  background: rgba(10, 22, 40, 0.95);
+  border: none !important;
+  border-radius: 16px;
+  padding: 24px;
+  transition: transform 0.3s ease;
+  overflow: visible;
+}
+
+.subscription-card:hover {
+  transform: translateY(-4px);
+}
+
+.subscription-card.featured {
+  box-shadow: none;
+}
+
+.subscription-card .eb-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Убираем старые бордеры когда есть электрический эффект */
+.subscription-card.electric-border {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Плашка "Популярный" поверх эффекта */
+.subscription-card .plan-popular {
+  z-index: 10;
 }

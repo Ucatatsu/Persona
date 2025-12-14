@@ -4787,14 +4787,20 @@ function initSidebarResizer() {
     
     // Загружаем сохранённую ширину
     const savedWidth = localStorage.getItem('kvant_sidebar_width');
+    const initialWidth = savedWidth ? parseInt(savedWidth) : 320;
     if (savedWidth) {
         chatScreen.style.setProperty('--sidebar-width', savedWidth + 'px');
-        updatePanelButtons(parseInt(savedWidth));
     }
+    updatePanelButtons(initialWidth);
     
     function updatePanelButtons(width) {
         if (panelActions) {
             panelActions.style.display = width < 250 ? 'none' : 'flex';
+        }
+        // Добавляем класс narrow для узкого сайдбара
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            sidebar.classList.toggle('narrow', width < 280);
         }
     }
     
@@ -5329,6 +5335,96 @@ function openSubscriptionModal() {
     
     modal.classList.remove('hidden');
     loadSubscriptionStatus();
+    
+    // Инициализируем электрические рамки
+    setTimeout(() => {
+        document.querySelectorAll('.subscription-card').forEach((card, i) => {
+            if (!card.querySelector('.eb-layers')) {
+                const color = card.dataset.plan === 'premium_plus' ? '#a855f7' : '#FFD700';
+                initElectricBorder(card, color);
+            }
+        });
+    }, 100);
+}
+
+// === ELECTRIC BORDER EFFECT ===
+let electricBorderCounter = 0;
+
+function initElectricBorder(element, color = '#FFD700', options = {}) {
+    const { speed = 1, chaos = 1, thickness = 2 } = options;
+    const id = `eb-filter-${++electricBorderCounter}`;
+    
+    element.classList.add('electric-border');
+    element.style.setProperty('--electric-border-color', color);
+    element.style.setProperty('--eb-border-width', `${thickness}px`);
+    
+    // Создаём SVG фильтр
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('eb-svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = `
+        <defs>
+            <filter id="${id}" color-interpolation-filters="sRGB" x="-200%" y="-200%" width="500%" height="500%">
+                <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise1" seed="1"/>
+                <feOffset in="noise1" dx="0" dy="0" result="offsetNoise1">
+                    <animate attributeName="dy" values="700;0" dur="${6/speed}s" repeatCount="indefinite" calcMode="linear"/>
+                </feOffset>
+                <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise2" seed="1"/>
+                <feOffset in="noise2" dx="0" dy="0" result="offsetNoise2">
+                    <animate attributeName="dy" values="0;-700" dur="${6/speed}s" repeatCount="indefinite" calcMode="linear"/>
+                </feOffset>
+                <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise3" seed="2"/>
+                <feOffset in="noise3" dx="0" dy="0" result="offsetNoise3">
+                    <animate attributeName="dx" values="490;0" dur="${6/speed}s" repeatCount="indefinite" calcMode="linear"/>
+                </feOffset>
+                <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise4" seed="2"/>
+                <feOffset in="noise4" dx="0" dy="0" result="offsetNoise4">
+                    <animate attributeName="dx" values="0;-490" dur="${6/speed}s" repeatCount="indefinite" calcMode="linear"/>
+                </feOffset>
+                <feComposite in="offsetNoise1" in2="offsetNoise2" result="part1"/>
+                <feComposite in="offsetNoise3" in2="offsetNoise4" result="part2"/>
+                <feBlend in="part1" in2="part2" mode="color-dodge" result="combinedNoise"/>
+                <feDisplacementMap in="SourceGraphic" in2="combinedNoise" scale="${30 * chaos}" xChannelSelector="R" yChannelSelector="B"/>
+            </filter>
+        </defs>
+    `;
+    
+    // Создаём слои
+    const layers = document.createElement('div');
+    layers.className = 'eb-layers';
+    layers.innerHTML = `
+        <div class="eb-stroke" style="filter: url(#${id})"></div>
+        <div class="eb-glow-1" style="filter: url(#${id}) blur(calc(0.5px + (var(--eb-border-width) * 0.25)))"></div>
+        <div class="eb-glow-2" style="filter: url(#${id}) blur(calc(2px + (var(--eb-border-width) * 0.5)))"></div>
+        <div class="eb-background-glow"></div>
+    `;
+    
+    // Оборачиваем контент
+    const content = document.createElement('div');
+    content.className = 'eb-content';
+    while (element.firstChild) {
+        content.appendChild(element.firstChild);
+    }
+    
+    element.appendChild(svg);
+    element.appendChild(layers);
+    element.appendChild(content);
+    
+    // Обновляем размеры анимации
+    const updateSize = () => {
+        const width = element.clientWidth || 300;
+        const height = element.clientHeight || 400;
+        
+        svg.querySelectorAll('animate[attributeName="dy"]').forEach((anim, i) => {
+            anim.setAttribute('values', i === 0 ? `${height};0` : `0;-${height}`);
+        });
+        svg.querySelectorAll('animate[attributeName="dx"]').forEach((anim, i) => {
+            anim.setAttribute('values', i === 0 ? `${width};0` : `0;-${width}`);
+        });
+    };
+    
+    updateSize();
+    new ResizeObserver(updateSize).observe(element);
 }
 
 function closeSubscriptionModal() {
