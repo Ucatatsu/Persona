@@ -297,9 +297,19 @@ app.post('/api/login', authLimiter, async (req, res) => {
 });
 
 // Health check для Render
+let serverReady = false;
 app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: Date.now() });
+    // Всегда возвращаем 200, чтобы Render не убивал сервер
+    res.status(200).json({ 
+        status: serverReady ? 'ready' : 'starting', 
+        timestamp: Date.now() 
+    });
 });
+
+// Функция для установки готовности
+function setServerReady() {
+    serverReady = true;
+}
 
 // Правовые документы
 app.get('/api/legal/privacy', (_req, res) => {
@@ -1066,6 +1076,70 @@ app.get('/api/server-channels/:channelId/messages', authMiddleware, async (req, 
     }
 });
 
+// === SUPPORT TICKETS ===
+
+// Создать тикет
+app.post('/api/support/ticket', authMiddleware, async (req, res) => {
+    try {
+        const { category, message } = req.body;
+        
+        if (!category || !message) {
+            return res.status(400).json({ error: 'Заполните все поля' });
+        }
+        
+        const ticket = await db.createSupportTicket(req.user.id, category, message);
+        res.json(ticket);
+    } catch (error) {
+        console.error('Create ticket error:', error);
+        res.status(500).json({ error: 'Ошибка создания обращения' });
+    }
+});
+
+// Получить тикеты пользователя
+app.get('/api/support/tickets', authMiddleware, async (req, res) => {
+    try {
+        const tickets = await db.getUserTickets(req.user.id);
+        res.json(tickets);
+    } catch (error) {
+        console.error('Get tickets error:', error);
+        res.status(500).json([]);
+    }
+});
+
+// Получить все тикеты (админ)
+app.get('/api/admin/support/tickets', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const tickets = await db.getAllTickets();
+        res.json(tickets);
+    } catch (error) {
+        console.error('Get all tickets error:', error);
+        res.status(500).json([]);
+    }
+});
+
+// Ответить на тикет (админ)
+app.post('/api/admin/support/ticket/:ticketId/reply', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { message } = req.body;
+        const reply = await db.replyToTicket(req.params.ticketId, req.user.id, message);
+        res.json(reply);
+    } catch (error) {
+        console.error('Reply ticket error:', error);
+        res.status(500).json({ error: 'Ошибка ответа' });
+    }
+});
+
+// Закрыть тикет (админ)
+app.post('/api/admin/support/ticket/:ticketId/close', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        await db.closeTicket(req.params.ticketId);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Close ticket error:', error);
+        res.status(500).json({ error: 'Ошибка закрытия' });
+    }
+});
+
 // === PUSH УВЕДОМЛЕНИЯ ===
 
 async function sendPushNotification(userId, payload) {
@@ -1514,14 +1588,22 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 
-db.initDB().then(() => {
-    server.listen(PORT, () => {
-        console.log(`✅ Квант запущен на порту ${PORT}`);
+// Флаг готовности сервера
+let isReady = false;
+
+// Запускаем сервер сразу, чтобы Render мог делать health check
+server.listen(PORT, () => {
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    
+    // Инициализируем БД после запуска сервера
+    db.initDB().then(() => {
+        setServerReady();
+        console.log(`✅ Квант полностью готов`);
         if (!VAPID_PUBLIC_KEY) {
             console.log('⚠️  Push-уведомления отключены (нет VAPID ключей)');
         }
+    }).catch(err => {
+        console.error('❌ Ошибка инициализации БД:', err);
+        process.exit(1);
     });
-}).catch(err => {
-    console.error('❌ Ошибка инициализации БД:', err);
-    process.exit(1);
 });

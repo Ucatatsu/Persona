@@ -4852,6 +4852,57 @@ document.addEventListener('DOMContentLoaded', () => {
 // === SETTINGS HANDLERS ===
 
 document.addEventListener('DOMContentLoaded', () => {
+    // FAQ аккордеон
+    document.querySelectorAll('.faq-question').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const item = btn.closest('.faq-item');
+            const wasOpen = item.classList.contains('open');
+            
+            // Закрываем все
+            document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+            
+            // Открываем текущий если был закрыт
+            if (!wasOpen) {
+                item.classList.add('open');
+            }
+        });
+    });
+    
+    // Форма поддержки
+    document.getElementById('support-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const category = document.getElementById('support-category').value;
+        const message = document.getElementById('support-message').value.trim();
+        
+        if (!category || !message) {
+            showToast('Заполните все поля', 'error');
+            return;
+        }
+        
+        const btn = e.target.querySelector('.support-submit-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span>Отправка...</span>';
+        
+        try {
+            const res = await api.post('/api/support/ticket', { category, message });
+            const data = await res.json();
+            
+            if (res.ok) {
+                showToast('Обращение отправлено!', 'success');
+                e.target.reset();
+                loadSupportTickets();
+            } else {
+                showToast(data.error || 'Ошибка отправки', 'error');
+            }
+        } catch (err) {
+            showToast('Ошибка сети', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Отправить</span>';
+        }
+    });
+    
     // Уведомления
     document.getElementById('notifications-checkbox')?.addEventListener('change', (e) => {
         state.notificationsEnabled = e.target.checked;
@@ -5495,6 +5546,77 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Оплата временно недоступна', 'info');
     });
 });
+
+// === SUPPORT TICKETS ===
+async function loadSupportTickets() {
+    const container = document.getElementById('support-tickets');
+    if (!container) return;
+    
+    try {
+        const res = await api.get('/api/support/tickets');
+        if (!res.ok) throw new Error('Failed to load');
+        
+        const tickets = await res.json();
+        
+        if (!tickets.length) {
+            container.innerHTML = `
+                <div class="tickets-empty">
+                    <span class="tickets-empty-icon">📭</span>
+                    <p>У вас пока нет обращений</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const categoryLabels = {
+            bug: '🐛 Ошибка',
+            feature: '💡 Предложение',
+            account: '👤 Аккаунт',
+            payment: '💳 Оплата',
+            other: '📝 Другое'
+        };
+        
+        const statusLabels = {
+            open: 'Открыт',
+            answered: 'Отвечен',
+            closed: 'Закрыт'
+        };
+        
+        container.innerHTML = tickets.map(t => `
+            <div class="ticket-item" data-ticket-id="${t.id}">
+                <div class="ticket-info">
+                    <span class="ticket-category">${categoryLabels[t.category] || t.category}</span>
+                    <span class="ticket-preview">${escapeHtml(t.message.substring(0, 50))}${t.message.length > 50 ? '...' : ''}</span>
+                </div>
+                <div class="ticket-meta">
+                    <span class="ticket-date">${formatDate(t.created_at)}</span>
+                    <span class="ticket-status ${t.status}">${statusLabels[t.status] || t.status}</span>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (e) {
+        console.log('Failed to load tickets:', e);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 60000) return 'только что';
+    if (diff < 3600000) return Math.floor(diff / 60000) + ' мин назад';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + ' ч назад';
+    
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
 
 function updateCreateModalUI(type) {
     const membersSection = document.getElementById('create-members-section');

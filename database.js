@@ -113,6 +113,33 @@ async function initDB() {
             )
         `);
         
+        // === SUPPORT TICKETS ===
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS support_tickets (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                message TEXT NOT NULL,
+                status TEXT DEFAULT 'open',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS support_replies (
+                id TEXT PRIMARY KEY,
+                ticket_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                message TEXT NOT NULL,
+                is_admin INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
         // === ГРУППОВЫЕ ЧАТЫ ===
         sqlite.exec(`
             CREATE TABLE IF NOT EXISTS group_chats (
@@ -434,6 +461,30 @@ async function initDB() {
             )
         `);
         await client.query('CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_id)').catch(() => {});
+
+        // === SUPPORT TICKETS ===
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS support_tickets (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                category TEXT NOT NULL,
+                message TEXT NOT NULL,
+                status TEXT DEFAULT 'open',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS support_replies (
+                id TEXT PRIMARY KEY,
+                ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                is_admin BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
 
         // === ГРУППОВЫЕ ЧАТЫ ===
         await client.query(`
