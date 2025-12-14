@@ -6151,7 +6151,8 @@ input[type="range"]:focus::-moz-range-thumb {
   height: 4px;
   opacity: 0;
   transition: width 0.2s, opacity 0.2s;
-  background: transparent;
+  background: linear-gradient(to right, white 100%, rgba(255,255,255,0.3) 100%);
+  border-radius: 2px;
   cursor: pointer;
 }
 
@@ -6163,7 +6164,7 @@ input[type="range"]:focus::-moz-range-thumb {
 .vfp-volume-slider::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.3);
+  background: transparent;
 }
 
 .vfp-volume-slider::-webkit-slider-thumb {
