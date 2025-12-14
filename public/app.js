@@ -1041,8 +1041,7 @@ function createMessageElement(msg, isSent) {
         // Telegram-style: превью с временем, автоплей без звука
         bubbleContent = `
             <div class="video-message" data-src="${escapeAttr(msg.text)}">
-                <video class="video-preview" loop muted playsinline preload="auto">
-                    <source src="${escapeAttr(msg.text)}" type="video/mp4">
+                <video class="video-preview" loop muted playsinline preload="metadata" src="${escapeAttr(msg.text)}">
                 </video>
                 <span class="video-duration">0:00</span>
                 <div class="video-mute-indicator">🔇</div>
@@ -1135,6 +1134,13 @@ function initVideoMessage(container) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
     
+    // Обработка ошибок загрузки
+    video.addEventListener('error', (e) => {
+        console.error('Video load error:', video.src, e);
+        durationEl.textContent = '⚠️';
+        container.style.opacity = '0.5';
+    });
+    
     // Показать длительность когда загрузится
     video.addEventListener('loadedmetadata', () => {
         durationEl.textContent = formatDuration(video.duration);
@@ -1176,8 +1182,7 @@ function openVideoViewer(url, startTime = 0) {
     player.innerHTML = `
         <div class="vfp-overlay"></div>
         <div class="vfp-container">
-            <video class="vfp-video" playsinline>
-                <source src="${escapeAttr(url)}" type="video/mp4">
+            <video class="vfp-video" playsinline src="${escapeAttr(url)}">
             </video>
             <div class="vfp-controls">
                 <div class="vfp-progress-container">
