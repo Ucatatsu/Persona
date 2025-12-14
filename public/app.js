@@ -519,17 +519,25 @@ function initSocket() {
         // Проверяем не отключены ли уведомления от этого пользователя
         const isMuted = isUserMuted(message.sender_id);
         
-        // Воспроизводим звук если не muted
-        if (!isMuted) {
+        // Воспроизводим звук если не muted и это не наше сообщение
+        if (!isMuted && message.sender_id !== state.currentUser.id) {
             ensureSoundsInitialized();
             sounds.playMessage?.();
         }
         
-        if (state.selectedUser && message.sender_id === state.selectedUser.id) {
+        // Проверяем, относится ли сообщение к текущему открытому чату
+        const isCurrentChat = state.selectedUser && (
+            message.sender_id === state.selectedUser.id || 
+            message.receiver_id === state.selectedUser.id
+        );
+        
+        if (isCurrentChat) {
             appendMessage(message);
-            markAsRead();
-        } else if (!isMuted) {
-            // Показываем уведомление только если не muted
+            if (message.sender_id !== state.currentUser.id) {
+                markAsRead();
+            }
+        } else if (!isMuted && message.sender_id !== state.currentUser.id) {
+            // Показываем уведомление только если не muted и не наше сообщение
             const localNickname = getLocalNickname(message.sender_id);
             const senderName = localNickname || message.sender_name || 'Новое сообщение';
             showNotification(senderName, message.text, () => {
@@ -1030,23 +1038,14 @@ function createMessageElement(msg, isSent) {
     if (isMedia) {
         bubbleContent = `<img src="${escapeAttr(msg.text)}" class="message-media" alt="Изображение" loading="lazy">`;
     } else if (isVideo) {
+        // Telegram-style: превью с временем, автоплей без звука
         bubbleContent = `
-            <div class="video-player" data-src="${escapeAttr(msg.text)}">
-                <video class="video-element" preload="metadata" playsinline>
+            <div class="video-message" data-src="${escapeAttr(msg.text)}">
+                <video class="video-preview" loop muted playsinline preload="auto">
                     <source src="${escapeAttr(msg.text)}" type="video/mp4">
                 </video>
-                <div class="video-overlay">
-                    <button class="video-play-btn">▶</button>
-                </div>
-                <div class="video-controls hidden">
-                    <button class="video-play-pause">▶</button>
-                    <div class="video-progress">
-                        <div class="video-progress-bar"></div>
-                    </div>
-                    <span class="video-time">0:00</span>
-                    <button class="video-mute">🔊</button>
-                    <button class="video-fullscreen">⛶</button>
-                </div>
+                <span class="video-duration">0:00</span>
+                <div class="video-mute-indicator">🔇</div>
             </div>`;
     } else {
         bubbleContent = escapeHtml(msg.text);
@@ -1069,9 +1068,9 @@ function createMessageElement(msg, isSent) {
         });
     }
     
-    // Инициализация видеоплеера
+    // Инициализация видео (Telegram-style)
     if (isVideo) {
-        initVideoPlayer(div.querySelector('.video-player'));
+        initVideoMessage(div.querySelector('.video-message'));
     }
     
     // Контекстное меню по правому клику
@@ -1119,166 +1118,280 @@ function openMediaViewer(url) {
 // Делаем функцию глобальной для onclick в HTML
 window.openMediaViewer = openMediaViewer;
 
-// === КАСТОМНЫЙ ВИДЕОПЛЕЕР ===
-function initVideoPlayer(container) {
+// === TELEGRAM-STYLE VIDEO MESSAGE ===
+function initVideoMessage(container) {
     if (!container) return;
     
-    const video = container.querySelector('.video-element');
-    const overlay = container.querySelector('.video-overlay');
-    const playBtn = container.querySelector('.video-play-btn');
-    const controls = container.querySelector('.video-controls');
-    const playPauseBtn = container.querySelector('.video-play-pause');
-    const progress = container.querySelector('.video-progress');
-    const progressBar = container.querySelector('.video-progress-bar');
-    const timeDisplay = container.querySelector('.video-time');
-    const muteBtn = container.querySelector('.video-mute');
-    const fullscreenBtn = container.querySelector('.video-fullscreen');
+    const video = container.querySelector('.video-preview');
+    const durationEl = container.querySelector('.video-duration');
+    const muteIndicator = container.querySelector('.video-mute-indicator');
     
     if (!video) return;
     
-    // Форматирование времени
-    const formatTime = (seconds) => {
+    const formatDuration = (seconds) => {
+        if (!seconds || isNaN(seconds)) return '0:00';
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
     
-    // Показать/скрыть контролы
-    const showControls = () => {
-        controls?.classList.remove('hidden');
-        overlay?.classList.add('hidden');
-    };
-    
-    const hideControls = () => {
-        if (video.paused) {
-            overlay?.classList.remove('hidden');
-            controls?.classList.add('hidden');
-        }
-    };
-    
-    // Play/Pause
-    const togglePlay = () => {
-        if (video.paused) {
-            video.play().catch(e => console.log('Play error:', e));
-        } else {
-            video.pause();
-        }
-    };
-    
-    // Обработчики видео
+    // Показать длительность когда загрузится
     video.addEventListener('loadedmetadata', () => {
-        timeDisplay.textContent = formatTime(video.duration);
+        durationEl.textContent = formatDuration(video.duration);
     });
     
-    video.addEventListener('play', () => {
-        showControls();
-        playPauseBtn.textContent = '⏸';
-        playBtn.textContent = '⏸';
+    // Автоплей когда видео в зоне видимости
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                video.play().catch(() => {});
+            } else {
+                video.pause();
+            }
+        });
+    }, { threshold: 0.5 });
+    
+    observer.observe(container);
+    
+    // Клик - открыть полноэкранный плеер
+    container.addEventListener('click', () => {
+        openVideoViewer(container.dataset.src, video.currentTime);
     });
     
-    video.addEventListener('pause', () => {
-        playPauseBtn.textContent = '▶';
-        playBtn.textContent = '▶';
+    // Клик на индикатор звука - включить/выключить
+    muteIndicator?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        video.muted = !video.muted;
+        muteIndicator.textContent = video.muted ? '🔇' : '🔊';
+        muteIndicator.classList.toggle('unmuted', !video.muted);
     });
+}
+
+// === YOUTUBE-STYLE FULLSCREEN VIDEO PLAYER ===
+function openVideoViewer(url, startTime = 0) {
+    document.querySelector('.video-fullscreen-player')?.remove();
     
-    video.addEventListener('ended', () => {
-        playPauseBtn.textContent = '▶';
-        playBtn.textContent = '▶';
-        overlay?.classList.remove('hidden');
+    const player = document.createElement('div');
+    player.className = 'video-fullscreen-player';
+    player.innerHTML = `
+        <div class="vfp-overlay"></div>
+        <div class="vfp-container">
+            <video class="vfp-video" playsinline>
+                <source src="${escapeAttr(url)}" type="video/mp4">
+            </video>
+            <div class="vfp-controls">
+                <div class="vfp-progress-container">
+                    <div class="vfp-progress">
+                        <div class="vfp-progress-buffered"></div>
+                        <div class="vfp-progress-played"></div>
+                    </div>
+                </div>
+                <div class="vfp-buttons">
+                    <div class="vfp-left">
+                        <button class="vfp-btn vfp-play">▶</button>
+                        <div class="vfp-volume">
+                            <button class="vfp-btn vfp-mute">🔊</button>
+                            <input type="range" class="vfp-volume-slider" min="0" max="1" step="0.1" value="1">
+                        </div>
+                        <span class="vfp-time">0:00 / 0:00</span>
+                    </div>
+                    <div class="vfp-right">
+                        <button class="vfp-btn vfp-pip" title="Картинка в картинке">⧉</button>
+                        <button class="vfp-btn vfp-fullscreen" title="Полный экран">⛶</button>
+                        <button class="vfp-btn vfp-close">✕</button>
+                    </div>
+                </div>
+            </div>
+            <div class="vfp-center-play hidden">▶</div>
+        </div>
+    `;
+    
+    document.body.appendChild(player);
+    
+    const video = player.querySelector('.vfp-video');
+    const controls = player.querySelector('.vfp-controls');
+    const progressContainer = player.querySelector('.vfp-progress-container');
+    const progressPlayed = player.querySelector('.vfp-progress-played');
+    const progressBuffered = player.querySelector('.vfp-progress-buffered');
+    const playBtn = player.querySelector('.vfp-play');
+    const muteBtn = player.querySelector('.vfp-mute');
+    const volumeSlider = player.querySelector('.vfp-volume-slider');
+    const timeDisplay = player.querySelector('.vfp-time');
+    const pipBtn = player.querySelector('.vfp-pip');
+    const fullscreenBtn = player.querySelector('.vfp-fullscreen');
+    const closeBtn = player.querySelector('.vfp-close');
+    const overlay = player.querySelector('.vfp-overlay');
+    const centerPlay = player.querySelector('.vfp-center-play');
+    
+    const formatTime = (s) => {
+        if (!s || isNaN(s)) return '0:00';
+        const m = Math.floor(s / 60);
+        const sec = Math.floor(s % 60);
+        return `${m}:${sec.toString().padStart(2, '0')}`;
+    };
+    
+    let hideControlsTimeout;
+    const showControls = () => {
+        controls.classList.add('visible');
+        clearTimeout(hideControlsTimeout);
+        if (!video.paused) {
+            hideControlsTimeout = setTimeout(() => {
+                controls.classList.remove('visible');
+            }, 3000);
+        }
+    };
+    
+    // Video events
+    video.addEventListener('loadedmetadata', () => {
+        video.currentTime = startTime;
+        video.play().catch(() => {});
+        timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
     });
     
     video.addEventListener('timeupdate', () => {
         const percent = (video.currentTime / video.duration) * 100;
-        progressBar.style.width = `${percent}%`;
+        progressPlayed.style.width = `${percent}%`;
         timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
     });
     
-    // Клики
-    playBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        togglePlay();
+    video.addEventListener('progress', () => {
+        if (video.buffered.length > 0) {
+            const buffered = (video.buffered.end(video.buffered.length - 1) / video.duration) * 100;
+            progressBuffered.style.width = `${buffered}%`;
+        }
     });
     
-    playPauseBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        togglePlay();
+    video.addEventListener('play', () => {
+        playBtn.textContent = '⏸';
+        centerPlay.classList.add('hidden');
     });
     
-    overlay?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        togglePlay();
+    video.addEventListener('pause', () => {
+        playBtn.textContent = '▶';
+        centerPlay.classList.remove('hidden');
+        controls.classList.add('visible');
     });
     
-    video.addEventListener('click', (e) => {
-        e.stopPropagation();
-        togglePlay();
+    video.addEventListener('ended', () => {
+        playBtn.textContent = '↺';
     });
     
-    // Прогресс бар
-    progress?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const rect = progress.getBoundingClientRect();
+    // Controls
+    const togglePlay = () => {
+        if (video.ended) {
+            video.currentTime = 0;
+        }
+        video.paused ? video.play() : video.pause();
+    };
+    
+    playBtn.addEventListener('click', togglePlay);
+    video.addEventListener('click', togglePlay);
+    centerPlay.addEventListener('click', togglePlay);
+    
+    // Progress seek
+    progressContainer.addEventListener('click', (e) => {
+        const rect = progressContainer.getBoundingClientRect();
         const percent = (e.clientX - rect.left) / rect.width;
         video.currentTime = percent * video.duration;
     });
     
-    // Mute
-    muteBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
+    // Volume - загружаем сохранённую громкость
+    const savedVolume = parseFloat(localStorage.getItem('videoVolume') || '1');
+    video.volume = savedVolume;
+    volumeSlider.value = savedVolume;
+    updateVolumeSliderVisual(volumeSlider, savedVolume);
+    muteBtn.textContent = savedVolume === 0 ? '🔇' : '🔊';
+    
+    function updateVolumeSliderVisual(slider, value) {
+        const percent = value * 100;
+        slider.style.background = `linear-gradient(to right, white ${percent}%, rgba(255,255,255,0.3) ${percent}%)`;
+    }
+    
+    muteBtn.addEventListener('click', () => {
         video.muted = !video.muted;
         muteBtn.textContent = video.muted ? '🔇' : '🔊';
+        volumeSlider.value = video.muted ? 0 : video.volume;
+        updateVolumeSliderVisual(volumeSlider, video.muted ? 0 : video.volume);
+    });
+    
+    volumeSlider.addEventListener('input', (e) => {
+        const vol = parseFloat(e.target.value);
+        video.volume = vol;
+        video.muted = vol === 0;
+        muteBtn.textContent = vol === 0 ? '🔇' : '🔊';
+        updateVolumeSliderVisual(volumeSlider, vol);
+        localStorage.setItem('videoVolume', vol.toString());
+    });
+    
+    // PiP
+    pipBtn.addEventListener('click', async () => {
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else {
+                await video.requestPictureInPicture();
+            }
+        } catch (e) {
+            console.log('PiP not supported');
+        }
     });
     
     // Fullscreen
-    fullscreenBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openVideoViewer(container.dataset.src);
-    });
-    
-    // Показ контролов при наведении
-    container.addEventListener('mouseenter', () => {
-        if (!video.paused) showControls();
-    });
-    
-    container.addEventListener('mouseleave', () => {
-        if (!video.paused) {
-            setTimeout(() => {
-                if (!video.paused) {
-                    // Оставляем контролы видимыми при воспроизведении
-                }
-            }, 2000);
+    fullscreenBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            player.requestFullscreen().catch(() => {});
         }
     });
-}
-
-// Полноэкранный просмотр видео
-function openVideoViewer(url) {
-    document.querySelector('.media-viewer')?.remove();
     
-    const viewer = document.createElement('div');
-    viewer.className = 'media-viewer video-viewer';
-    viewer.innerHTML = `
-        <div class="media-viewer-overlay"></div>
-        <div class="video-viewer-container">
-            <video class="video-viewer-content" controls autoplay playsinline>
-                <source src="${escapeAttr(url)}" type="video/mp4">
-            </video>
-        </div>
-        <button class="media-viewer-close">✕</button>
-    `;
-    
-    viewer.querySelector('.media-viewer-overlay').addEventListener('click', () => viewer.remove());
-    viewer.querySelector('.media-viewer-close').addEventListener('click', () => viewer.remove());
-    
-    const handleEscape = (e) => {
-        if (e.key === 'Escape') {
-            viewer.remove();
-            document.removeEventListener('keydown', handleEscape);
-        }
+    // Close
+    const closePlayer = () => {
+        video.pause();
+        player.remove();
     };
-    document.addEventListener('keydown', handleEscape);
     
-    document.body.appendChild(viewer);
+    closeBtn.addEventListener('click', closePlayer);
+    overlay.addEventListener('click', closePlayer);
+    
+    // Keyboard
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') closePlayer();
+        if (e.key === ' ' || e.key === 'k') { e.preventDefault(); togglePlay(); }
+        if (e.key === 'ArrowLeft') video.currentTime -= 5;
+        if (e.key === 'ArrowRight') video.currentTime += 5;
+        if (e.key === 'ArrowUp') { 
+            e.preventDefault(); 
+            video.volume = Math.min(1, video.volume + 0.1);
+            volumeSlider.value = video.volume;
+            updateVolumeSliderVisual(volumeSlider, video.volume);
+            localStorage.setItem('videoVolume', video.volume.toString());
+        }
+        if (e.key === 'ArrowDown') { 
+            e.preventDefault(); 
+            video.volume = Math.max(0, video.volume - 0.1);
+            volumeSlider.value = video.volume;
+            updateVolumeSliderVisual(volumeSlider, video.volume);
+            localStorage.setItem('videoVolume', video.volume.toString());
+        }
+        if (e.key === 'm') { 
+            video.muted = !video.muted; 
+            muteBtn.textContent = video.muted ? '🔇' : '🔊';
+            updateVolumeSliderVisual(volumeSlider, video.muted ? 0 : video.volume);
+        }
+        if (e.key === 'f') fullscreenBtn.click();
+    };
+    
+    document.addEventListener('keydown', handleKeydown);
+    player.addEventListener('remove', () => document.removeEventListener('keydown', handleKeydown));
+    
+    // Show/hide controls on mouse move
+    player.addEventListener('mousemove', showControls);
+    player.addEventListener('mouseleave', () => {
+        if (!video.paused) controls.classList.remove('visible');
+    });
+    
+    showControls();
 }
 
 function renderReactions(reactions, messageId) {
@@ -1317,10 +1430,28 @@ function showMessageContextMenu(e, msg, isSent) {
     }
     
     menu.innerHTML = menuItems;
-    menu.style.left = `${e.clientX}px`;
-    menu.style.top = `${e.clientY}px`;
-    
     document.body.appendChild(menu);
+    
+    // Позиционирование с учётом границ экрана
+    const menuRect = menu.getBoundingClientRect();
+    let left = e.clientX;
+    let top = e.clientY;
+    
+    // Проверяем правую границу
+    if (left + menuRect.width > window.innerWidth) {
+        left = window.innerWidth - menuRect.width - 10;
+    }
+    // Проверяем нижнюю границу
+    if (top + menuRect.height > window.innerHeight) {
+        top = window.innerHeight - menuRect.height - 10;
+    }
+    // Проверяем левую границу
+    if (left < 10) left = 10;
+    // Проверяем верхнюю границу
+    if (top < 10) top = 10;
+    
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
     
     // Обработчики
     menu.addEventListener('click', async (ev) => {
@@ -2701,6 +2832,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('ctx-notif-icon').textContent = isMuted ? '🔕' : '🔔';
         document.getElementById('ctx-notif-text').textContent = isMuted ? 'Включить уведомления' : 'Отключить уведомления';
         
+        // Позиционируем меню под кнопкой
+        const btnRect = chatMenuBtn.getBoundingClientRect();
+        chatContextMenu.style.top = `${btnRect.bottom + 8}px`;
+        chatContextMenu.style.right = `${window.innerWidth - btnRect.right}px`;
+        chatContextMenu.style.left = 'auto';
+        
         chatContextMenu?.classList.toggle('hidden');
     });
     
@@ -3914,8 +4051,11 @@ function updateChatHeaderAvatar() {
 document.addEventListener('DOMContentLoaded', () => {
     initSidebarResizer();
     
-    // Обработчики для кнопок в хедере
+    // Обработчики для кнопок в хедере (звонки)
     document.querySelectorAll('.header-action-btn').forEach((btn, index) => {
+        // Пропускаем кнопку меню - у неё свой обработчик
+        if (btn.id === 'chat-menu-btn') return;
+        
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (!state.selectedUser) return;
@@ -3924,9 +4064,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 startCall(false); // Аудио
             } else if (index === 1) {
                 startCall(true); // Видео
-            } else if (index === 2) {
-                // Меню - можно добавить dropdown
-                showUserProfile(state.selectedUser.id);
             }
         });
     });

@@ -1,33 +1,131 @@
-const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
-// Подключение к PostgreSQL
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes('render.com') ? { rejectUnauthorized: false } : false,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-});
+// Определяем какую БД использовать
+const USE_SQLITE = !process.env.DATABASE_URL || process.env.USE_SQLITE === 'true';
 
-// Обработка ошибок пула
-pool.on('error', (err) => {
-    console.error('Unexpected database error:', err);
-});
+let pool = null;
+let sqlite = null;
+
+if (USE_SQLITE) {
+    // SQLite для локальной разработки
+    const Database = require('better-sqlite3');
+    sqlite = new Database('kvant_local.db');
+    sqlite.pragma('journal_mode = WAL');
+    console.log('📦 Используется SQLite (локальная разработка)');
+} else {
+    // PostgreSQL для продакшена
+    const { Pool } = require('pg');
+    pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.DATABASE_URL?.includes('render.com') ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    });
+    
+    pool.on('error', (err) => {
+        console.error('Unexpected database error:', err);
+    });
+}
 
 // Генерация уникального короткого ID (типа Discord: #1234)
-async function generateUniqueTag(client) {
+async function generateUniqueTag(clientOrDb) {
     for (let i = 0; i < 100; i++) {
-        const tag = Math.floor(1000 + Math.random() * 9000).toString(); // 1000-9999
-        const exists = await client.query('SELECT 1 FROM users WHERE tag = $1', [tag]);
-        if (exists.rows.length === 0) return tag;
+        const tag = Math.floor(1000 + Math.random() * 9000).toString();
+        if (USE_SQLITE) {
+            const exists = sqlite.prepare('SELECT 1 FROM users WHERE tag = ?').get(tag);
+            if (!exists) return tag;
+        } else {
+            const exists = await clientOrDb.query('SELECT 1 FROM users WHERE tag = $1', [tag]);
+            if (exists.rows.length === 0) return tag;
+        }
     }
-    // Если 4-значные закончились, генерируем 5-значный
     return Math.floor(10000 + Math.random() * 90000).toString();
 }
 
 async function initDB() {
+    if (USE_SQLITE) {
+        // SQLite инициализация
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                tag TEXT UNIQUE,
+                role TEXT DEFAULT 'user',
+                premium_until TEXT,
+                display_name TEXT,
+                phone TEXT,
+                bio TEXT,
+                avatar_url TEXT,
+                banner_url TEXT,
+                name_color TEXT,
+                profile_theme TEXT DEFAULT 'default',
+                profile_color TEXT,
+                custom_id TEXT,
+                hide_online INTEGER DEFAULT 0,
+                settings TEXT DEFAULT '{}',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                sender_id TEXT NOT NULL,
+                receiver_id TEXT NOT NULL,
+                text TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                message_type TEXT DEFAULT 'text',
+                call_duration INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT,
+                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, endpoint),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS message_reactions (
+                id TEXT PRIMARY KEY,
+                message_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                emoji TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(message_id, user_id, emoji),
+                FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        // Индексы
+        try { sqlite.exec('CREATE INDEX idx_messages_sender ON messages(sender_id)'); } catch {}
+        try { sqlite.exec('CREATE INDEX idx_messages_receiver ON messages(receiver_id)'); } catch {}
+        try { sqlite.exec('CREATE INDEX idx_messages_created ON messages(created_at DESC)'); } catch {}
+        try { sqlite.exec('CREATE INDEX idx_users_username ON users(username)'); } catch {}
+        try { sqlite.exec('CREATE INDEX idx_users_tag ON users(tag)'); } catch {}
+        try { sqlite.exec('CREATE INDEX idx_reactions_message ON message_reactions(message_id)'); } catch {}
+        
+        console.log('✅ SQLite база данных инициализирована');
+        return;
+    }
+    
+    // PostgreSQL инициализация
     const client = await pool.connect();
     try {
         await client.query(`
@@ -50,7 +148,6 @@ async function initDB() {
             )
         `);
         
-        // Добавляем новые колонки
         const alterQueries = [
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT',
@@ -61,11 +158,10 @@ async function initDB() {
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS tag TEXT UNIQUE',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT \'user\'',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TIMESTAMP',
-            // Premium features
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS name_color TEXT',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_theme TEXT DEFAULT \'default\'',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_color TEXT',
-            'ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_tag TEXT', // deprecated, use custom_id
+            'ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_tag TEXT',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_id TEXT',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS hide_online BOOLEAN DEFAULT FALSE',
             'ALTER TABLE users ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT \'{}\''
@@ -75,26 +171,13 @@ async function initDB() {
             await client.query(query).catch(() => {});
         }
         
-        // Генерируем tag для пользователей без него
         const usersWithoutTag = await client.query('SELECT id FROM users WHERE tag IS NULL');
         for (const user of usersWithoutTag.rows) {
             const tag = await generateUniqueTag(client);
             await client.query('UPDATE users SET tag = $1 WHERE id = $2', [tag, user.id]);
         }
         
-        // Создаём индекс для tag
         await client.query('CREATE INDEX IF NOT EXISTS idx_users_tag ON users(tag)').catch(() => {});
-        
-        // Очищаем локальные URL аватарок/баннеров (они не работают после редеплоя)
-        // Оставляем только Cloudinary URL (начинаются с https://)
-        await client.query(`
-            UPDATE users SET avatar_url = NULL 
-            WHERE avatar_url IS NOT NULL AND avatar_url NOT LIKE 'https://%'
-        `).catch(() => {});
-        await client.query(`
-            UPDATE users SET banner_url = NULL 
-            WHERE banner_url IS NOT NULL AND banner_url NOT LIKE 'https://%'
-        `).catch(() => {});
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS messages (
@@ -112,14 +195,13 @@ async function initDB() {
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE').catch(() => {});
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT \'text\'').catch(() => {});
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_duration INTEGER DEFAULT 0').catch(() => {});
+        await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP').catch(() => {});
 
-        // Индексы
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at DESC)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)').catch(() => {});
 
-        // Push подписки
         await client.query(`
             CREATE TABLE IF NOT EXISTS push_subscriptions (
                 id TEXT PRIMARY KEY,
@@ -132,7 +214,6 @@ async function initDB() {
             )
         `);
 
-        // Реакции на сообщения
         await client.query(`
             CREATE TABLE IF NOT EXISTS message_reactions (
                 id TEXT PRIMARY KEY,
@@ -144,16 +225,8 @@ async function initDB() {
             )
         `);
         await client.query('CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_id)').catch(() => {});
-        
-        // Колонка updated_at для сообщений (редактирование)
-        await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP').catch(() => {});
 
-        console.log('✅ База данных инициализирована');
-
-        // Добавляем updated_at для сообщений (для редактирования)
-        await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP').catch(() => {});
-
-        console.log('✅ База данных инициализирована');
+        console.log('✅ PostgreSQL база данных инициализирована');
     } finally {
         client.release();
     }
@@ -162,9 +235,35 @@ async function initDB() {
 // === ПОЛЬЗОВАТЕЛИ ===
 
 async function createUser(username, password) {
+    if (USE_SQLITE) {
+        try {
+            const existing = sqlite.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(username);
+            if (existing) {
+                return { success: false, error: 'Пользователь уже существует' };
+            }
+            
+            const hash = await bcrypt.hash(password, 12);
+            const id = uuidv4();
+            const tag = await generateUniqueTag();
+            
+            const adminUsernames = (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const role = adminUsernames.includes(username.toLowerCase()) ? 'admin' : 'user';
+            
+            sqlite.prepare('INSERT INTO users (id, username, password, tag, role) VALUES (?, ?, ?, ?, ?)').run(id, username, hash, tag, role);
+            
+            if (role === 'admin') {
+                console.log(`👑 Пользователь ${username} назначен админом`);
+            }
+            
+            return { success: true, user: { id, username, tag } };
+        } catch (error) {
+            console.error('Create user error:', error);
+            return { success: false, error: 'Ошибка создания пользователя' };
+        }
+    }
+    
     const client = await pool.connect();
     try {
-        // Проверяем существование
         const existing = await client.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
         if (existing.rows.length > 0) {
             return { success: false, error: 'Пользователь уже существует' };
@@ -174,7 +273,6 @@ async function createUser(username, password) {
         const id = uuidv4();
         const tag = await generateUniqueTag(client);
         
-        // Проверяем, есть ли username в списке админов из env
         const adminUsernames = (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
         const role = adminUsernames.includes(username.toLowerCase()) ? 'admin' : 'user';
         
@@ -198,46 +296,45 @@ async function createUser(username, password) {
 
 async function loginUser(username, password) {
     try {
-        const result = await pool.query(
-            'SELECT id, username, password, tag, role, premium_until FROM users WHERE LOWER(username) = LOWER($1)',
-            [username]
-        );
+        let user;
+        if (USE_SQLITE) {
+            user = sqlite.prepare('SELECT id, username, password, tag, role, premium_until FROM users WHERE LOWER(username) = LOWER(?)').get(username);
+        } else {
+            const result = await pool.query(
+                'SELECT id, username, password, tag, role, premium_until FROM users WHERE LOWER(username) = LOWER($1)',
+                [username]
+            );
+            user = result.rows[0];
+        }
         
-        if (result.rows.length === 0) {
+        if (!user) {
             await bcrypt.compare(password, '$2a$12$dummy.hash.for.timing.attack.protection');
             return { success: false, error: 'Неверный логин или пароль' };
         }
         
-        const user = result.rows[0];
         const isValid = await bcrypt.compare(password, user.password);
-        
         if (!isValid) {
             return { success: false, error: 'Неверный логин или пароль' };
         }
         
-        // Проверяем, есть ли в списке админов из env (обновляем роль если нужно)
         const adminUsernames = (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
         let role = user.role;
         
         if (adminUsernames.includes(user.username.toLowerCase()) && role !== 'admin') {
             role = 'admin';
-            await pool.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', user.id]);
-            console.log(`👑 Пользователь ${user.username} повышен до админа (из ADMIN_USERNAMES)`);
+            if (USE_SQLITE) {
+                sqlite.prepare('UPDATE users SET role = ? WHERE id = ?').run('admin', user.id);
+            } else {
+                await pool.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', user.id]);
+            }
+            console.log(`👑 Пользователь ${user.username} повышен до админа`);
         }
         
-        // Проверяем премиум статус
-        const isPremium = role === 'admin' || 
-                          (user.premium_until && new Date(user.premium_until) > new Date());
+        const isPremium = role === 'admin' || (user.premium_until && new Date(user.premium_until) > new Date());
         
         return { 
             success: true, 
-            user: { 
-                id: user.id, 
-                username: user.username, 
-                tag: user.tag,
-                role: role,
-                isPremium
-            } 
+            user: { id: user.id, username: user.username, tag: user.tag, role, isPremium } 
         };
     } catch (error) {
         console.error('Login error:', error);
@@ -247,17 +344,21 @@ async function loginUser(username, password) {
 
 async function getUser(userId) {
     try {
-        const result = await pool.query(
-            `SELECT id, username, tag, role, premium_until, display_name, phone, bio, avatar_url, banner_url, 
-                    name_color, profile_theme, profile_color, custom_tag, custom_id, hide_online, created_at 
-             FROM users WHERE id = $1`,
-            [userId]
-        );
-        if (result.rows.length === 0) return null;
-        
-        const user = result.rows[0];
-        user.isPremium = user.role === 'admin' || 
-                         (user.premium_until && new Date(user.premium_until) > new Date());
+        let user;
+        if (USE_SQLITE) {
+            user = sqlite.prepare(`SELECT id, username, tag, role, premium_until, display_name, phone, bio, avatar_url, banner_url, 
+                    name_color, profile_theme, profile_color, custom_id, hide_online, created_at FROM users WHERE id = ?`).get(userId);
+        } else {
+            const result = await pool.query(
+                `SELECT id, username, tag, role, premium_until, display_name, phone, bio, avatar_url, banner_url, 
+                        name_color, profile_theme, profile_color, custom_tag, custom_id, hide_online, created_at 
+                 FROM users WHERE id = $1`,
+                [userId]
+            );
+            user = result.rows[0];
+        }
+        if (!user) return null;
+        user.isPremium = user.role === 'admin' || (user.premium_until && new Date(user.premium_until) > new Date());
         return user;
     } catch (error) {
         console.error('Get user error:', error);
@@ -450,18 +551,26 @@ async function updateUsername(userId, username) {
 
 async function searchUsers(query, excludeUserId) {
     try {
-        // Санитизация и ограничение
         const sanitized = query.replace(/[%_]/g, '').substring(0, 50);
         if (sanitized.length < 2) return [];
         
-        const result = await pool.query(
-            `SELECT id, username, tag, display_name, avatar_url, role, premium_until, name_color, custom_id
-             FROM users 
-             WHERE (username ILIKE $1 OR display_name ILIKE $1 OR custom_id ILIKE $1 OR tag ILIKE $1) AND id != $2
-             LIMIT 20`,
-            [`%${sanitized}%`, excludeUserId]
-        );
-        return result.rows.map(u => ({
+        let rows;
+        if (USE_SQLITE) {
+            rows = sqlite.prepare(`SELECT id, username, tag, display_name, avatar_url, role, premium_until, name_color, custom_id
+                FROM users 
+                WHERE (username LIKE ? OR display_name LIKE ? OR custom_id LIKE ? OR tag LIKE ?) AND id != ?
+                LIMIT 20`).all(`%${sanitized}%`, `%${sanitized}%`, `%${sanitized}%`, `%${sanitized}%`, excludeUserId);
+        } else {
+            const result = await pool.query(
+                `SELECT id, username, tag, display_name, avatar_url, role, premium_until, name_color, custom_id
+                 FROM users 
+                 WHERE (username ILIKE $1 OR display_name ILIKE $1 OR custom_id ILIKE $1 OR tag ILIKE $1) AND id != $2
+                 LIMIT 20`,
+                [`%${sanitized}%`, excludeUserId]
+            );
+            rows = result.rows;
+        }
+        return rows.map(u => ({
             ...u,
             isPremium: u.role === 'admin' || (u.premium_until && new Date(u.premium_until) > new Date())
         }));
@@ -478,21 +587,18 @@ async function saveMessage(senderId, receiverId, text, messageType = 'text', cal
         const id = uuidv4();
         const created_at = new Date().toISOString();
         
-        await pool.query(
-            `INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [id, senderId, receiverId, text, messageType, callDuration, created_at]
-        );
+        if (USE_SQLITE) {
+            sqlite.prepare(`INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, senderId, receiverId, text, messageType, callDuration, created_at);
+        } else {
+            await pool.query(
+                `INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [id, senderId, receiverId, text, messageType, callDuration, created_at]
+            );
+        }
         
-        return { 
-            id, 
-            sender_id: senderId, 
-            receiver_id: receiverId, 
-            text, 
-            created_at, 
-            message_type: messageType, 
-            call_duration: callDuration 
-        };
+        return { id, sender_id: senderId, receiver_id: receiverId, text, created_at, message_type: messageType, call_duration: callDuration };
     } catch (error) {
         console.error('Save message error:', error);
         throw error;
@@ -544,21 +650,36 @@ async function getMessages(userId1, userId2, limit = 50, before = null) {
 
 async function getContacts(userId) {
     try {
-        const result = await pool.query(`
-            SELECT DISTINCT u.id, u.username, u.tag, u.display_name, u.avatar_url, u.role, u.premium_until, u.name_color, u.custom_id,
-                (SELECT COUNT(*) FROM messages m 
-                 WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.is_read = FALSE) as unread_count,
-                (SELECT MAX(created_at) FROM messages m 
-                 WHERE (m.sender_id = u.id AND m.receiver_id = $1) OR (m.sender_id = $1 AND m.receiver_id = u.id)) as last_message_at
-            FROM users u
-            WHERE u.id IN (
-                SELECT DISTINCT sender_id FROM messages WHERE receiver_id = $1
-                UNION
-                SELECT DISTINCT receiver_id FROM messages WHERE sender_id = $1
-            )
-            ORDER BY last_message_at DESC NULLS LAST
-        `, [userId]);
-        return result.rows.map(u => ({
+        let rows;
+        if (USE_SQLITE) {
+            rows = sqlite.prepare(`
+                SELECT DISTINCT u.id, u.username, u.tag, u.display_name, u.avatar_url, u.role, u.premium_until, u.name_color, u.custom_id,
+                    (SELECT COUNT(*) FROM messages m WHERE m.sender_id = u.id AND m.receiver_id = ? AND m.is_read = 0) as unread_count,
+                    (SELECT MAX(created_at) FROM messages m WHERE (m.sender_id = u.id AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = u.id)) as last_message_at
+                FROM users u
+                WHERE u.id IN (
+                    SELECT DISTINCT sender_id FROM messages WHERE receiver_id = ?
+                    UNION
+                    SELECT DISTINCT receiver_id FROM messages WHERE sender_id = ?
+                )
+                ORDER BY last_message_at DESC
+            `).all(userId, userId, userId, userId, userId);
+        } else {
+            const result = await pool.query(`
+                SELECT DISTINCT u.id, u.username, u.tag, u.display_name, u.avatar_url, u.role, u.premium_until, u.name_color, u.custom_id,
+                    (SELECT COUNT(*) FROM messages m WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.is_read = FALSE) as unread_count,
+                    (SELECT MAX(created_at) FROM messages m WHERE (m.sender_id = u.id AND m.receiver_id = $1) OR (m.sender_id = $1 AND m.receiver_id = u.id)) as last_message_at
+                FROM users u
+                WHERE u.id IN (
+                    SELECT DISTINCT sender_id FROM messages WHERE receiver_id = $1
+                    UNION
+                    SELECT DISTINCT receiver_id FROM messages WHERE sender_id = $1
+                )
+                ORDER BY last_message_at DESC NULLS LAST
+            `, [userId]);
+            rows = result.rows;
+        }
+        return rows.map(u => ({
             ...u,
             isPremium: u.role === 'admin' || (u.premium_until && new Date(u.premium_until) > new Date())
         }));
@@ -630,33 +751,39 @@ async function globalSearch(userId, query) {
         const sanitized = query.replace(/[%_]/g, '').substring(0, 100);
         if (sanitized.length < 2) return { users: [], messages: [] };
         
-        // Поиск пользователей
-        const usersResult = await pool.query(
-            `SELECT id, username, tag, display_name, avatar_url 
-             FROM users 
-             WHERE (username ILIKE $1 OR display_name ILIKE $1) AND id != $2
-             LIMIT 10`,
-            [`%${sanitized}%`, userId]
-        );
+        let users, messages;
         
-        // Поиск сообщений (только в чатах текущего пользователя)
-        const messagesResult = await pool.query(
-            `SELECT m.id, m.text, m.created_at, m.sender_id, m.receiver_id,
+        if (USE_SQLITE) {
+            users = sqlite.prepare(`SELECT id, username, tag, display_name, avatar_url 
+                FROM users WHERE (username LIKE ? OR display_name LIKE ?) AND id != ? LIMIT 10`)
+                .all(`%${sanitized}%`, `%${sanitized}%`, userId);
+            
+            messages = sqlite.prepare(`SELECT m.id, m.text, m.created_at, m.sender_id, m.receiver_id,
                     u.username as sender_username, u.display_name as sender_display_name, u.avatar_url as sender_avatar
-             FROM messages m
-             JOIN users u ON u.id = m.sender_id
-             WHERE (m.sender_id = $1 OR m.receiver_id = $1)
-               AND m.text ILIKE $2
-               AND m.message_type = 'text'
-             ORDER BY m.created_at DESC
-             LIMIT 20`,
-            [userId, `%${sanitized}%`]
-        );
+                FROM messages m JOIN users u ON u.id = m.sender_id
+                WHERE (m.sender_id = ? OR m.receiver_id = ?) AND m.text LIKE ? AND m.message_type = 'text'
+                ORDER BY m.created_at DESC LIMIT 20`)
+                .all(userId, userId, `%${sanitized}%`);
+        } else {
+            const usersResult = await pool.query(
+                `SELECT id, username, tag, display_name, avatar_url 
+                 FROM users WHERE (username ILIKE $1 OR display_name ILIKE $1) AND id != $2 LIMIT 10`,
+                [`%${sanitized}%`, userId]
+            );
+            users = usersResult.rows;
+            
+            const messagesResult = await pool.query(
+                `SELECT m.id, m.text, m.created_at, m.sender_id, m.receiver_id,
+                        u.username as sender_username, u.display_name as sender_display_name, u.avatar_url as sender_avatar
+                 FROM messages m JOIN users u ON u.id = m.sender_id
+                 WHERE (m.sender_id = $1 OR m.receiver_id = $1) AND m.text ILIKE $2 AND m.message_type = 'text'
+                 ORDER BY m.created_at DESC LIMIT 20`,
+                [userId, `%${sanitized}%`]
+            );
+            messages = messagesResult.rows;
+        }
         
-        return {
-            users: usersResult.rows,
-            messages: messagesResult.rows
-        };
+        return { users, messages };
     } catch (error) {
         console.error('Global search error:', error);
         return { users: [], messages: [] };
