@@ -443,9 +443,11 @@ button {
 
 /* User card popup */
 .user-card-popup {
-  position: fixed;
-  bottom: 100px;
-  left: 24px;
+  position: fixed !important;
+  top: auto !important;
+  bottom: 100px !important;
+  left: 24px !important;
+  right: auto !important;
   width: 280px;
   max-width: calc(var(--sidebar-width, 320px) - 48px);
   background: var(--bg-dark);
@@ -454,7 +456,6 @@ button {
   overflow: hidden;
   z-index: 1000;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  animation: slideUp 0.2s ease;
 }
 
 @keyframes slideUp {
