@@ -392,9 +392,28 @@ async function registerServiceWorker() {
             state.swRegistration = await navigator.serviceWorker.register('/sw.js');
             console.log('Service Worker зарегистрирован');
             
-            // Обработка сообщений от Service Worker (для звонков из уведомлений)
+            // Проверка обновлений SW
+            state.swRegistration.addEventListener('updatefound', () => {
+                const newWorker = state.swRegistration.installing;
+                console.log('Найдено обновление Service Worker');
+                
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // Новая версия готова, показываем уведомление
+                        showUpdateNotification();
+                    }
+                });
+            });
+            
+            // Обработка сообщений от Service Worker
             navigator.serviceWorker.addEventListener('message', (event) => {
                 const data = event.data;
+                
+                // Уведомление о новой версии от SW
+                if (data.type === 'sw-updated') {
+                    console.log('SW обновлён до версии:', data.version);
+                    showUpdateNotification();
+                }
                 
                 if (data.type === 'call-answer-from-notification') {
                     // Пользователь ответил на звонок из уведомления
@@ -420,10 +439,60 @@ async function registerServiceWorker() {
                     }
                 }
             });
+            
+            // Периодическая проверка обновлений (каждые 5 минут)
+            setInterval(() => {
+                state.swRegistration.update();
+            }, 5 * 60 * 1000);
+            
         } catch (e) {
             console.error('Ошибка регистрации SW:', e);
         }
     }
+}
+
+// Показать уведомление об обновлении
+function showUpdateNotification() {
+    // Проверяем, не показано ли уже
+    if (document.getElementById('update-banner')) return;
+    
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.className = 'update-banner';
+    banner.innerHTML = `
+        <div class="update-banner-content">
+            <span class="update-icon">🔄</span>
+            <span class="update-text">Доступна новая версия Квант!</span>
+            <button class="update-btn" id="update-now-btn">Обновить</button>
+            <button class="update-close" id="update-close-btn">✕</button>
+        </div>
+    `;
+    document.body.appendChild(banner);
+    
+    // Анимация появления
+    requestAnimationFrame(() => {
+        banner.classList.add('show');
+    });
+    
+    // Обработчики
+    document.getElementById('update-now-btn').addEventListener('click', () => {
+        applyUpdate();
+    });
+    
+    document.getElementById('update-close-btn').addEventListener('click', () => {
+        banner.classList.remove('show');
+        setTimeout(() => banner.remove(), 300);
+    });
+}
+
+// Применить обновление
+function applyUpdate() {
+    if (state.swRegistration && state.swRegistration.waiting) {
+        // Говорим новому SW активироваться
+        state.swRegistration.waiting.postMessage('skipWaiting');
+    }
+    // Перезагружаем страницу
+    window.location.reload(true);
 }
 
 async function subscribeToPush() {
@@ -5152,6 +5221,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { icon: '👥', label: 'Группы', tab: 'groups' },
             { icon: '📢', label: 'Каналы', tab: 'channels' },
             { icon: '🏠', label: 'Серверы', tab: 'servers' },
+            { icon: '👑', label: 'Подписка', action: 'subscription' },
             { icon: '➕', label: 'Создать', action: 'create' }
         ];
         
@@ -5163,6 +5233,8 @@ document.addEventListener('DOMContentLoaded', () => {
             onItemClick: (item, index) => {
                 if (item.action === 'create') {
                     openCreateModal();
+                } else if (item.action === 'subscription') {
+                    openSubscriptionModal();
                 } else {
                     switchSidebarTab(item.tab);
                 }
@@ -5249,6 +5321,84 @@ function openCreateModal() {
 function closeCreateModal() {
     document.getElementById('create-modal')?.classList.add('hidden');
 }
+
+// === МОДАЛКА ПОДПИСКИ ===
+function openSubscriptionModal() {
+    const modal = document.getElementById('subscription-modal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    loadSubscriptionStatus();
+}
+
+function closeSubscriptionModal() {
+    document.getElementById('subscription-modal')?.classList.add('hidden');
+}
+
+async function loadSubscriptionStatus() {
+    try {
+        const res = await api.get('/api/subscription/status');
+        if (res.ok) {
+            const data = await res.json();
+            updateSubscriptionUI(data);
+        }
+    } catch (e) {
+        console.log('Failed to load subscription:', e);
+    }
+}
+
+function updateSubscriptionUI(data) {
+    const statusEl = document.getElementById('subscription-current');
+    const premiumBtn = document.getElementById('subscribe-premium-btn');
+    const premiumPlusBtn = document.getElementById('subscribe-premium-plus-btn');
+    
+    if (!statusEl) return;
+    
+    // Обновляем статус
+    statusEl.className = 'subscription-current ' + (data.plan || 'free');
+    
+    const icons = { free: '✨', premium: '👑', premium_plus: '💎' };
+    const names = { free: 'Бесплатный план', premium: 'Premium', premium_plus: 'Premium+' };
+    const descs = { 
+        free: 'Базовые функции мессенджера',
+        premium: 'Активна до ' + (data.expires ? new Date(data.expires).toLocaleDateString('ru') : ''),
+        premium_plus: 'Активна до ' + (data.expires ? new Date(data.expires).toLocaleDateString('ru') : '')
+    };
+    
+    statusEl.innerHTML = `
+        <span class="subscription-icon">${icons[data.plan] || icons.free}</span>
+        <div class="subscription-info">
+            <span class="subscription-plan">${names[data.plan] || names.free}</span>
+            <span class="subscription-desc">${descs[data.plan] || descs.free}</span>
+        </div>
+    `;
+    
+    // Обновляем кнопки
+    if (premiumBtn) {
+        premiumBtn.textContent = data.plan === 'premium' ? 'Активно' : 'Оформить';
+        premiumBtn.disabled = data.plan === 'premium' || data.plan === 'premium_plus';
+    }
+    if (premiumPlusBtn) {
+        premiumPlusBtn.textContent = data.plan === 'premium_plus' ? 'Активно' : 'Оформить';
+        premiumPlusBtn.disabled = data.plan === 'premium_plus';
+    }
+}
+
+// Обработчики кнопок подписки
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('subscription-modal-close')?.addEventListener('click', closeSubscriptionModal);
+    document.querySelector('#subscription-modal .modal-overlay')?.addEventListener('click', closeSubscriptionModal);
+    
+    document.getElementById('subscribe-premium-btn')?.addEventListener('click', () => {
+        // Здесь будет интеграция с платёжной системой
+        showToast('Оплата временно недоступна', 'info');
+    });
+    
+    document.getElementById('subscribe-premium-plus-btn')?.addEventListener('click', () => {
+        // Здесь будет интеграция с платёжной системой
+        showToast('Оплата временно недоступна', 'info');
+    });
+});
 
 function updateCreateModalUI(type) {
     const membersSection = document.getElementById('create-members-section');

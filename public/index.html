@@ -406,6 +406,10 @@
             <span class="nav-icon" aria-hidden="true">🔒</span>
             <span>Приватность</span>
           </div>
+          <div class="settings-nav-item" data-section="subscription" role="tab" tabindex="0">
+            <span class="nav-icon" aria-hidden="true">👑</span>
+            <span>Подписка</span>
+          </div>
           <div class="settings-nav-item" data-section="about" role="tab" tabindex="0">
             <span class="nav-icon" aria-hidden="true">ℹ️</span>
             <span>О приложении</span>
@@ -644,6 +648,81 @@
           </div>
         </section>
         
+        <!-- Подписка -->
+        <section class="settings-section" id="section-subscription" role="tabpanel">
+          <h2>Подписка</h2>
+          
+          <!-- Текущий статус -->
+          <div class="subscription-status" id="subscription-status">
+            <div class="subscription-current free" id="subscription-current">
+              <span class="subscription-icon">✨</span>
+              <div class="subscription-info">
+                <span class="subscription-plan">Бесплатный план</span>
+                <span class="subscription-desc">Базовые функции мессенджера</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Планы подписки -->
+          <div class="settings-group">
+            <h3>Планы подписки</h3>
+            <div class="subscription-plans">
+              
+              <!-- Premium -->
+              <div class="subscription-card" data-plan="premium">
+                <div class="plan-header premium">
+                  <span class="plan-badge">👑</span>
+                  <span class="plan-name">Premium</span>
+                </div>
+                <div class="plan-price">
+                  <span class="price-amount">149 ₽</span>
+                  <span class="price-period">/ месяц</span>
+                </div>
+                <ul class="plan-features">
+                  <li>✓ Анимированные аватарки</li>
+                  <li>✓ Кастомный цвет ника</li>
+                  <li>✓ Кастомный ID (4 цифры)</li>
+                  <li>✓ Премиум темы</li>
+                  <li>✓ Увеличенный размер файлов</li>
+                  <li>✓ Без рекламы</li>
+                </ul>
+                <button class="plan-btn" id="subscribe-premium-btn">Оформить</button>
+              </div>
+              
+              <!-- Premium+ -->
+              <div class="subscription-card featured" data-plan="premium_plus">
+                <div class="plan-popular">Популярный</div>
+                <div class="plan-header premium-plus">
+                  <span class="plan-badge">💎</span>
+                  <span class="plan-name">Premium+</span>
+                </div>
+                <div class="plan-price">
+                  <span class="price-amount">299 ₽</span>
+                  <span class="price-period">/ месяц</span>
+                </div>
+                <ul class="plan-features">
+                  <li>✓ Всё из Premium</li>
+                  <li>✓ Видео-аватарки</li>
+                  <li>✓ Анимированные баннеры</li>
+                  <li>✓ Эксклюзивные значки</li>
+                  <li>✓ Приоритетная поддержка</li>
+                  <li>✓ Ранний доступ к функциям</li>
+                </ul>
+                <button class="plan-btn featured" id="subscribe-premium-plus-btn">Оформить</button>
+              </div>
+              
+            </div>
+          </div>
+          
+          <!-- История подписок -->
+          <div class="settings-group">
+            <h3>История</h3>
+            <div class="subscription-history" id="subscription-history">
+              <p class="history-empty">История подписок пуста</p>
+            </div>
+          </div>
+        </section>
+        
         <!-- О приложении -->
         <section class="settings-section" id="section-about" role="tabpanel">
           <h2>О приложении</h2>
@@ -803,6 +882,66 @@
       <div class="prompt-actions">
         <button class="prompt-btn prompt-cancel" id="prompt-cancel">Отмена</button>
         <button class="prompt-btn prompt-ok" id="prompt-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно подписки -->
+  <div id="subscription-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="subscription-modal-content">
+      <button class="modal-close" id="subscription-modal-close">✕</button>
+      <h2 class="subscription-modal-title">👑 Подписка</h2>
+      
+      <!-- Текущий статус -->
+      <div class="subscription-current free" id="subscription-current">
+        <span class="subscription-icon">✨</span>
+        <div class="subscription-info">
+          <span class="subscription-plan">Бесплатный план</span>
+          <span class="subscription-desc">Базовые функции мессенджера</span>
+        </div>
+      </div>
+      
+      <!-- Планы -->
+      <div class="subscription-plans">
+        <div class="subscription-card" data-plan="premium">
+          <div class="plan-header premium">
+            <span class="plan-badge">👑</span>
+            <span class="plan-name">Premium</span>
+          </div>
+          <div class="plan-price">
+            <span class="price-amount">149 ₽</span>
+            <span class="price-period">/ месяц</span>
+          </div>
+          <ul class="plan-features">
+            <li>✓ Анимированные аватарки</li>
+            <li>✓ Кастомный цвет ника</li>
+            <li>✓ Кастомный ID</li>
+            <li>✓ Премиум темы</li>
+            <li>✓ Без рекламы</li>
+          </ul>
+          <button class="plan-btn" id="subscribe-premium-btn">Оформить</button>
+        </div>
+        
+        <div class="subscription-card featured" data-plan="premium_plus">
+          <div class="plan-popular">Популярный</div>
+          <div class="plan-header premium-plus">
+            <span class="plan-badge">💎</span>
+            <span class="plan-name">Premium+</span>
+          </div>
+          <div class="plan-price">
+            <span class="price-amount">299 ₽</span>
+            <span class="price-period">/ месяц</span>
+          </div>
+          <ul class="plan-features">
+            <li>✓ Всё из Premium</li>
+            <li>✓ Видео-аватарки</li>
+            <li>✓ Анимированные баннеры</li>
+            <li>✓ Эксклюзивные значки</li>
+            <li>✓ Приоритетная поддержка</li>
+          </ul>
+          <button class="plan-btn featured" id="subscribe-premium-plus-btn">Оформить</button>
+        </div>
       </div>
     </div>
   </div>

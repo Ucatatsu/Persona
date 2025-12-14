@@ -1,6 +1,7 @@
 // === КВАНТ - SERVICE WORKER ===
 
-const CACHE_NAME = 'kvant-v2';
+const CACHE_NAME = 'kvant-v3';
+const APP_VERSION = '1.0.1'; // Увеличивай при каждом обновлении
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -20,20 +21,7 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// Активация - очистка старых кэшей
-self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys()
-            .then((cacheNames) => {
-                return Promise.all(
-                    cacheNames
-                        .filter((name) => name !== CACHE_NAME)
-                        .map((name) => caches.delete(name))
-                );
-            })
-            .then(() => self.clients.claim())
-    );
-});
+// Активация перенесена в обработчик message для уведомления клиентов
 
 // Fetch - стратегия Network First с fallback на кэш
 self.addEventListener('fetch', (event) => {
@@ -240,7 +228,39 @@ self.addEventListener('message', (event) => {
     if (event.data.type === 'clearCache') {
         caches.delete(CACHE_NAME);
     }
+    
+    // Запрос версии от клиента
+    if (event.data.type === 'getVersion') {
+        event.ports[0].postMessage({ version: APP_VERSION, cacheName: CACHE_NAME });
+    }
 });
+
+// Уведомление клиентов о новой версии при активации
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys()
+            .then((cacheNames) => {
+                return Promise.all(
+                    cacheNames
+                        .filter((name) => name.startsWith('kvant-') && name !== CACHE_NAME)
+                        .map((name) => caches.delete(name))
+                );
+            })
+            .then(() => self.clients.claim())
+            .then(() => {
+                // Уведомляем все открытые вкладки о новой версии
+                return self.clients.matchAll({ type: 'window' });
+            })
+            .then((clients) => {
+                clients.forEach((client) => {
+                    client.postMessage({
+                        type: 'sw-updated',
+                        version: APP_VERSION
+                    });
+                });
+            })
+    );
+}, { once: false });
 
 // Background Sync (для отправки сообщений офлайн)
 self.addEventListener('sync', (event) => {
