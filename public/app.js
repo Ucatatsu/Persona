@@ -968,17 +968,26 @@ async function selectGroup(groupId) {
     state.selectedUser = null;
     state.selectedChannel = null;
     state.selectedServer = null;
+    state.selectedServerChannel = null;
     
     // Присоединяемся к комнате группы
     state.socket?.emit('join-group', groupId);
+    
+    // Обновляем UI списка
+    document.querySelectorAll('.group-item').forEach(i => i.classList.remove('active'));
+    document.querySelector(`[data-group-id="${groupId}"]`)?.classList.add('active');
     
     // Обновляем UI
     renderGroups();
     updateChatHeader(group.name, `${group.member_count || 0} участников`, group.avatar_url);
     await loadGroupMessages(groupId);
     
-    // Показываем чат на мобильных
-    document.querySelector('.chat-area')?.classList.add('active');
+    // Включаем инпут
+    document.getElementById('message-input').disabled = false;
+    document.getElementById('message-input').placeholder = 'Сообщение...';
+    document.querySelector('.send-btn').disabled = false;
+    
+    handleMobileAfterSelect();
 }
 
 async function loadGroupMessages(groupId) {
@@ -1065,14 +1074,25 @@ async function selectChannel(channelId) {
     state.selectedUser = null;
     state.selectedGroup = null;
     state.selectedServer = null;
+    state.selectedServerChannel = null;
     
     state.socket?.emit('join-channel', channelId);
+    
+    // Обновляем UI списка
+    document.querySelectorAll('.channel-item').forEach(i => i.classList.remove('active'));
+    document.querySelector(`[data-channel-id="${channelId}"]`)?.classList.add('active');
     
     renderChannels();
     updateChatHeader(channel.name, `${channel.subscriber_count || 0} подписчиков`, channel.avatar_url);
     await loadChannelPosts(channelId);
     
-    document.querySelector('.chat-area')?.classList.add('active');
+    // Включаем инпут (только для админов канала можно постить)
+    const isAdmin = channel.owner_id === state.currentUser?.id;
+    document.getElementById('message-input').disabled = !isAdmin;
+    document.getElementById('message-input').placeholder = isAdmin ? 'Написать пост...' : 'Только админы могут постить';
+    document.querySelector('.send-btn').disabled = !isAdmin;
+    
+    handleMobileAfterSelect();
 }
 
 async function loadChannelPosts(channelId) {
@@ -1168,28 +1188,50 @@ async function selectServer(serverId) {
     state.selectedUser = null;
     state.selectedGroup = null;
     state.selectedChannel = null;
+    state.selectedServerChannel = null;
     
     state.socket?.emit('join-server', serverId);
     
-    renderServers();
-    // TODO: показать интерфейс сервера с каналами
+    // Обновляем UI списка
+    document.querySelectorAll('.server-item').forEach(i => i.classList.remove('active'));
+    document.querySelector(`[data-server-id="${serverId}"]`)?.classList.add('active');
     
-    document.querySelector('.chat-area')?.classList.add('active');
+    renderServers();
+    updateChatHeader(server.name, `${server.member_count || 0} участников`, server.icon_url);
+    
+    // Очищаем сообщения и показываем заглушку
+    const messagesEl = getEl('messages');
+    if (messagesEl) {
+        messagesEl.innerHTML = '<div class="empty-list">Выберите канал сервера</div>';
+    }
+    
+    // Пока отключаем инпут для серверов (нужно выбрать канал)
+    document.getElementById('message-input').disabled = true;
+    document.getElementById('message-input').placeholder = 'Выберите канал...';
+    document.querySelector('.send-btn').disabled = true;
+    
+    handleMobileAfterSelect();
 }
 
 function updateChatHeader(name, subtitle, avatarUrl) {
     const header = document.querySelector('.chat-header');
     if (!header) return;
     
-    const avatarEl = header.querySelector('.chat-avatar');
-    const nameEl = header.querySelector('.chat-name');
-    const statusEl = header.querySelector('.chat-status');
+    const avatarEl = header.querySelector('.chat-header-avatar');
+    const nameEl = header.querySelector('.chat-user-name');
+    const statusEl = header.querySelector('.chat-user-status');
     
     if (avatarEl) {
         avatarEl.innerHTML = avatarUrl ? `<img src="${avatarUrl}">` : name[0]?.toUpperCase() || '?';
     }
     if (nameEl) nameEl.textContent = name;
     if (statusEl) statusEl.textContent = subtitle;
+    
+    // Включаем инпут для ввода сообщений
+    const messageInput = getEl('message-input');
+    const sendBtn = document.querySelector('.send-btn');
+    if (messageInput) messageInput.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
 }
 
 function getNameColor(msg) {
