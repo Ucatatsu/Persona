@@ -5532,19 +5532,49 @@ function updateSubscriptionUI(data) {
 }
 
 // Обработчики кнопок подписки
+const DONATION_ALERTS_URL = 'https://www.donationalerts.com/r/ucatatsu';
+
+function showSubscriptionWarning(planName, price) {
+    const modal = document.getElementById('subscription-warning-modal');
+    if (!modal) return;
+    
+    const planNameEl = document.getElementById('warning-plan-name');
+    const priceEl = document.getElementById('warning-price');
+    const usernameEl = document.getElementById('warning-username');
+    
+    if (planNameEl) planNameEl.textContent = planName;
+    if (priceEl) priceEl.textContent = price;
+    if (usernameEl) usernameEl.textContent = state.currentUser?.username || 'ваш_ник';
+    
+    modal.classList.remove('hidden');
+}
+
+function closeSubscriptionWarning() {
+    document.getElementById('subscription-warning-modal')?.classList.add('hidden');
+}
+
+function proceedToPayment() {
+    closeSubscriptionWarning();
+    window.open(DONATION_ALERTS_URL, '_blank');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('subscription-modal-close')?.addEventListener('click', closeSubscriptionModal);
     document.querySelector('#subscription-modal .modal-overlay')?.addEventListener('click', closeSubscriptionModal);
     
     document.getElementById('subscribe-premium-btn')?.addEventListener('click', () => {
-        // Здесь будет интеграция с платёжной системой
-        showToast('Оплата временно недоступна', 'info');
+        showSubscriptionWarning('Premium', '120 ₽');
     });
     
     document.getElementById('subscribe-premium-plus-btn')?.addEventListener('click', () => {
-        // Здесь будет интеграция с платёжной системой
-        showToast('Оплата временно недоступна', 'info');
+        showSubscriptionWarning('Premium+', '200 ₽');
     });
+    
+    // Модалка предупреждения
+    document.getElementById('warning-modal-close')?.addEventListener('click', closeSubscriptionWarning);
+    document.querySelector('#subscription-warning-modal .modal-overlay')?.addEventListener('click', closeSubscriptionWarning);
+    document.getElementById('warning-cancel-btn')?.addEventListener('click', closeSubscriptionWarning);
+    document.getElementById('warning-proceed-btn')?.addEventListener('click', proceedToPayment);
 });
 
 // === SUPPORT TICKETS ===

@@ -1004,6 +1004,37 @@
     </div>
   </div>
 
+  <!-- Модальное окно предупреждения об оплате -->
+  <div id="subscription-warning-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="warning-modal-content">
+      <button class="modal-close" id="warning-modal-close">✕</button>
+      
+      <div class="warning-icon">⚠️</div>
+      <h2 class="warning-title">Важная информация</h2>
+      
+      <div class="warning-plan-info">
+        <span class="warning-plan-name" id="warning-plan-name">Premium</span>
+        <span class="warning-plan-price" id="warning-price">120 ₽</span>
+      </div>
+      
+      <div class="warning-text">
+        <p><strong>Обязательно укажите ваш ник в сообщении к донату!</strong></p>
+        <p>Иначе мы не сможем определить, кому выдать подписку.</p>
+        <p class="warning-username-hint">Ваш ник: <strong id="warning-username">username</strong></p>
+      </div>
+      
+      <div class="warning-notice">
+        <p>Нажимая кнопку ниже, вы подтверждаете, что ознакомлены и согласны с этими условиями.</p>
+      </div>
+      
+      <div class="warning-actions">
+        <button class="btn-secondary" id="warning-cancel-btn">Отмена</button>
+        <button class="btn-primary" id="warning-proceed-btn">Перейти к оплате</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Модальное окно создания группы/канала/сервера -->
   <div id="create-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
