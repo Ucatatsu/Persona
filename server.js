@@ -97,12 +97,16 @@ const upload = multer({
     storage,
     limits: { fileSize: FILE_LIMITS.premium }, // Максимальный лимит, проверка ниже
     fileFilter: (_req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif|webp|mp4/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = /image\/(jpeg|jpg|png|gif|webp)|video\/mp4/.test(file.mimetype);
-        if (extname && mimetype) {
+        const allowedExtensions = /\.(jpeg|jpg|png|gif|webp|mp4)$/i;
+        const allowedMimetypes = /^(image\/(jpeg|png|gif|webp)|video\/mp4)$/;
+        
+        const extValid = allowedExtensions.test(file.originalname);
+        const mimeValid = allowedMimetypes.test(file.mimetype);
+        
+        if (extValid && mimeValid) {
             cb(null, true);
         } else {
+            console.log('File rejected:', file.originalname, file.mimetype);
             cb(new Error('Только изображения (jpg, png, gif, webp) и видео (mp4)'));
         }
     }
@@ -122,16 +126,23 @@ function isAnimatedFormat(file) {
 }
 
 // Функция загрузки в Cloudinary
-async function uploadToCloudinary(buffer, folder) {
+async function uploadToCloudinary(buffer, folder, options = {}) {
     return new Promise((resolve, reject) => {
+        const uploadOptions = { 
+            folder: `kvant/${folder}`,
+            resource_type: options.resourceType || 'auto'
+        };
+        
+        // Трансформации только для изображений
+        if (options.resourceType !== 'video') {
+            uploadOptions.transformation = [
+                { width: 500, height: 500, crop: 'limit' },
+                { quality: 'auto' }
+            ];
+        }
+        
         const uploadStream = cloudinary.uploader.upload_stream(
-            { 
-                folder: `kvant/${folder}`,
-                transformation: [
-                    { width: 500, height: 500, crop: 'limit' },
-                    { quality: 'auto' }
-                ]
-            },
+            uploadOptions,
             (error, result) => {
                 if (error) reject(error);
                 else resolve(result.secure_url);
@@ -518,18 +529,23 @@ app.post('/api/upload-message-file', authMiddleware, upload.single('file'), asyn
             });
         }
         
-        let fileUrl;
-        if (process.env.CLOUDINARY_CLOUD_NAME) {
-            fileUrl = await uploadToCloudinary(req.file.buffer, 'messages');
-        } else {
-            fileUrl = `/uploads/${req.file.filename}`;
-        }
-        
         // Определяем тип файла
         const ext = path.extname(req.file.originalname).toLowerCase();
         let fileType = 'image';
-        if (ext === '.mp4') fileType = 'video';
-        else if (ext === '.gif') fileType = 'gif';
+        let resourceType = 'image';
+        if (ext === '.mp4') {
+            fileType = 'video';
+            resourceType = 'video';
+        } else if (ext === '.gif') {
+            fileType = 'gif';
+        }
+        
+        let fileUrl;
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            fileUrl = await uploadToCloudinary(req.file.buffer, 'messages', { resourceType });
+        } else {
+            fileUrl = `/uploads/${req.file.filename}`;
+        }
         
         res.json({ success: true, fileUrl, fileType });
     } catch (error) {
