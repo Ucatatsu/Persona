@@ -5210,16 +5210,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Кастомный фон с кроппером
-    document.getElementById('custom-bg-input')?.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                openBgCropper(ev.target.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    });
+    const customBgInput = document.getElementById('custom-bg-input');
+    if (customBgInput) {
+        // Сбрасываем при клике чтобы можно было выбрать тот же файл
+        customBgInput.addEventListener('click', () => {
+            customBgInput.value = '';
+        });
+        customBgInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    openBgCropper(ev.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
     
     // Режим отображения фона
     function updateBgModeVisibility() {
@@ -6621,52 +6628,64 @@ let cropperState = {
     isResizing: false,
     resizeHandle: null,
     dragStart: { x: 0, y: 0 },
-    minSize: 50
+    aspectRatio: 16 / 9,
+    minWidth: 100,
+    listenersAttached: false
 };
 
 function openBgCropper(imageDataUrl) {
     const modal = document.getElementById('bg-cropper-modal');
     const img = document.getElementById('cropper-image');
-    const selection = document.getElementById('cropper-selection');
-    const wrapper = document.getElementById('cropper-wrapper');
     
     cropperState.originalImage = imageDataUrl;
     img.src = imageDataUrl;
     
-    img.onload = () => {
-        modal.classList.remove('hidden');
-        
-        // Получаем размеры отображаемого изображения
-        const rect = img.getBoundingClientRect();
-        cropperState.imgWidth = rect.width;
-        cropperState.imgHeight = rect.height;
-        
-        // Вычисляем пропорции экрана (16:9 для десктопа)
-        const screenRatio = window.innerWidth / window.innerHeight;
-        
-        // Начальный размер выделения - максимально возможный с сохранением пропорций
-        let selWidth, selHeight;
-        if (cropperState.imgWidth / cropperState.imgHeight > screenRatio) {
-            // Изображение шире - ограничиваем по высоте
-            selHeight = cropperState.imgHeight;
-            selWidth = selHeight * screenRatio;
-        } else {
-            // Изображение выше - ограничиваем по ширине
-            selWidth = cropperState.imgWidth;
-            selHeight = selWidth / screenRatio;
-        }
-        
-        // Центрируем выделение
-        cropperState.selection = {
-            x: (cropperState.imgWidth - selWidth) / 2,
-            y: (cropperState.imgHeight - selHeight) / 2,
-            width: selWidth,
-            height: selHeight
-        };
-        
-        updateCropperSelection();
-        initCropperDrag();
+    // Показываем модал сразу, чтобы изображение могло отрендериться
+    modal.classList.remove('hidden');
+    
+    // Ждём загрузки изображения
+    const initCropper = () => {
+        // Даём время на рендер
+        requestAnimationFrame(() => {
+            const rect = img.getBoundingClientRect();
+            cropperState.imgWidth = rect.width;
+            cropperState.imgHeight = rect.height;
+            
+            // Начальный размер с соотношением 16:9
+            let selWidth, selHeight;
+            const imgRatio = cropperState.imgWidth / cropperState.imgHeight;
+            
+            if (imgRatio > cropperState.aspectRatio) {
+                // Изображение шире чем 16:9 - ограничиваем по высоте
+                selHeight = cropperState.imgHeight * 0.9;
+                selWidth = selHeight * cropperState.aspectRatio;
+            } else {
+                // Изображение уже чем 16:9 - ограничиваем по ширине
+                selWidth = cropperState.imgWidth * 0.9;
+                selHeight = selWidth / cropperState.aspectRatio;
+            }
+            
+            // Центрируем выделение
+            cropperState.selection = {
+                x: (cropperState.imgWidth - selWidth) / 2,
+                y: (cropperState.imgHeight - selHeight) / 2,
+                width: selWidth,
+                height: selHeight
+            };
+            
+            updateCropperSelection();
+            if (!cropperState.listenersAttached) {
+                initCropperDrag();
+                cropperState.listenersAttached = true;
+            }
+        });
     };
+    
+    if (img.complete && img.naturalWidth > 0) {
+        initCropper();
+    } else {
+        img.onload = initCropper;
+    }
 }
 
 function updateCropperSelection() {
@@ -6720,41 +6739,50 @@ function initCropperDrag() {
         
         const coords = getRelativeCoords(e);
         const s = cropperState.selection;
+        const ratio = cropperState.aspectRatio;
         
         if (cropperState.isResizing) {
             const handle = cropperState.resizeHandle;
             let newX = s.x, newY = s.y, newW = s.width, newH = s.height;
             
-            if (handle.includes('e')) {
-                newW = Math.max(cropperState.minSize, coords.x - s.x);
+            // Вычисляем новую ширину на основе перемещения
+            if (handle === 'se') {
+                newW = coords.x - s.x;
+                newH = newW / ratio;
+            } else if (handle === 'sw') {
+                newW = s.x + s.width - coords.x;
+                newH = newW / ratio;
+                newX = coords.x;
+            } else if (handle === 'ne') {
+                newW = coords.x - s.x;
+                newH = newW / ratio;
+                newY = s.y + s.height - newH;
+            } else if (handle === 'nw') {
+                newW = s.x + s.width - coords.x;
+                newH = newW / ratio;
+                newX = coords.x;
+                newY = s.y + s.height - newH;
             }
-            if (handle.includes('w')) {
-                const diff = coords.x - s.x;
-                newX = s.x + diff;
-                newW = s.width - diff;
-                if (newW < cropperState.minSize) {
-                    newX = s.x + s.width - cropperState.minSize;
-                    newW = cropperState.minSize;
-                }
-            }
-            if (handle.includes('s')) {
-                newH = Math.max(cropperState.minSize, coords.y - s.y);
-            }
-            if (handle.includes('n')) {
-                const diff = coords.y - s.y;
-                newY = s.y + diff;
-                newH = s.height - diff;
-                if (newH < cropperState.minSize) {
-                    newY = s.y + s.height - cropperState.minSize;
-                    newH = cropperState.minSize;
-                }
+            
+            // Минимальный размер
+            if (newW < cropperState.minWidth) {
+                newW = cropperState.minWidth;
+                newH = newW / ratio;
+                if (handle.includes('w')) newX = s.x + s.width - newW;
+                if (handle.includes('n')) newY = s.y + s.height - newH;
             }
             
             // Ограничиваем границами изображения
-            if (newX < 0) { newW += newX; newX = 0; }
-            if (newY < 0) { newH += newY; newY = 0; }
-            if (newX + newW > cropperState.imgWidth) newW = cropperState.imgWidth - newX;
-            if (newY + newH > cropperState.imgHeight) newH = cropperState.imgHeight - newY;
+            if (newX < 0) { newW += newX; newH = newW / ratio; newX = 0; }
+            if (newY < 0) { newH += newY; newW = newH * ratio; newY = 0; }
+            if (newX + newW > cropperState.imgWidth) { 
+                newW = cropperState.imgWidth - newX; 
+                newH = newW / ratio; 
+            }
+            if (newY + newH > cropperState.imgHeight) { 
+                newH = cropperState.imgHeight - newY; 
+                newW = newH * ratio; 
+            }
             
             cropperState.selection = { x: newX, y: newY, width: newW, height: newH };
         } else {
@@ -6762,6 +6790,7 @@ function initCropperDrag() {
             let newX = coords.x - cropperState.dragStart.x;
             let newY = coords.y - cropperState.dragStart.y;
             
+            // Ограничиваем перемещение границами изображения
             newX = Math.max(0, Math.min(newX, cropperState.imgWidth - s.width));
             newY = Math.max(0, Math.min(newY, cropperState.imgHeight - s.height));
             
@@ -6835,7 +6864,12 @@ function applyCrop() {
 
 function closeBgCropper() {
     document.getElementById('bg-cropper-modal').classList.add('hidden');
-    document.getElementById('custom-bg-input').value = '';
+    // Сбрасываем input чтобы можно было выбрать тот же файл снова
+    const input = document.getElementById('custom-bg-input');
+    if (input) input.value = '';
+    // Сбрасываем состояние
+    cropperState.isDragging = false;
+    cropperState.isResizing = false;
 }
 
 // Инициализация кнопок кроппера
