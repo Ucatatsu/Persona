@@ -6831,6 +6831,10 @@ function initCropperDrag() {
     
     const getRelativeCoords = (e) => {
         const rect = img.getBoundingClientRect();
+        // Обновляем размеры изображения при каждом движении
+        cropperState.imgWidth = rect.width;
+        cropperState.imgHeight = rect.height;
+        
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         return {
@@ -6849,6 +6853,7 @@ function initCropperDrag() {
             x: coords.x - cropperState.selection.x,
             y: coords.y - cropperState.selection.y
         };
+        console.log('Drag start - imgSize:', cropperState.imgWidth, 'x', cropperState.imgHeight);
     };
     
     // Resize для изменения размера
@@ -6961,36 +6966,34 @@ function applyCrop() {
     // Размеры обрезки в реальных пикселях
     const cropX = cropperState.selection.x * scaleX;
     const cropY = cropperState.selection.y * scaleY;
-    let cropW = cropperState.selection.width * scaleX;
-    let cropH = cropperState.selection.height * scaleY;
+    const cropW = cropperState.selection.width * scaleX;
+    const cropH = cropperState.selection.height * scaleY;
     
-    // Ограничиваем максимальный размер для экономии места в localStorage
-    const maxWidth = 1920;
-    const maxHeight = 1080;
+    console.log('applyCrop - selection:', cropperState.selection);
+    console.log('applyCrop - crop area:', cropX, cropY, cropW, cropH);
+    
+    // Выходной размер - Full HD максимум для баланса качества и размера
+    const maxDim = 1920;
     let outputW = cropW;
     let outputH = cropH;
     
-    if (cropW > maxWidth || cropH > maxHeight) {
-        const ratio = Math.min(maxWidth / cropW, maxHeight / cropH);
-        outputW = cropW * ratio;
-        outputH = cropH * ratio;
+    if (outputW > maxDim || outputH > maxDim) {
+        const ratio = maxDim / Math.max(outputW, outputH);
+        outputW = Math.round(outputW * ratio);
+        outputH = Math.round(outputH * ratio);
     }
     
-    // Устанавливаем размер canvas
     canvas.width = outputW;
     canvas.height = outputH;
     
-    // Рисуем обрезанную часть с масштабированием
+    // Рисуем с высоким качеством
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputW, outputH);
     
-    // Сохраняем результат с меньшим качеством для экономии места
-    const croppedImage = canvas.toDataURL('image/jpeg', 0.7);
-    
-    // Проверяем размер
-    if (croppedImage.length > 4 * 1024 * 1024) {
-        showToast('Изображение слишком большое, попробуйте меньший размер', 'error');
-        return;
-    }
+    // Качество 0.92 - хороший баланс
+    const croppedImage = canvas.toDataURL('image/jpeg', 0.92);
+    console.log('applyCrop - result size:', Math.round(croppedImage.length / 1024), 'KB');
     
     state.settings.background = 'custom';
     state.settings.customBg = croppedImage;
@@ -7002,14 +7005,14 @@ function applyCrop() {
         document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
         document.querySelector('[data-bg="custom"]')?.classList.add('active');
         
-        // Показать настройку режима фона
         const bgModeSetting = document.getElementById('bg-mode-setting');
         if (bgModeSetting) bgModeSetting.style.display = 'flex';
         
         closeBgCropper();
+        showToast('Фон установлен');
     } catch (e) {
         console.error('Save settings error:', e);
-        showToast('Не удалось сохранить обои (недостаточно места)', 'error');
+        showToast('Не удалось сохранить (очистите кэш браузера)', 'error');
     }
 }
 
