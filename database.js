@@ -873,13 +873,16 @@ async function setPremium(userId, days, plan = 'premium') {
 
 async function getAllUsers(limit = 50, offset = 0) {
     try {
+        console.log('getAllUsers called with limit:', limit, 'offset:', offset);
         const result = await pool.query(
             `SELECT id, username, tag, custom_id, role, premium_until, premium_plan, display_name, avatar_url, created_at 
              FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
             [limit, offset]
         );
+        console.log('getAllUsers query result rows:', result.rows.length);
         
         const countResult = await pool.query('SELECT COUNT(*) FROM users');
+        console.log('getAllUsers total count:', countResult.rows[0].count);
         
         return {
             users: result.rows.map(u => ({
@@ -891,6 +894,7 @@ async function getAllUsers(limit = 50, offset = 0) {
         };
     } catch (error) {
         console.error('Get all users error:', error);
+        console.error('Error stack:', error.stack);
         return { users: [], total: 0 };
     }
 }
