@@ -9532,3 +9532,131 @@ input[type="range"]:focus::-moz-range-thumb {
 .bg-mode-btn.active .icon {
   filter: brightness(0) saturate(100%) invert(76%) sepia(52%) saturate(1000%) hue-rotate(166deg) brightness(101%) contrast(96%);
 }
+
+
+/* === BACKGROUND CROPPER === */
+.cropper-modal-content {
+  width: 90vw;
+  max-width: 800px;
+  max-height: 90vh;
+  background: var(--bg-dark);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cropper-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--bg-light);
+}
+
+.cropper-header h3 {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cropper-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--bg-darkest);
+  overflow: hidden;
+  min-height: 300px;
+  max-height: 60vh;
+}
+
+.cropper-image-wrapper {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  user-select: none;
+}
+
+.cropper-image-wrapper img {
+  max-width: 100%;
+  max-height: 55vh;
+  display: block;
+  opacity: 0.5;
+}
+
+.cropper-selection {
+  position: absolute;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  cursor: move;
+  background: transparent;
+}
+
+.cropper-selection::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.3)" stroke-width="1"/><line x1="66.66%" y1="0" x2="66.66%" y2="100%" stroke="rgba(255,255,255,0.3)" stroke-width="1"/><line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.3)" stroke-width="1"/><line x1="0" y1="66.66%" x2="100%" y2="66.66%" stroke="rgba(255,255,255,0.3)" stroke-width="1"/></svg>');
+  pointer-events: none;
+}
+
+.cropper-hint {
+  padding: 12px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  border-top: 1px solid var(--bg-light);
+}
+
+.cropper-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--bg-light);
+}
+
+.cropper-actions .btn-secondary {
+  padding: 10px 24px;
+  background: var(--bg-medium);
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cropper-actions .btn-secondary:hover {
+  background: var(--bg-light);
+}
+
+.cropper-actions .btn-primary {
+  padding: 10px 24px;
+  background: var(--accent);
+  color: var(--bg-darkest);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.cropper-actions .btn-primary:hover {
+  background: var(--accent-light);
+}
+
+@media (max-width: 600px) {
+  .cropper-modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+  
+  .cropper-container {
+    min-height: 200px;
+  }
+}

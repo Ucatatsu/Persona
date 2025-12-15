@@ -3558,22 +3558,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    document.getElementById('custom-bg-input')?.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                state.settings.background = 'custom';
-                state.settings.customBg = e.target.result;
-                saveSettings();
-                applySettings();
-                document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
-                document.querySelector('[data-bg="custom"]')?.classList.add('active');
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-    
     // Размер сообщений
     document.querySelectorAll('.size-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -5225,20 +5209,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Кастомный фон
+    // Кастомный фон с кроппером
     document.getElementById('custom-bg-input')?.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
             reader.onload = (ev) => {
-                state.settings.background = 'custom';
-                state.settings.customBg = ev.target.result;
-                saveSettings();
-                applySettings();
-                document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
-                document.querySelector('[data-bg="custom"]')?.classList.add('active');
-                // Показать настройку режима фона
-                updateBgModeVisibility();
+                openBgCropper(ev.target.result);
             };
             reader.readAsDataURL(file);
         }
@@ -6632,6 +6609,169 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('to-register-btn')?.addEventListener('click', () => {
         registrationStepper?.reset();
     });
+});
+
+// === BACKGROUND CROPPER ===
+let cropperState = {
+    originalImage: null,
+    imgWidth: 0,
+    imgHeight: 0,
+    selection: { x: 0, y: 0, width: 0, height: 0 },
+    isDragging: false,
+    dragStart: { x: 0, y: 0 }
+};
+
+function openBgCropper(imageDataUrl) {
+    const modal = document.getElementById('bg-cropper-modal');
+    const img = document.getElementById('cropper-image');
+    const selection = document.getElementById('cropper-selection');
+    const wrapper = document.getElementById('cropper-wrapper');
+    
+    cropperState.originalImage = imageDataUrl;
+    img.src = imageDataUrl;
+    
+    img.onload = () => {
+        modal.classList.remove('hidden');
+        
+        // Получаем размеры отображаемого изображения
+        const rect = img.getBoundingClientRect();
+        cropperState.imgWidth = rect.width;
+        cropperState.imgHeight = rect.height;
+        
+        // Вычисляем пропорции экрана (16:9 для десктопа)
+        const screenRatio = window.innerWidth / window.innerHeight;
+        
+        // Начальный размер выделения - максимально возможный с сохранением пропорций
+        let selWidth, selHeight;
+        if (cropperState.imgWidth / cropperState.imgHeight > screenRatio) {
+            // Изображение шире - ограничиваем по высоте
+            selHeight = cropperState.imgHeight;
+            selWidth = selHeight * screenRatio;
+        } else {
+            // Изображение выше - ограничиваем по ширине
+            selWidth = cropperState.imgWidth;
+            selHeight = selWidth / screenRatio;
+        }
+        
+        // Центрируем выделение
+        cropperState.selection = {
+            x: (cropperState.imgWidth - selWidth) / 2,
+            y: (cropperState.imgHeight - selHeight) / 2,
+            width: selWidth,
+            height: selHeight
+        };
+        
+        updateCropperSelection();
+        initCropperDrag();
+    };
+}
+
+function updateCropperSelection() {
+    const selection = document.getElementById('cropper-selection');
+    const s = cropperState.selection;
+    selection.style.left = s.x + 'px';
+    selection.style.top = s.y + 'px';
+    selection.style.width = s.width + 'px';
+    selection.style.height = s.height + 'px';
+}
+
+function initCropperDrag() {
+    const selection = document.getElementById('cropper-selection');
+    const wrapper = document.getElementById('cropper-wrapper');
+    
+    const onMouseDown = (e) => {
+        e.preventDefault();
+        cropperState.isDragging = true;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        cropperState.dragStart = {
+            x: clientX - cropperState.selection.x,
+            y: clientY - cropperState.selection.y
+        };
+    };
+    
+    const onMouseMove = (e) => {
+        if (!cropperState.isDragging) return;
+        e.preventDefault();
+        
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        let newX = clientX - cropperState.dragStart.x;
+        let newY = clientY - cropperState.dragStart.y;
+        
+        // Ограничиваем перемещение границами изображения
+        newX = Math.max(0, Math.min(newX, cropperState.imgWidth - cropperState.selection.width));
+        newY = Math.max(0, Math.min(newY, cropperState.imgHeight - cropperState.selection.height));
+        
+        cropperState.selection.x = newX;
+        cropperState.selection.y = newY;
+        updateCropperSelection();
+    };
+    
+    const onMouseUp = () => {
+        cropperState.isDragging = false;
+    };
+    
+    selection.addEventListener('mousedown', onMouseDown);
+    selection.addEventListener('touchstart', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('touchmove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchend', onMouseUp);
+}
+
+function applyCrop() {
+    const img = document.getElementById('cropper-image');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Вычисляем масштаб между отображаемым и реальным размером
+    const scaleX = img.naturalWidth / cropperState.imgWidth;
+    const scaleY = img.naturalHeight / cropperState.imgHeight;
+    
+    // Размеры обрезки в реальных пикселях
+    const cropX = cropperState.selection.x * scaleX;
+    const cropY = cropperState.selection.y * scaleY;
+    const cropW = cropperState.selection.width * scaleX;
+    const cropH = cropperState.selection.height * scaleY;
+    
+    // Устанавливаем размер canvas
+    canvas.width = cropW;
+    canvas.height = cropH;
+    
+    // Рисуем обрезанную часть
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    
+    // Сохраняем результат
+    const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+    
+    state.settings.background = 'custom';
+    state.settings.customBg = croppedImage;
+    saveSettings();
+    applySettings();
+    
+    document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
+    document.querySelector('[data-bg="custom"]')?.classList.add('active');
+    
+    // Показать настройку режима фона
+    const bgModeSetting = document.getElementById('bg-mode-setting');
+    if (bgModeSetting) bgModeSetting.style.display = 'flex';
+    
+    closeBgCropper();
+}
+
+function closeBgCropper() {
+    document.getElementById('bg-cropper-modal').classList.add('hidden');
+    document.getElementById('custom-bg-input').value = '';
+}
+
+// Инициализация кнопок кроппера
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('cropper-apply')?.addEventListener('click', applyCrop);
+    document.getElementById('cropper-cancel')?.addEventListener('click', closeBgCropper);
+    document.getElementById('close-cropper')?.addEventListener('click', closeBgCropper);
+    document.querySelector('#bg-cropper-modal .modal-overlay')?.addEventListener('click', closeBgCropper);
 });
 
 

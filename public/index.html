@@ -827,6 +827,28 @@
     </div>
   </div>
 
+  <!-- Модальное окно кроппера фона -->
+  <div id="bg-cropper-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content cropper-modal-content">
+      <div class="cropper-header">
+        <h3>Обрезать изображение</h3>
+        <button class="modal-close" id="close-cropper" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="cropper-container">
+        <div class="cropper-image-wrapper" id="cropper-wrapper">
+          <img id="cropper-image" src="" alt="Crop preview">
+          <div class="cropper-selection" id="cropper-selection"></div>
+        </div>
+      </div>
+      <div class="cropper-hint">Перетащите область выделения для выбора нужной части изображения</div>
+      <div class="cropper-actions">
+        <button class="btn-secondary" id="cropper-cancel">Отмена</button>
+        <button class="btn-primary" id="cropper-apply">Применить</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Модальное окно профиля собеседника -->
   <div id="user-profile-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
