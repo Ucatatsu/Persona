@@ -9602,6 +9602,41 @@ input[type="range"]:focus::-moz-range-thumb {
   pointer-events: none;
 }
 
+.cropper-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.cropper-handle[data-handle="nw"] {
+  top: -8px;
+  left: -8px;
+  cursor: nw-resize;
+}
+
+.cropper-handle[data-handle="ne"] {
+  top: -8px;
+  right: -8px;
+  cursor: ne-resize;
+}
+
+.cropper-handle[data-handle="sw"] {
+  bottom: -8px;
+  left: -8px;
+  cursor: sw-resize;
+}
+
+.cropper-handle[data-handle="se"] {
+  bottom: -8px;
+  right: -8px;
+  cursor: se-resize;
+}
+
 .cropper-hint {
   padding: 12px 20px;
   text-align: center;

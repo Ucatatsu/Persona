@@ -20,6 +20,9 @@ build/
 *.swp
 *.swo
 
+# Local docs
+hello.md
+
 # Qt build
 kvant-qt/build/
 kvant-qt/.qtcreator/

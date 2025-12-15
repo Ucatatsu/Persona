@@ -1,6 +1,6 @@
 {
   "name": "kvant-messenger",
-  "version": "1A6a0",
+  "version": "1A6a1",
   "description": "Квант - мессенджер",
   "main": "electron.js",
   "scripts": {

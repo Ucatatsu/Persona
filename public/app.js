@@ -6618,7 +6618,10 @@ let cropperState = {
     imgHeight: 0,
     selection: { x: 0, y: 0, width: 0, height: 0 },
     isDragging: false,
-    dragStart: { x: 0, y: 0 }
+    isResizing: false,
+    resizeHandle: null,
+    dragStart: { x: 0, y: 0 },
+    minSize: 50
 };
 
 function openBgCropper(imageDataUrl) {
@@ -6678,43 +6681,112 @@ function updateCropperSelection() {
 function initCropperDrag() {
     const selection = document.getElementById('cropper-selection');
     const wrapper = document.getElementById('cropper-wrapper');
+    const img = document.getElementById('cropper-image');
     
-    const onMouseDown = (e) => {
-        e.preventDefault();
-        cropperState.isDragging = true;
+    const getRelativeCoords = (e) => {
+        const rect = img.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        cropperState.dragStart = {
-            x: clientX - cropperState.selection.x,
-            y: clientY - cropperState.selection.y
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
         };
     };
     
+    // Drag для перемещения
+    const onMouseDown = (e) => {
+        if (e.target.classList.contains('cropper-handle')) return;
+        e.preventDefault();
+        cropperState.isDragging = true;
+        const coords = getRelativeCoords(e);
+        cropperState.dragStart = {
+            x: coords.x - cropperState.selection.x,
+            y: coords.y - cropperState.selection.y
+        };
+    };
+    
+    // Resize для изменения размера
+    const onHandleDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        cropperState.isResizing = true;
+        cropperState.resizeHandle = e.target.dataset.handle;
+        cropperState.dragStart = getRelativeCoords(e);
+    };
+    
     const onMouseMove = (e) => {
-        if (!cropperState.isDragging) return;
+        if (!cropperState.isDragging && !cropperState.isResizing) return;
         e.preventDefault();
         
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const coords = getRelativeCoords(e);
+        const s = cropperState.selection;
         
-        let newX = clientX - cropperState.dragStart.x;
-        let newY = clientY - cropperState.dragStart.y;
+        if (cropperState.isResizing) {
+            const handle = cropperState.resizeHandle;
+            let newX = s.x, newY = s.y, newW = s.width, newH = s.height;
+            
+            if (handle.includes('e')) {
+                newW = Math.max(cropperState.minSize, coords.x - s.x);
+            }
+            if (handle.includes('w')) {
+                const diff = coords.x - s.x;
+                newX = s.x + diff;
+                newW = s.width - diff;
+                if (newW < cropperState.minSize) {
+                    newX = s.x + s.width - cropperState.minSize;
+                    newW = cropperState.minSize;
+                }
+            }
+            if (handle.includes('s')) {
+                newH = Math.max(cropperState.minSize, coords.y - s.y);
+            }
+            if (handle.includes('n')) {
+                const diff = coords.y - s.y;
+                newY = s.y + diff;
+                newH = s.height - diff;
+                if (newH < cropperState.minSize) {
+                    newY = s.y + s.height - cropperState.minSize;
+                    newH = cropperState.minSize;
+                }
+            }
+            
+            // Ограничиваем границами изображения
+            if (newX < 0) { newW += newX; newX = 0; }
+            if (newY < 0) { newH += newY; newY = 0; }
+            if (newX + newW > cropperState.imgWidth) newW = cropperState.imgWidth - newX;
+            if (newY + newH > cropperState.imgHeight) newH = cropperState.imgHeight - newY;
+            
+            cropperState.selection = { x: newX, y: newY, width: newW, height: newH };
+        } else {
+            // Обычное перемещение
+            let newX = coords.x - cropperState.dragStart.x;
+            let newY = coords.y - cropperState.dragStart.y;
+            
+            newX = Math.max(0, Math.min(newX, cropperState.imgWidth - s.width));
+            newY = Math.max(0, Math.min(newY, cropperState.imgHeight - s.height));
+            
+            cropperState.selection.x = newX;
+            cropperState.selection.y = newY;
+        }
         
-        // Ограничиваем перемещение границами изображения
-        newX = Math.max(0, Math.min(newX, cropperState.imgWidth - cropperState.selection.width));
-        newY = Math.max(0, Math.min(newY, cropperState.imgHeight - cropperState.selection.height));
-        
-        cropperState.selection.x = newX;
-        cropperState.selection.y = newY;
         updateCropperSelection();
     };
     
     const onMouseUp = () => {
         cropperState.isDragging = false;
+        cropperState.isResizing = false;
+        cropperState.resizeHandle = null;
     };
     
     selection.addEventListener('mousedown', onMouseDown);
     selection.addEventListener('touchstart', onMouseDown);
+    
+    // Обработчики для ручек ресайза
+    document.querySelectorAll('.cropper-handle').forEach(handle => {
+        handle.addEventListener('mousedown', onHandleDown);
+        handle.addEventListener('touchstart', onHandleDown);
+    });
+    
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('touchmove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
