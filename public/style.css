@@ -1357,15 +1357,49 @@ button {
     width: 100%;
     border-radius: 0;
     z-index: 100;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), 
+                opacity 0.3s ease;
     background: var(--bg-darkest);
     padding-top: var(--safe-area-top);
     padding-bottom: var(--safe-area-bottom);
+    will-change: transform;
   }
 
   .sidebar.hidden-mobile {
     transform: translateX(-100%);
     pointer-events: none;
+    opacity: 0.5;
+  }
+  
+  /* Анимация появления чата при выборе */
+  .chat-area.mobile-animate {
+    animation: mobileSlideIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  
+  @keyframes mobileSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(20%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  /* Улучшенные тапы на мобильных */
+  .user-item,
+  .dock-item,
+  .header-action-btn,
+  .back-btn {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  .user-item:active,
+  .dock-item:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
   }
 
   .chat-header {
@@ -8677,7 +8711,7 @@ input[type="range"]:focus::-moz-range-thumb {
 }
 
 
-/* === ELECTRIC BORDER EFFECT === */
+/* === ELECTRIC BORDER EFFECT (Optimized CSS-only) === */
 .electric-border {
   --electric-border-color: #FFD700;
   --eb-border-width: 2px;
@@ -8695,16 +8729,6 @@ input[type="range"]:focus::-moz-range-thumb {
   --electric-border-color: #a855f7;
 }
 
-.eb-svg {
-  position: fixed;
-  left: -10000px;
-  top: -10000px;
-  width: 10px;
-  height: 10px;
-  opacity: 0.001;
-  pointer-events: none;
-}
-
 .eb-content {
   position: relative;
   border-radius: inherit;
@@ -8717,6 +8741,7 @@ input[type="range"]:focus::-moz-range-thumb {
   border-radius: inherit;
   pointer-events: none;
   z-index: 2;
+  overflow: hidden;
 }
 
 .eb-stroke,
@@ -8732,26 +8757,47 @@ input[type="range"]:focus::-moz-range-thumb {
 
 .eb-stroke {
   border: var(--eb-border-width) solid var(--electric-border-color);
+  animation: electricPulse 2s ease-in-out infinite;
 }
 
 .eb-glow-1 {
   border: var(--eb-border-width) solid var(--electric-border-color);
-  opacity: 0.5;
-  filter: blur(calc(0.5px + (var(--eb-border-width) * 0.25)));
+  opacity: 0.6;
+  filter: blur(4px);
+  animation: electricPulse 2s ease-in-out infinite 0.1s;
 }
 
 .eb-glow-2 {
   border: var(--eb-border-width) solid var(--electric-border-color);
-  opacity: 0.5;
-  filter: blur(calc(2px + (var(--eb-border-width) * 0.5)));
+  opacity: 0.4;
+  filter: blur(8px);
+  animation: electricPulse 2s ease-in-out infinite 0.2s;
 }
 
 .eb-background-glow {
   z-index: -1;
-  transform: scale(1.08);
-  filter: blur(32px);
-  opacity: 0.3;
-  background: linear-gradient(-30deg, var(--electric-border-color), transparent, var(--electric-border-color));
+  transform: scale(1.05);
+  filter: blur(20px);
+  opacity: 0.25;
+  background: var(--electric-border-color);
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+@keyframes electricPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.25; transform: scale(1.05); }
+  50% { opacity: 0.4; transform: scale(1.08); }
+}
+
+/* Отключаем анимацию на слабых устройствах */
+@media (prefers-reduced-motion: reduce) {
+  .eb-stroke, .eb-glow-1, .eb-glow-2, .eb-background-glow {
+    animation: none;
+  }
 }
 
 /* Обновлённые карточки подписки с электрическим эффектом */
@@ -9693,5 +9739,58 @@ input[type="range"]:focus::-moz-range-thumb {
   
   .cropper-container {
     min-height: 200px;
+  }
+}
+
+/* === MOBILE OPTIMIZATIONS v2 === */
+@media (max-width: 768px) {
+  /* Плавный скролл */
+  .messages,
+  .users-list,
+  .settings-content {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Улучшенные сообщения */
+  .message {
+    max-width: 85%;
+    padding: 10px 14px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  
+  /* Компактный input */
+  .message-input-container {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  
+  .message-input {
+    font-size: 16px; /* Предотвращает зум на iOS */
+    padding: 10px 14px;
+    min-height: 44px;
+  }
+  
+  /* Улучшенные кнопки действий */
+  .send-btn,
+  .attach-btn,
+  .emoji-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Оптимизация модальных окон */
+  .modal-content {
+    max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 40px);
+  }
+  
+  /* Улучшенный профиль */
+  .profile-modal-content {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
   }
 }
