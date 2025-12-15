@@ -4973,6 +4973,7 @@ input:focus {
   background: linear-gradient(135deg, #ffd700, #ffaa00);
   color: #000;
   text-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
 }
 
 /* P+ badge (фиолетовый) */
@@ -4980,6 +4981,7 @@ input:focus {
   background: linear-gradient(135deg, #a855f7, #6366f1);
   color: #fff;
   text-shadow: 0 0 4px rgba(168, 85, 247, 0.5);
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
 }
 
 /* Кастомный тег */
