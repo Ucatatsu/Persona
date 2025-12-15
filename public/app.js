@@ -6766,39 +6766,45 @@ function openBgCropper(imageDataUrl) {
     
     // Ждём загрузки изображения
     const initCropper = () => {
-        // Даём время на рендер
+        // Даём время на рендер (два кадра для надёжности)
         requestAnimationFrame(() => {
-            const rect = img.getBoundingClientRect();
-            cropperState.imgWidth = rect.width;
-            cropperState.imgHeight = rect.height;
-            
-            // Начальный размер с соотношением 16:9
-            let selWidth, selHeight;
-            const imgRatio = cropperState.imgWidth / cropperState.imgHeight;
-            
-            if (imgRatio > cropperState.aspectRatio) {
-                // Изображение шире чем 16:9 - ограничиваем по высоте
-                selHeight = cropperState.imgHeight * 0.9;
-                selWidth = selHeight * cropperState.aspectRatio;
-            } else {
-                // Изображение уже чем 16:9 - ограничиваем по ширине
-                selWidth = cropperState.imgWidth * 0.9;
-                selHeight = selWidth / cropperState.aspectRatio;
-            }
-            
-            // Центрируем выделение
-            cropperState.selection = {
-                x: (cropperState.imgWidth - selWidth) / 2,
-                y: (cropperState.imgHeight - selHeight) / 2,
-                width: selWidth,
-                height: selHeight
-            };
-            
-            updateCropperSelection();
-            if (!cropperState.listenersAttached) {
-                initCropperDrag();
-                cropperState.listenersAttached = true;
-            }
+            requestAnimationFrame(() => {
+                const rect = img.getBoundingClientRect();
+                cropperState.imgWidth = rect.width;
+                cropperState.imgHeight = rect.height;
+                
+                console.log('Cropper init - img size:', cropperState.imgWidth, 'x', cropperState.imgHeight);
+                
+                // Начальный размер с соотношением 16:9
+                let selWidth, selHeight;
+                const imgRatio = cropperState.imgWidth / cropperState.imgHeight;
+                
+                if (imgRatio > cropperState.aspectRatio) {
+                    // Изображение шире чем 16:9 - ограничиваем по высоте
+                    selHeight = cropperState.imgHeight * 0.8;
+                    selWidth = selHeight * cropperState.aspectRatio;
+                } else {
+                    // Изображение уже чем 16:9 - ограничиваем по ширине
+                    selWidth = cropperState.imgWidth * 0.8;
+                    selHeight = selWidth / cropperState.aspectRatio;
+                }
+                
+                // Центрируем выделение
+                cropperState.selection = {
+                    x: (cropperState.imgWidth - selWidth) / 2,
+                    y: (cropperState.imgHeight - selHeight) / 2,
+                    width: selWidth,
+                    height: selHeight
+                };
+                
+                console.log('Cropper selection:', cropperState.selection);
+                
+                updateCropperSelection();
+                if (!cropperState.listenersAttached) {
+                    initCropperDrag();
+                    cropperState.listenersAttached = true;
+                }
+            });
         });
     };
     
@@ -6955,32 +6961,56 @@ function applyCrop() {
     // Размеры обрезки в реальных пикселях
     const cropX = cropperState.selection.x * scaleX;
     const cropY = cropperState.selection.y * scaleY;
-    const cropW = cropperState.selection.width * scaleX;
-    const cropH = cropperState.selection.height * scaleY;
+    let cropW = cropperState.selection.width * scaleX;
+    let cropH = cropperState.selection.height * scaleY;
+    
+    // Ограничиваем максимальный размер для экономии места в localStorage
+    const maxWidth = 1920;
+    const maxHeight = 1080;
+    let outputW = cropW;
+    let outputH = cropH;
+    
+    if (cropW > maxWidth || cropH > maxHeight) {
+        const ratio = Math.min(maxWidth / cropW, maxHeight / cropH);
+        outputW = cropW * ratio;
+        outputH = cropH * ratio;
+    }
     
     // Устанавливаем размер canvas
-    canvas.width = cropW;
-    canvas.height = cropH;
+    canvas.width = outputW;
+    canvas.height = outputH;
     
-    // Рисуем обрезанную часть
-    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    // Рисуем обрезанную часть с масштабированием
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputW, outputH);
     
-    // Сохраняем результат
-    const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+    // Сохраняем результат с меньшим качеством для экономии места
+    const croppedImage = canvas.toDataURL('image/jpeg', 0.7);
+    
+    // Проверяем размер
+    if (croppedImage.length > 4 * 1024 * 1024) {
+        showToast('Изображение слишком большое, попробуйте меньший размер', 'error');
+        return;
+    }
     
     state.settings.background = 'custom';
     state.settings.customBg = croppedImage;
-    saveSettings();
-    applySettings();
     
-    document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
-    document.querySelector('[data-bg="custom"]')?.classList.add('active');
-    
-    // Показать настройку режима фона
-    const bgModeSetting = document.getElementById('bg-mode-setting');
-    if (bgModeSetting) bgModeSetting.style.display = 'flex';
-    
-    closeBgCropper();
+    try {
+        saveSettings();
+        applySettings();
+        
+        document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
+        document.querySelector('[data-bg="custom"]')?.classList.add('active');
+        
+        // Показать настройку режима фона
+        const bgModeSetting = document.getElementById('bg-mode-setting');
+        if (bgModeSetting) bgModeSetting.style.display = 'flex';
+        
+        closeBgCropper();
+    } catch (e) {
+        console.error('Save settings error:', e);
+        showToast('Не удалось сохранить обои (недостаточно места)', 'error');
+    }
 }
 
 function closeBgCropper() {
