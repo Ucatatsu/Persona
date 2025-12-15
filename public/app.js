@@ -4403,11 +4403,12 @@ async function toggleAdmin(userId, currentRole) {
 
 async function givePremium(userId, planType = 'premium') {
     const planName = planType === 'premium_plus' ? 'Premium+' : 'Premium';
+    const icon = planType === 'premium_plus' ? '💎' : '⭐';
     const days = await customPrompt({
         title: `Выдать ${planName}`,
         message: 'Введите количество дней:',
-        icon: '<img src="/assets/dimond.svg" class="icon">',
-        variant: 'premium',
+        icon: icon,
+        variant: planType === 'premium_plus' ? 'premium-plus' : 'premium',
         placeholder: 'Дней',
         defaultValue: '30',
         okText: 'Выдать',
