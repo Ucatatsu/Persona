@@ -5553,14 +5553,7 @@ input:focus {
   position: relative;
 }
 
-.settings-item.premium-only::after {
-  content: '👑 Premium';
-  position: absolute;
-  right: 60px;
-  font-size: 11px;
-  color: #ffd700;
-  opacity: 0.8;
-}
+/* Убрали ::after - используем premium-badge-inline */
 
 /* Кастомный тег */
 .custom-tag-display {
@@ -9451,16 +9444,19 @@ input[type="range"]:focus::-moz-range-thumb {
 
 
 /* Dock иконки */
-.dock-icon {
+.dock-img {
   width: 24px;
   height: 24px;
-  filter: brightness(0) invert(1);
+  filter: brightness(0) invert(0.8);
   transition: filter 0.2s;
 }
 
-.dock-item.active .dock-icon,
-.dock-item:hover .dock-icon {
+.dock-item.active .dock-img {
   filter: brightness(0) saturate(100%) invert(76%) sepia(52%) saturate(1000%) hue-rotate(166deg) brightness(101%) contrast(96%);
+}
+
+.dock-item:hover .dock-img {
+  filter: brightness(0) invert(1);
 }
 
 /* Empty tab иконки */
@@ -9491,4 +9487,48 @@ input[type="range"]:focus::-moz-range-thumb {
 .plan-badge .icon {
   width: 24px;
   height: 24px;
+}
+
+
+/* Admin Premium+ button */
+.admin-btn-premium-plus {
+  background: rgba(138, 43, 226, 0.2);
+  color: #a855f7;
+  border: 1px solid rgba(138, 43, 226, 0.3);
+}
+
+.admin-btn-premium-plus:hover {
+  background: rgba(138, 43, 226, 0.3);
+}
+
+.admin-btn .icon-sm {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.admin-btn-premium .icon-sm {
+  filter: brightness(0) saturate(100%) invert(83%) sepia(50%) saturate(1000%) hue-rotate(10deg);
+}
+
+.admin-btn-premium-plus .icon-sm {
+  filter: brightness(0) saturate(100%) invert(50%) sepia(80%) saturate(2000%) hue-rotate(250deg);
+}
+
+.admin-btn-delete .icon-sm {
+  filter: brightness(0) saturate(100%) invert(40%) sepia(90%) saturate(2000%) hue-rotate(340deg);
+}
+
+
+/* Background mode icons */
+.bg-mode-btn .icon {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) invert(0.6);
+}
+
+.bg-mode-btn:hover .icon,
+.bg-mode-btn.active .icon {
+  filter: brightness(0) saturate(100%) invert(76%) sepia(52%) saturate(1000%) hue-rotate(166deg) brightness(101%) contrast(96%);
 }

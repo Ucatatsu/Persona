@@ -768,13 +768,13 @@ app.put('/api/admin/user/:userId/role', authMiddleware, adminMiddleware, async (
 app.post('/api/admin/user/:userId/premium', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { userId } = req.params;
-        const { days } = req.body;
+        const { days, plan } = req.body;
         
         if (!days || days < 1) {
             return res.status(400).json({ success: false, error: 'Укажите количество дней' });
         }
         
-        const result = await db.setPremium(userId, parseInt(days));
+        const result = await db.setPremium(userId, parseInt(days), plan || 'premium');
         res.json(result);
     } catch (error) {
         console.error('Admin set premium error:', error);

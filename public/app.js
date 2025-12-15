@@ -1226,6 +1226,8 @@ function updateChatHeader(name, subtitle, avatarUrl) {
     const statusEl = header.querySelector('.chat-user-status');
     
     if (avatarEl) {
+        // Очищаем backgroundImage от предыдущего чата
+        avatarEl.style.backgroundImage = '';
         avatarEl.innerHTML = avatarUrl ? `<img src="${avatarUrl}">` : name[0]?.toUpperCase() || '?';
     }
     if (nameEl) nameEl.textContent = name;
@@ -2059,7 +2061,15 @@ function sendMessage() {
 // Прикрепление файла
 async function handleAttachFile(e) {
     const file = e.target.files[0];
-    if (!file || !state.selectedUser) return;
+    if (!file) return;
+    
+    // Проверяем что выбран какой-то чат
+    const hasChat = state.selectedUser || state.selectedGroup || state.selectedChannel || state.selectedServerChannel;
+    if (!hasChat) {
+        showToast('Сначала выберите чат', 'error');
+        e.target.value = '';
+        return;
+    }
     
     // Проверка размера
     const isPremium = state.currentUserProfile?.isPremium || state.currentUser?.role === 'admin';
@@ -2077,18 +2087,37 @@ async function handleAttachFile(e) {
         
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('receiverId', state.selectedUser.id);
         
         const res = await api.uploadFile('/api/upload-message-file', formData);
         const result = await res.json();
         
         if (result.success) {
-            // Отправляем сообщение с файлом
-            state.socket.emit('send-message', {
-                receiverId: state.selectedUser.id,
-                text: result.fileUrl,
-                messageType: result.fileType
-            });
+            // Отправляем сообщение с файлом в зависимости от типа чата
+            if (state.selectedUser) {
+                state.socket.emit('send-message', {
+                    receiverId: state.selectedUser.id,
+                    text: result.fileUrl,
+                    messageType: result.fileType
+                });
+            } else if (state.selectedGroup) {
+                state.socket.emit('group-message', {
+                    groupId: state.selectedGroup.id,
+                    text: result.fileUrl,
+                    messageType: result.fileType
+                });
+            } else if (state.selectedChannel) {
+                state.socket.emit('channel-message', {
+                    channelId: state.selectedChannel.id,
+                    text: result.fileUrl,
+                    messageType: result.fileType
+                });
+            } else if (state.selectedServerChannel) {
+                state.socket.emit('server-message', {
+                    channelId: state.selectedServerChannel.id,
+                    text: result.fileUrl,
+                    messageType: result.fileType
+                });
+            }
             showToast('Файл отправлен!', 'success');
         } else {
             showToast(result.error || 'Ошибка загрузки', 'error');
@@ -3304,7 +3333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Кнопка прикрепления файла
     document.getElementById('attach-btn')?.addEventListener('click', () => {
-        if (!state.selectedUser) {
+        if (!state.selectedUser && !state.selectedGroup && !state.selectedChannel && !state.selectedServerChannel) {
             showToast('Сначала выберите чат', 'error');
             return;
         }
@@ -3614,7 +3643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     emojiBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!state.selectedUser) {
+        if (!state.selectedUser && !state.selectedGroup && !state.selectedChannel && !state.selectedServerChannel) {
             showToast('Сначала выберите чат', 'error');
             return;
         }
@@ -4148,11 +4177,14 @@ function renderAdminUsers(users) {
                     </button>
                 ` : ''}
                 <button class="admin-btn admin-btn-premium" data-action="give-premium">
-                    +Premium
+                    <img src="/assets/dimond.svg" class="icon-sm"> Premium
+                </button>
+                <button class="admin-btn admin-btn-premium-plus" data-action="give-premium-plus">
+                    <img src="/assets/dimond-plus.svg" class="icon-sm"> Premium+
                 </button>
                 ${user.id !== state.currentUser.id ? `
                     <button class="admin-btn admin-btn-delete" data-action="delete-user">
-                        Удалить
+                        <img src="/assets/trash.svg" class="icon-sm"> Удалить
                     </button>
                 ` : ''}
             </div>
@@ -4180,7 +4212,9 @@ async function handleAdminAction(e) {
     if (action === 'toggle-admin') {
         await toggleAdmin(userId, userRole);
     } else if (action === 'give-premium') {
-        await givePremium(userId);
+        await givePremium(userId, 'premium');
+    } else if (action === 'give-premium-plus') {
+        await givePremium(userId, 'premium_plus');
     } else if (action === 'delete-user') {
         await deleteUserAdmin(userId);
     }
@@ -4215,11 +4249,12 @@ async function toggleAdmin(userId, currentRole) {
     }
 }
 
-async function givePremium(userId) {
+async function givePremium(userId, planType = 'premium') {
+    const planName = planType === 'premium_plus' ? 'Premium+' : 'Premium';
     const days = await customPrompt({
-        title: 'Выдать Premium',
+        title: `Выдать ${planName}`,
         message: 'Введите количество дней:',
-        icon: '👑',
+        icon: '<img src="/assets/dimond.svg" class="icon">',
         variant: 'premium',
         placeholder: 'Дней',
         defaultValue: '30',
@@ -4229,11 +4264,14 @@ async function givePremium(userId) {
     if (!days || isNaN(days)) return;
     
     try {
-        const res = await api.post(`/api/admin/user/${userId}/premium`, { days: parseInt(days) });
+        const res = await api.post(`/api/admin/user/${userId}/premium`, { 
+            days: parseInt(days),
+            plan: planType
+        });
         const data = await res.json();
         
         if (data.success) {
-            showToast(`Premium выдан на ${days} дней`);
+            showToast(`${planName} выдан на ${days} дней`);
             showAdminPanel();
         } else {
             showToast(data.error || 'Ошибка', 'error');
@@ -4410,14 +4448,18 @@ function togglePanelMic() {
     state.micMuted = !state.micMuted;
     const btn = document.getElementById('panel-mic-btn');
     btn.classList.toggle('muted', state.micMuted);
-    btn.textContent = state.micMuted ? '🔇' : '🎤';
+    btn.innerHTML = state.micMuted 
+        ? '<img src="/assets/Block-microphone.svg" alt="" class="icon">' 
+        : '<img src="/assets/microphone.svg" alt="" class="icon">';
 }
 
 function togglePanelCam() {
     state.camMuted = !state.camMuted;
     const btn = document.getElementById('panel-cam-btn');
     btn.classList.toggle('muted', state.camMuted);
-    btn.textContent = state.camMuted ? '📷' : '📹';
+    btn.innerHTML = state.camMuted 
+        ? '<img src="/assets/camera-off.svg" alt="" class="icon">' 
+        : '<img src="/assets/camera.svg" alt="" class="icon">';
 }
 
 // Инициализация событий для карточки
@@ -5411,12 +5453,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const dockContainer = document.getElementById('sidebar-dock');
     if (dockContainer && window.Dock) {
         const dockItems = [
-            { icon: '<img src="/assets/message.svg" class="dock-icon">', label: 'Чаты', tab: 'chats' },
-            { icon: '<img src="/assets/group.svg" class="dock-icon">', label: 'Группы', tab: 'groups' },
-            { icon: '<img src="/assets/megaphone.svg" class="dock-icon">', label: 'Каналы', tab: 'channels' },
-            { icon: '<img src="/assets/Castle.svg" class="dock-icon">', label: 'Серверы', tab: 'servers' },
-            { icon: '<img src="/assets/badge-dollar.svg" class="dock-icon">', label: 'Подписка', action: 'subscription' },
-            { icon: '<img src="/assets/Plus.svg" class="dock-icon">', label: 'Создать', action: 'create' }
+            { icon: '<img src="/assets/message.svg" class="dock-img">', label: 'Чаты', tab: 'chats' },
+            { icon: '<img src="/assets/group.svg" class="dock-img">', label: 'Группы', tab: 'groups' },
+            { icon: '<img src="/assets/megaphone.svg" class="dock-img">', label: 'Каналы', tab: 'channels' },
+            { icon: '<img src="/assets/Castle.svg" class="dock-img">', label: 'Серверы', tab: 'servers' },
+            { icon: '<img src="/assets/badge-dollar.svg" class="dock-img">', label: 'Подписка', action: 'subscription' },
+            { icon: '<img src="/assets/Plus.svg" class="dock-img">', label: 'Создать', action: 'create' }
         ];
         
         window.sidebarDock = new Dock(dockContainer, {
@@ -5642,7 +5684,7 @@ function updateSubscriptionUI(data) {
     statusEl.className = 'subscription-current ' + (data.plan || 'free');
     
     const icons = { 
-        free: '✨', 
+        free: '<img src="/assets/Sparkles.svg" class="icon-sm">', 
         premium: '<img src="/assets/dimond.svg" class="icon-sm">', 
         premium_plus: '<img src="/assets/dimond-plus.svg" class="icon-sm">' 
     };

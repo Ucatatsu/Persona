@@ -855,16 +855,16 @@ async function setUserRole(userId, role) {
     }
 }
 
-async function setPremium(userId, days) {
+async function setPremium(userId, days, plan = 'premium') {
     try {
         const premiumUntil = new Date();
         premiumUntil.setDate(premiumUntil.getDate() + days);
         
         await pool.query(
-            'UPDATE users SET premium_until = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-            [userId, premiumUntil]
+            'UPDATE users SET premium_until = $2, premium_plan = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+            [userId, premiumUntil, plan]
         );
-        return { success: true, premiumUntil };
+        return { success: true, premiumUntil, plan };
     } catch (error) {
         console.error('Set premium error:', error);
         return { success: false, error: 'Ошибка выдачи премиума' };

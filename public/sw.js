@@ -1,7 +1,7 @@
 // === КВАНТ - SERVICE WORKER ===
 
-const CACHE_NAME = 'kvant-v6';
-const APP_VERSION = '1.5.3'; // Увеличивай при каждом обновлении
+const CACHE_NAME = 'kvant-v8';
+const APP_VERSION = '1.5.5'; // Увеличивай при каждом обновлении
 const STATIC_ASSETS = [
     '/',
     '/index.html',
