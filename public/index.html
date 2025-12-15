@@ -253,6 +253,10 @@
           <span class="ctx-icon"><img src="/assets/edit.svg" alt="" class="icon-sm"></span>
           <span>Записать как...</span>
         </button>
+        <button class="context-menu-item" id="ctx-pin-chat">
+          <span class="ctx-icon" id="ctx-pin-icon">📌</span>
+          <span id="ctx-pin-text">Закрепить чат</span>
+        </button>
         <div class="context-menu-divider"></div>
         <button class="context-menu-item" id="ctx-toggle-notifications">
           <span class="ctx-icon" id="ctx-notif-icon"><img src="/assets/bell.svg" alt="" class="icon-sm"></span>
@@ -290,6 +294,9 @@
         <img src="/assets/Clip.svg" alt="" class="icon">
       </button>
       <input type="file" id="attach-input" accept="image/*,video/mp4,.gif" hidden aria-hidden="true">
+      <button type="button" class="self-destruct-btn hidden" id="self-destruct-btn" aria-label="Самоуничтожение" title="Самоуничтожающееся сообщение">
+        ⏱️
+      </button>
       <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off" 
              disabled aria-label="Текст сообщения">
       <button type="button" class="emoji-btn" aria-label="Выбрать эмодзи" aria-haspopup="true">
@@ -299,6 +306,17 @@
         <img src="/assets/send.svg" alt="" class="icon">
       </button>
     </form>
+    
+    <!-- Меню самоуничтожения -->
+    <div class="self-destruct-menu hidden" id="self-destruct-menu">
+      <div class="self-destruct-title">⏱️ Самоуничтожение <span class="badge-premium-plus">P+</span></div>
+      <button class="self-destruct-option" data-minutes="0">Выкл</button>
+      <button class="self-destruct-option" data-minutes="1">1 мин</button>
+      <button class="self-destruct-option" data-minutes="5">5 мин</button>
+      <button class="self-destruct-option" data-minutes="15">15 мин</button>
+      <button class="self-destruct-option" data-minutes="60">1 час</button>
+      <button class="self-destruct-option" data-minutes="1440">24 часа</button>
+    </div>
   </div>
 
   <!-- Модальное окно профиля -->
@@ -395,6 +413,37 @@
               <input type="text" id="edit-custom-id" placeholder="6666" 
                      pattern="\d{4}" maxlength="4">
               <span class="form-hint">4 цифры (например: 6666, 1234)</span>
+            </div>
+            
+            <!-- Premium+ only: Кастомные пузыри -->
+            <div class="form-group premium-plus-only" id="bubble-style-group">
+              <label>Стиль пузырей сообщений <span class="badge-premium-plus">P+</span></label>
+              <div class="bubble-style-picker" id="bubble-style-picker">
+                <div class="bubble-style-option active" data-style="default" title="Стандартный">
+                  <div class="bubble-preview default"></div>
+                </div>
+                <div class="bubble-style-option" data-style="gradient-purple" title="Фиолетовый градиент">
+                  <div class="bubble-preview gradient-purple"></div>
+                </div>
+                <div class="bubble-style-option" data-style="gradient-green" title="Зелёный градиент">
+                  <div class="bubble-preview gradient-green"></div>
+                </div>
+                <div class="bubble-style-option" data-style="gradient-orange" title="Оранжевый градиент">
+                  <div class="bubble-preview gradient-orange"></div>
+                </div>
+                <div class="bubble-style-option" data-style="gradient-pink" title="Розовый градиент">
+                  <div class="bubble-preview gradient-pink"></div>
+                </div>
+                <div class="bubble-style-option" data-style="neon" title="Неон">
+                  <div class="bubble-preview neon"></div>
+                </div>
+                <div class="bubble-style-option" data-style="glass" title="Стекло">
+                  <div class="bubble-preview glass"></div>
+                </div>
+                <div class="bubble-style-option" data-style="minimal" title="Минимализм">
+                  <div class="bubble-preview minimal"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

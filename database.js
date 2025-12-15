@@ -356,6 +356,23 @@ async function initDB() {
         try { sqlite.exec('CREATE INDEX idx_server_members_user ON server_members(user_id)'); } catch {}
         try { sqlite.exec('CREATE INDEX idx_server_channels_server ON server_channels(server_id)'); } catch {}
         try { sqlite.exec('CREATE INDEX idx_server_messages_channel ON server_messages(channel_id)'); } catch {}
+
+        // === ЗАКРЕПЛЁННЫЕ ЧАТЫ ===
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS pinned_chats (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                chat_id TEXT NOT NULL,
+                chat_type TEXT DEFAULT 'user',
+                pinned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, chat_id, chat_type),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        try { sqlite.exec('CREATE INDEX idx_pinned_chats_user ON pinned_chats(user_id)'); } catch {}
+        
+        // Миграция: добавляем self_destruct_at в messages
+        try { sqlite.exec('ALTER TABLE messages ADD COLUMN self_destruct_at TEXT'); } catch {}
         
         console.log('✅ SQLite база данных инициализирована');
         return;
@@ -433,6 +450,7 @@ async function initDB() {
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT \'text\'').catch(() => {});
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_duration INTEGER DEFAULT 0').catch(() => {});
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP').catch(() => {});
+        await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS self_destruct_at TIMESTAMP').catch(() => {});
 
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)').catch(() => {});
@@ -673,6 +691,19 @@ async function initDB() {
         await client.query('CREATE INDEX IF NOT EXISTS idx_server_members_user ON server_members(user_id)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_server_channels_server ON server_channels(server_id)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_server_messages_channel ON server_messages(channel_id)').catch(() => {});
+
+        // === ЗАКРЕПЛЁННЫЕ ЧАТЫ ===
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS pinned_chats (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                chat_id TEXT NOT NULL,
+                chat_type TEXT DEFAULT 'user',
+                pinned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, chat_id, chat_type)
+            )
+        `);
+        await client.query('CREATE INDEX IF NOT EXISTS idx_pinned_chats_user ON pinned_chats(user_id)').catch(() => {});
 
         console.log('✅ PostgreSQL база данных инициализирована');
     } finally {
@@ -1051,23 +1082,29 @@ async function searchUsers(query, excludeUserId) {
 
 // === СООБЩЕНИЯ ===
 
-async function saveMessage(senderId, receiverId, text, messageType = 'text', callDuration = 0) {
+async function saveMessage(senderId, receiverId, text, messageType = 'text', callDuration = 0, selfDestructMinutes = null) {
     try {
         const id = uuidv4();
         const created_at = new Date().toISOString();
+        let self_destruct_at = null;
+        
+        if (selfDestructMinutes && selfDestructMinutes > 0) {
+            const destructDate = new Date(Date.now() + selfDestructMinutes * 60 * 1000);
+            self_destruct_at = destructDate.toISOString();
+        }
         
         if (USE_SQLITE) {
-            sqlite.prepare(`INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, senderId, receiverId, text, messageType, callDuration, created_at);
+            sqlite.prepare(`INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at, self_destruct_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, senderId, receiverId, text, messageType, callDuration, created_at, self_destruct_at);
         } else {
             await pool.query(
-                `INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [id, senderId, receiverId, text, messageType, callDuration, created_at]
+                `INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at, self_destruct_at) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [id, senderId, receiverId, text, messageType, callDuration, created_at, self_destruct_at]
             );
         }
         
-        return { id, sender_id: senderId, receiver_id: receiverId, text, created_at, message_type: messageType, call_duration: callDuration };
+        return { id, sender_id: senderId, receiver_id: receiverId, text, created_at, message_type: messageType, call_duration: callDuration, self_destruct_at };
     } catch (error) {
         console.error('Save message error:', error);
         throw error;
@@ -1124,33 +1161,38 @@ async function getContacts(userId) {
             rows = sqlite.prepare(`
                 SELECT DISTINCT u.id, u.username, u.tag, u.display_name, u.avatar_url, u.role, u.premium_until, u.name_color, u.custom_id,
                     (SELECT COUNT(*) FROM messages m WHERE m.sender_id = u.id AND m.receiver_id = ? AND m.is_read = 0) as unread_count,
-                    (SELECT MAX(created_at) FROM messages m WHERE (m.sender_id = u.id AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = u.id)) as last_message_at
+                    (SELECT MAX(created_at) FROM messages m WHERE (m.sender_id = u.id AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = u.id)) as last_message_at,
+                    (SELECT 1 FROM pinned_chats pc WHERE pc.user_id = ? AND pc.chat_id = u.id AND pc.chat_type = 'user') as is_pinned,
+                    (SELECT pinned_at FROM pinned_chats pc WHERE pc.user_id = ? AND pc.chat_id = u.id AND pc.chat_type = 'user') as pinned_at
                 FROM users u
                 WHERE u.id IN (
                     SELECT DISTINCT sender_id FROM messages WHERE receiver_id = ?
                     UNION
                     SELECT DISTINCT receiver_id FROM messages WHERE sender_id = ?
                 )
-                ORDER BY last_message_at DESC
-            `).all(userId, userId, userId, userId, userId);
+                ORDER BY is_pinned DESC, pinned_at ASC, last_message_at DESC
+            `).all(userId, userId, userId, userId, userId, userId, userId);
         } else {
             const result = await pool.query(`
                 SELECT DISTINCT u.id, u.username, u.tag, u.display_name, u.avatar_url, u.role, u.premium_until, u.name_color, u.custom_id,
                     (SELECT COUNT(*) FROM messages m WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.is_read = FALSE) as unread_count,
-                    (SELECT MAX(created_at) FROM messages m WHERE (m.sender_id = u.id AND m.receiver_id = $1) OR (m.sender_id = $1 AND m.receiver_id = u.id)) as last_message_at
+                    (SELECT MAX(created_at) FROM messages m WHERE (m.sender_id = u.id AND m.receiver_id = $1) OR (m.sender_id = $1 AND m.receiver_id = u.id)) as last_message_at,
+                    (SELECT 1 FROM pinned_chats pc WHERE pc.user_id = $1 AND pc.chat_id = u.id AND pc.chat_type = 'user') as is_pinned,
+                    (SELECT pinned_at FROM pinned_chats pc WHERE pc.user_id = $1 AND pc.chat_id = u.id AND pc.chat_type = 'user') as pinned_at
                 FROM users u
                 WHERE u.id IN (
                     SELECT DISTINCT sender_id FROM messages WHERE receiver_id = $1
                     UNION
                     SELECT DISTINCT receiver_id FROM messages WHERE sender_id = $1
                 )
-                ORDER BY last_message_at DESC NULLS LAST
+                ORDER BY is_pinned DESC NULLS LAST, pinned_at ASC NULLS LAST, last_message_at DESC NULLS LAST
             `, [userId]);
             rows = result.rows;
         }
         return rows.map(u => ({
             ...u,
-            isPremium: u.role === 'admin' || (u.premium_until && new Date(u.premium_until) > new Date())
+            isPremium: u.role === 'admin' || (u.premium_until && new Date(u.premium_until) > new Date()),
+            isPinned: !!u.is_pinned
         }));
     } catch (error) {
         console.error('Get contacts error:', error);
@@ -1279,16 +1321,26 @@ async function editMessage(messageId, userId, newText) {
     }
 }
 
-async function deleteMessage(messageId, odataId) {
+async function deleteMessage(messageId, odataId, deleteForAll = false) {
     try {
-        const result = await pool.query(
-            'DELETE FROM messages WHERE id = $1 AND sender_id = $2 RETURNING id',
-            [messageId, odataId]
-        );
-        if (result.rows.length === 0) {
-            return { success: false, error: 'Сообщение не найдено или нет прав' };
+        if (USE_SQLITE) {
+            // Проверяем что пользователь - отправитель
+            const msg = sqlite.prepare('SELECT sender_id, receiver_id FROM messages WHERE id = ?').get(messageId);
+            if (!msg || msg.sender_id !== odataId) {
+                return { success: false, error: 'Сообщение не найдено или нет прав' };
+            }
+            sqlite.prepare('DELETE FROM messages WHERE id = ?').run(messageId);
+            return { success: true, receiverId: msg.receiver_id, deleteForAll };
+        } else {
+            const result = await pool.query(
+                'DELETE FROM messages WHERE id = $1 AND sender_id = $2 RETURNING id, receiver_id',
+                [messageId, odataId]
+            );
+            if (result.rows.length === 0) {
+                return { success: false, error: 'Сообщение не найдено или нет прав' };
+            }
+            return { success: true, receiverId: result.rows[0].receiver_id, deleteForAll };
         }
-        return { success: true };
     } catch (error) {
         console.error('Delete message error:', error);
         return { success: false, error: 'Ошибка удаления' };
@@ -1916,6 +1968,99 @@ async function getServerMembers(serverId) {
     }
 }
 
+// === ЗАКРЕПЛЁННЫЕ ЧАТЫ ===
+
+async function pinChat(userId, chatId, chatType = 'user') {
+    try {
+        const id = uuidv4();
+        if (USE_SQLITE) {
+            sqlite.prepare(`
+                INSERT OR REPLACE INTO pinned_chats (id, user_id, chat_id, chat_type, pinned_at)
+                VALUES (?, ?, ?, ?, datetime('now'))
+            `).run(id, userId, chatId, chatType);
+        } else {
+            await pool.query(`
+                INSERT INTO pinned_chats (id, user_id, chat_id, chat_type, pinned_at)
+                VALUES ($1, $2, $3, $4, NOW())
+                ON CONFLICT (user_id, chat_id, chat_type) DO UPDATE SET pinned_at = NOW()
+            `, [id, userId, chatId, chatType]);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Pin chat error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function unpinChat(userId, chatId, chatType = 'user') {
+    try {
+        if (USE_SQLITE) {
+            sqlite.prepare('DELETE FROM pinned_chats WHERE user_id = ? AND chat_id = ? AND chat_type = ?').run(userId, chatId, chatType);
+        } else {
+            await pool.query('DELETE FROM pinned_chats WHERE user_id = $1 AND chat_id = $2 AND chat_type = $3', [userId, chatId, chatType]);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Unpin chat error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function getPinnedChatsCount(userId, chatType = 'user') {
+    try {
+        if (USE_SQLITE) {
+            const result = sqlite.prepare('SELECT COUNT(*) as count FROM pinned_chats WHERE user_id = ? AND chat_type = ?').get(userId, chatType);
+            return result?.count || 0;
+        } else {
+            const result = await pool.query('SELECT COUNT(*) as count FROM pinned_chats WHERE user_id = $1 AND chat_type = $2', [userId, chatType]);
+            return parseInt(result.rows[0]?.count) || 0;
+        }
+    } catch (error) {
+        console.error('Get pinned chats count error:', error);
+        return 0;
+    }
+}
+
+async function isPinned(userId, chatId, chatType = 'user') {
+    try {
+        if (USE_SQLITE) {
+            const result = sqlite.prepare('SELECT 1 FROM pinned_chats WHERE user_id = ? AND chat_id = ? AND chat_type = ?').get(userId, chatId, chatType);
+            return !!result;
+        } else {
+            const result = await pool.query('SELECT 1 FROM pinned_chats WHERE user_id = $1 AND chat_id = $2 AND chat_type = $3', [userId, chatId, chatType]);
+            return result.rows.length > 0;
+        }
+    } catch (error) {
+        console.error('Is pinned error:', error);
+        return false;
+    }
+}
+
+// === САМОУНИЧТОЖАЮЩИЕСЯ СООБЩЕНИЯ ===
+async function cleanupSelfDestructMessages() {
+    try {
+        const now = new Date().toISOString();
+        let deletedIds = [];
+        
+        if (USE_SQLITE) {
+            const messages = sqlite.prepare('SELECT id, sender_id, receiver_id FROM messages WHERE self_destruct_at IS NOT NULL AND self_destruct_at <= ?').all(now);
+            deletedIds = messages.map(m => ({ id: m.id, senderId: m.sender_id, receiverId: m.receiver_id }));
+            sqlite.prepare('DELETE FROM messages WHERE self_destruct_at IS NOT NULL AND self_destruct_at <= ?').run(now);
+        } else {
+            const result = await pool.query(
+                'DELETE FROM messages WHERE self_destruct_at IS NOT NULL AND self_destruct_at <= $1 RETURNING id, sender_id, receiver_id',
+                [now]
+            );
+            deletedIds = result.rows.map(r => ({ id: r.id, senderId: r.sender_id, receiverId: r.receiver_id }));
+        }
+        
+        return deletedIds;
+    } catch (error) {
+        console.error('Cleanup self-destruct messages error:', error);
+        return [];
+    }
+}
+
 module.exports = { 
     initDB, 
     createUser, 
@@ -1981,5 +2126,12 @@ module.exports = {
     createServerChannel,
     saveServerMessage,
     getServerMessages,
-    getServerMembers
+    getServerMembers,
+    // Закреплённые чаты
+    pinChat,
+    unpinChat,
+    getPinnedChatsCount,
+    isPinned,
+    // Самоуничтожающиеся сообщения
+    cleanupSelfDestructMessages
 };

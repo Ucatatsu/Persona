@@ -1316,7 +1316,8 @@ function renderUsers(users) {
         }
         
         const item = document.createElement('div');
-        item.className = `user-item ${statusClass} ${state.selectedUser?.id === user.id ? 'active' : ''}`;
+        const isPinned = user.isPinned;
+        item.className = `user-item ${statusClass} ${state.selectedUser?.id === user.id ? 'active' : ''} ${isPinned ? 'pinned' : ''}`;
         item.dataset.id = user.id;
         item.dataset.name = user.username;
         item.dataset.status = userStatus || 'offline';
@@ -1329,17 +1330,18 @@ function renderUsers(users) {
         const localNickname = getLocalNickname(user.id);
         const displayName = localNickname || user.display_name || user.username;
         const isMuted = isUserMuted(user.id);
-        const isPremium = user.isPremium || user.role === 'admin';
+        const isPremiumUser = user.isPremium || user.role === 'admin';
         const avatarClass = 'user-avatar';
         const nameStyle = user.name_color ? `style="--name-color: ${escapeAttr(user.name_color)}" data-name-color` : '';
         
         item.innerHTML = `
+            ${isPinned ? '<span class="pin-indicator">📌</span>' : ''}
             <div class="${avatarClass}" style="${avatarStyle}">
                 ${avatarContent}
                 <div class="online-indicator ${userStatus || 'offline'}"></div>
             </div>
             <div class="user-info">
-                <div class="user-name" ${nameStyle}>${escapeHtml(displayName)}${isPremium ? ' <span class="premium-indicator"><img src="/assets/dimond.svg" alt="premium" class="icon-sm"></span>' : ''}${isMuted ? ' <span class="muted-indicator"><img src="/assets/bell.svg" alt="muted" class="icon-sm" style="opacity:0.5"></span>' : ''}</div>
+                <div class="user-name" ${nameStyle}>${escapeHtml(displayName)}${isPremiumUser ? ' <span class="premium-indicator"><img src="/assets/dimond.svg" alt="premium" class="icon-sm"></span>' : ''}${isMuted ? ' <span class="muted-indicator"><img src="/assets/bell.svg" alt="muted" class="icon-sm" style="opacity:0.5"></span>' : ''}</div>
                 <div class="user-last-message">${localNickname ? `@${escapeHtml(user.username)} · ` : ''}${statusText}</div>
             </div>
             ${unread > 0 ? `<div class="unread-badge">${unread}</div>` : ''}
@@ -1437,7 +1439,9 @@ function renderMessages(messages) {
 
 function createMessageElement(msg, isSent) {
     const div = document.createElement('div');
-    div.className = `message ${isSent ? 'sent' : 'received'}`;
+    const bubbleStyleClass = isSent ? getBubbleStyleClass() : '';
+    const selfDestructClass = msg.self_destruct_at ? 'self-destruct' : '';
+    div.className = `message ${isSent ? 'sent' : 'received'} ${bubbleStyleClass} ${selfDestructClass}`.trim();
     div.dataset.messageId = msg.id;
     div.dataset.senderId = msg.sender_id;
     
@@ -1854,10 +1858,12 @@ function showMessageContextMenu(e, msg, isSent) {
     `;
     
     if (isSent) {
+        const isPremiumPlus = state.currentUserProfile?.premiumPlan === 'premium_plus' || state.currentUser?.role === 'admin';
         menuItems += `
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="edit">✏️ Редактировать</div>
-            <div class="context-menu-item danger" data-action="delete">🗑️ Удалить</div>
+            <div class="context-menu-item danger" data-action="delete">🗑️ Удалить у себя</div>
+            ${isPremiumPlus ? '<div class="context-menu-item danger" data-action="delete-all">🗑️ Удалить у всех <span class="badge-premium-plus">P+</span></div>' : ''}
         `;
     }
     
@@ -1899,7 +1905,10 @@ function showMessageContextMenu(e, msg, isSent) {
                 editMessage(msg);
                 break;
             case 'delete':
-                deleteMessagePrompt(msg);
+                deleteMessagePrompt(msg, false);
+                break;
+            case 'delete-all':
+                deleteMessagePrompt(msg, true);
                 break;
             case 'react':
                 showReactionPicker(msg.id, ev.target);
@@ -1931,10 +1940,14 @@ async function editMessage(msg) {
     }
 }
 
-async function deleteMessagePrompt(msg) {
+async function deleteMessagePrompt(msg, deleteForAll = false) {
+    const message = deleteForAll 
+        ? 'Сообщение будет удалено у всех участников чата'
+        : 'Сообщение будет удалено только у вас';
+    
     const confirmed = await customConfirm({
-        title: 'Удалить сообщение?',
-        message: 'Сообщение будет удалено у всех участников чата',
+        title: deleteForAll ? 'Удалить у всех?' : 'Удалить сообщение?',
+        message,
         icon: '🗑️',
         variant: 'danger',
         okText: 'Удалить'
@@ -1943,7 +1956,8 @@ async function deleteMessagePrompt(msg) {
     if (confirmed) {
         state.socket.emit('delete-message', {
             messageId: msg.id,
-            receiverId: state.selectedUser.id
+            receiverId: state.selectedUser.id,
+            deleteForAll
         });
     }
 }
@@ -2044,6 +2058,9 @@ function sendMessage() {
     
     stopTyping();
     
+    // Получаем время самоуничтожения
+    const selfDestructMinutes = state.selfDestructMinutes || 0;
+    
     // Отправляем в зависимости от типа чата
     if (state.selectedGroup) {
         state.socket.emit('group-message', {
@@ -2065,7 +2082,8 @@ function sendMessage() {
     } else if (state.selectedUser) {
         state.socket.emit('send-message', {
             receiverId: state.selectedUser.id,
-            text
+            text,
+            selfDestructMinutes
         });
     }
     
@@ -2212,6 +2230,10 @@ async function loadMyProfile() {
         if (res.ok) {
             state.currentUserProfile = await res.json();
             updateCurrentUserAvatar();
+            // Обновляем видимость Premium+ фич
+            if (window.updateSelfDestructVisibility) {
+                window.updateSelfDestructVisibility();
+            }
         }
     } catch (e) {
         console.error('Ошибка загрузки профиля:', e);
@@ -3364,6 +3386,59 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('attach-input')?.addEventListener('change', handleAttachFile);
     
+    // === САМОУНИЧТОЖАЮЩИЕСЯ СООБЩЕНИЯ (Premium+) ===
+    const selfDestructBtn = document.getElementById('self-destruct-btn');
+    const selfDestructMenu = document.getElementById('self-destruct-menu');
+    
+    // Показываем кнопку только для Premium+
+    function updateSelfDestructVisibility() {
+        const isPremiumPlus = state.currentUserProfile?.premiumPlan === 'premium_plus' || state.currentUser?.role === 'admin';
+        if (selfDestructBtn) {
+            selfDestructBtn.classList.toggle('hidden', !isPremiumPlus);
+        }
+    }
+    
+    selfDestructBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selfDestructMenu?.classList.toggle('hidden');
+    });
+    
+    document.querySelectorAll('.self-destruct-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            const minutes = parseInt(opt.dataset.minutes);
+            state.selfDestructMinutes = minutes;
+            
+            // Обновляем UI
+            document.querySelectorAll('.self-destruct-option').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            selfDestructBtn?.classList.toggle('active', minutes > 0);
+            selfDestructMenu?.classList.add('hidden');
+            
+            if (minutes > 0) {
+                showToast(`Сообщения будут удалены через ${formatSelfDestructTime(minutes)}`);
+            } else {
+                showToast('Самоуничтожение отключено');
+            }
+        });
+    });
+    
+    // Закрытие меню при клике вне
+    document.addEventListener('click', (e) => {
+        if (selfDestructMenu && !selfDestructMenu.contains(e.target) && e.target !== selfDestructBtn) {
+            selfDestructMenu.classList.add('hidden');
+        }
+    });
+    
+    // Форматирование времени самоуничтожения
+    function formatSelfDestructTime(minutes) {
+        if (minutes < 60) return `${minutes} мин`;
+        if (minutes < 1440) return `${Math.floor(minutes / 60)} ч`;
+        return `${Math.floor(minutes / 1440)} д`;
+    }
+    
+    // Вызываем при загрузке профиля
+    window.updateSelfDestructVisibility = updateSelfDestructVisibility;
+    
     // === ПРОФИЛЬ ===
     
     // Аватарка теперь часть user-panel, обработчик там
@@ -3419,6 +3494,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ? '<img src="/assets/bell.svg" alt="" class="icon-sm" style="opacity:0.5">' 
             : '<img src="/assets/bell.svg" alt="" class="icon-sm">';
         document.getElementById('ctx-notif-text').textContent = isMuted ? 'Включить уведомления' : 'Отключить уведомления';
+        
+        // Обновляем состояние закрепления
+        const userItem = document.querySelector(`[data-id="${state.selectedUser.id}"]`);
+        const isPinned = userItem?.classList.contains('pinned');
+        document.getElementById('ctx-pin-icon').textContent = isPinned ? '📍' : '📌';
+        document.getElementById('ctx-pin-text').textContent = isPinned ? 'Открепить чат' : 'Закрепить чат';
         
         // Позиционируем меню под кнопкой
         const btnRect = chatMenuBtn.getBoundingClientRect();
@@ -3493,6 +3574,42 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirmed) {
             document.getElementById('messages').innerHTML = '';
             showToast('Чат очищен');
+        }
+    });
+    
+    // Закрепление чата
+    document.getElementById('ctx-pin-chat')?.addEventListener('click', async () => {
+        chatContextMenu?.classList.add('hidden');
+        if (!state.selectedUser) return;
+        
+        const userItem = document.querySelector(`[data-id="${state.selectedUser.id}"]`);
+        const isPinned = userItem?.classList.contains('pinned');
+        
+        try {
+            if (isPinned) {
+                // Открепить
+                const res = await api.request(`/api/chats/${state.selectedUser.id}/pin?chatType=user`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Чат откреплён');
+                    updateContactsList();
+                } else {
+                    showToast(data.error || 'Ошибка', 'error');
+                }
+            } else {
+                // Закрепить
+                const res = await api.post(`/api/chats/${state.selectedUser.id}/pin`, { chatType: 'user' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Чат закреплён (${data.currentCount}/${data.limit})`);
+                    updateContactsList();
+                } else {
+                    showToast(data.error || 'Ошибка', 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Pin chat error:', error);
+            showToast('Ошибка закрепления', 'error');
         }
     });
     
@@ -3851,6 +3968,19 @@ function showEditProfile() {
         document.getElementById('edit-name-color').value = state.currentUserProfile?.name_color || '#4fc3f7';
         document.getElementById('edit-profile-color').value = state.currentUserProfile?.profile_color || '#1976d2';
         document.getElementById('edit-custom-id').value = state.currentUserProfile?.custom_id || '';
+        
+        // Инициализируем выбранный стиль пузырей
+        const currentBubbleStyle = state.settings.bubbleStyle || 'default';
+        document.querySelectorAll('.bubble-style-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.style === currentBubbleStyle);
+        });
+        
+        // Premium+ only секции
+        const isPremiumPlus = state.currentUserProfile?.premiumPlan === 'premium_plus' || state.currentUser?.role === 'admin';
+        const bubbleGroup = document.getElementById('bubble-style-group');
+        if (bubbleGroup) {
+            bubbleGroup.classList.toggle('locked', !isPremiumPlus);
+        }
         
         if (isPremium) {
             premiumSection.classList.remove('locked');
@@ -5364,6 +5494,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('edit-banner-preview').style.background = '#1976d2';
     });
     
+    // Выбор стиля пузырей (Premium+)
+    document.querySelectorAll('.bubble-style-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            document.querySelectorAll('.bubble-style-option').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            state.settings.bubbleStyle = opt.dataset.style;
+            saveSettings();
+            applyBubbleStyle();
+        });
+    });
+    
     // Превью цвета баннера при изменении
     document.getElementById('edit-profile-color')?.addEventListener('input', (e) => {
         const bannerPreview = document.getElementById('edit-banner-preview');
@@ -5553,6 +5694,34 @@ function applySettings() {
     if (state.settings.theme) {
         applyTheme(state.settings.theme);
     }
+    
+    // Применяем стиль пузырей
+    applyBubbleStyle();
+}
+
+// Применить стиль пузырей сообщений (Premium+)
+function applyBubbleStyle() {
+    const style = state.settings.bubbleStyle || 'default';
+    const messages = document.querySelectorAll('.message.sent');
+    
+    // Удаляем все bubble-* классы
+    messages.forEach(msg => {
+        msg.classList.forEach(cls => {
+            if (cls.startsWith('bubble-')) {
+                msg.classList.remove(cls);
+            }
+        });
+        // Добавляем новый стиль если не default
+        if (style !== 'default') {
+            msg.classList.add(`bubble-${style}`);
+        }
+    });
+}
+
+// Получить класс стиля пузыря для нового сообщения
+function getBubbleStyleClass() {
+    const style = state.settings.bubbleStyle || 'default';
+    return style !== 'default' ? `bubble-${style}` : '';
 }
 
 function adjustColor(color, amount) {

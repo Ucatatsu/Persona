@@ -1152,6 +1152,81 @@ app.post('/api/admin/support/ticket/:ticketId/close', authMiddleware, adminMiddl
     }
 });
 
+// === ЗАКРЕПЛЁННЫЕ ЧАТЫ ===
+
+// Лимиты закреплённых чатов по типу подписки
+const PIN_LIMITS = {
+    free: 3,
+    premium: 5,
+    premium_plus: 10
+};
+
+// Получить лимит закреплённых чатов для пользователя
+async function getPinLimit(userId) {
+    const user = await db.getUser(userId);
+    if (!user) return PIN_LIMITS.free;
+    if (user.role === 'admin') return PIN_LIMITS.premium_plus;
+    if (user.isPremium) {
+        return user.premiumPlan === 'premium_plus' ? PIN_LIMITS.premium_plus : PIN_LIMITS.premium;
+    }
+    return PIN_LIMITS.free;
+}
+
+// Закрепить чат
+app.post('/api/chats/:chatId/pin', authMiddleware, async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const { chatType = 'user' } = req.body;
+        
+        // Проверяем лимит
+        const currentCount = await db.getPinnedChatsCount(req.user.id, chatType);
+        const limit = await getPinLimit(req.user.id);
+        
+        if (currentCount >= limit) {
+            return res.status(400).json({ 
+                success: false, 
+                error: `Достигнут лимит закреплённых чатов (${limit})`,
+                limit,
+                currentCount
+            });
+        }
+        
+        const result = await db.pinChat(req.user.id, chatId, chatType);
+        res.json({ ...result, limit, currentCount: currentCount + 1 });
+    } catch (error) {
+        console.error('Pin chat error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
+// Открепить чат
+app.delete('/api/chats/:chatId/pin', authMiddleware, async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const { chatType = 'user' } = req.query;
+        
+        const result = await db.unpinChat(req.user.id, chatId, chatType);
+        res.json(result);
+    } catch (error) {
+        console.error('Unpin chat error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
+// Получить информацию о закреплённых чатах
+app.get('/api/pinned-chats/info', authMiddleware, async (req, res) => {
+    try {
+        const { chatType = 'user' } = req.query;
+        const currentCount = await db.getPinnedChatsCount(req.user.id, chatType);
+        const limit = await getPinLimit(req.user.id);
+        
+        res.json({ currentCount, limit });
+    } catch (error) {
+        console.error('Get pinned info error:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
 // === PUSH УВЕДОМЛЕНИЯ ===
 
 async function sendPushNotification(userId, payload) {
@@ -1215,7 +1290,7 @@ io.on('connection', async (socket) => {
     // Отправка сообщения
     socket.on('send-message', async (data) => {
         try {
-            const { receiverId, text, messageType = 'text' } = data;
+            const { receiverId, text, messageType = 'text', selfDestructMinutes = null } = data;
             
             if (!receiverId || !text || typeof text !== 'string') {
                 return socket.emit('error', { message: 'Неверные данные' });
@@ -1224,7 +1299,17 @@ io.on('connection', async (socket) => {
             const sanitizedText = text.trim().substring(0, 5000);
             if (!sanitizedText) return;
             
-            const message = await db.saveMessage(userId, receiverId, sanitizedText, messageType);
+            // Проверяем Premium+ для самоуничтожающихся сообщений
+            let actualSelfDestruct = null;
+            if (selfDestructMinutes && selfDestructMinutes > 0) {
+                const user = await db.getUser(userId);
+                const isPremiumPlus = user?.role === 'admin' || user?.premiumPlan === 'premium_plus';
+                if (isPremiumPlus) {
+                    actualSelfDestruct = selfDestructMinutes;
+                }
+            }
+            
+            const message = await db.saveMessage(userId, receiverId, sanitizedText, messageType, 0, actualSelfDestruct);
             
             // Отправляем получателю (все его устройства)
             const receiverData = onlineUsers.get(receiverId);
@@ -1280,14 +1365,24 @@ io.on('connection', async (socket) => {
     
     socket.on('delete-message', async (data) => {
         try {
-            const { messageId, receiverId } = data;
+            const { messageId, receiverId, deleteForAll = false } = data;
             if (!messageId) return;
             
-            const result = await db.deleteMessage(messageId, userId);
+            // Проверяем Premium+ для "удалить у всех"
+            let canDeleteForAll = false;
+            if (deleteForAll) {
+                const user = await db.getUser(userId);
+                canDeleteForAll = user?.role === 'admin' || user?.premiumPlan === 'premium_plus';
+            }
+            
+            const result = await db.deleteMessage(messageId, userId, canDeleteForAll);
             if (result.success) {
-                const deleteData = { messageId };
+                const deleteData = { messageId, deleteForAll: canDeleteForAll };
                 emitToUser(userId, 'message-deleted', deleteData);
-                emitToUser(receiverId, 'message-deleted', deleteData);
+                // Отправляем получателю только если "удалить у всех"
+                if (canDeleteForAll) {
+                    emitToUser(receiverId, 'message-deleted', deleteData);
+                }
             }
         } catch (error) {
             console.error('Delete message error:', error);
@@ -1617,6 +1712,19 @@ server.listen(PORT, () => {
         if (!VAPID_PUBLIC_KEY) {
             console.log('⚠️  Push-уведомления отключены (нет VAPID ключей)');
         }
+        
+        // Запускаем очистку самоуничтожающихся сообщений каждую минуту
+        setInterval(async () => {
+            const deleted = await db.cleanupSelfDestructMessages();
+            if (deleted.length > 0) {
+                console.log(`🗑️ Удалено ${deleted.length} самоуничтожающихся сообщений`);
+                // Уведомляем пользователей об удалении
+                for (const msg of deleted) {
+                    emitToUser(msg.senderId, 'message-deleted', { messageId: msg.id, selfDestruct: true });
+                    emitToUser(msg.receiverId, 'message-deleted', { messageId: msg.id, selfDestruct: true });
+                }
+            }
+        }, 60 * 1000); // Каждую минуту
     }).catch(err => {
         console.error('❌ Ошибка инициализации БД:', err);
         process.exit(1);
