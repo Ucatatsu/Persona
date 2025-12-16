@@ -34,14 +34,16 @@ async function waitForServer(maxAttempts = 30) {
 
 // Запуск сервера
 function startServer() {
-    // Проверяем наличие DATABASE_URL
+    // SQLite работает без DATABASE_URL (локальная разработка)
+    // PostgreSQL требует DATABASE_URL (продакшен)
     if (!process.env.DATABASE_URL) {
-        dialog.showErrorBox(
-            'Ошибка конфигурации',
-            'Не настроена переменная DATABASE_URL.\n\nСоздайте файл .env с настройками базы данных.'
-        );
-        app.quit();
-        return false;
+        console.log('📦 DATABASE_URL не установлен - используется SQLite (локальная БД)');
+        process.env.USE_SQLITE = 'true';
+    }
+    
+    // JWT_SECRET обязателен
+    if (!process.env.JWT_SECRET) {
+        console.warn('⚠️  JWT_SECRET не установлен - используется небезопасный дефолт');
     }
     
     process.env.NODE_ENV = process.env.NODE_ENV || 'production';

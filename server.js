@@ -189,6 +189,44 @@ const io = new Server(server, {
 // Socket.IO аутентификация
 io.use(socketAuthMiddleware);
 
+// Rate limiting для Socket.IO событий
+const socketRateLimits = new Map(); // userId -> { event: { count, resetTime } }
+
+function checkSocketRateLimit(userId, event, limit = 30, windowMs = 60000) {
+    const now = Date.now();
+    if (!socketRateLimits.has(userId)) {
+        socketRateLimits.set(userId, {});
+    }
+    const userLimits = socketRateLimits.get(userId);
+    
+    if (!userLimits[event] || now > userLimits[event].resetTime) {
+        userLimits[event] = { count: 1, resetTime: now + windowMs };
+        return true;
+    }
+    
+    if (userLimits[event].count >= limit) {
+        return false;
+    }
+    
+    userLimits[event].count++;
+    return true;
+}
+
+// Очистка rate limits каждые 5 минут
+setInterval(() => {
+    const now = Date.now();
+    for (const [userId, limits] of socketRateLimits.entries()) {
+        for (const event of Object.keys(limits)) {
+            if (now > limits[event].resetTime) {
+                delete limits[event];
+            }
+        }
+        if (Object.keys(limits).length === 0) {
+            socketRateLimits.delete(userId);
+        }
+    }
+}, 5 * 60 * 1000);
+
 app.use(express.static('public'));
 app.use(express.json({ limit: '1mb' }));
 
@@ -596,13 +634,13 @@ app.put('/api/user/:userId/username', authMiddleware, ownerMiddleware('userId'),
 });
 
 // Сообщения
-app.get('/api/messages/:oderId', authMiddleware, async (req, res) => {
+app.get('/api/messages/:otherId', authMiddleware, async (req, res) => {
     try {
-        const { oderId } = req.params;
+        const { otherId } = req.params;
         const { limit = 50, before } = req.query;
         
-        const messages = await db.getMessages(req.user.id, oderId, parseInt(limit), before);
-        await db.markMessagesAsRead(oderId, req.user.id);
+        const messages = await db.getMessages(req.user.id, otherId, parseInt(limit), before);
+        await db.markMessagesAsRead(otherId, req.user.id);
         res.json(messages);
     } catch (error) {
         console.error('Get messages error:', error);
@@ -908,6 +946,17 @@ app.get('/api/groups/:groupId/messages', authMiddleware, async (req, res) => {
     }
 });
 
+app.get('/api/groups/:groupId/media', authMiddleware, async (req, res) => {
+    try {
+        const { limit = 50 } = req.query;
+        const media = await db.getGroupMedia(req.params.groupId, parseInt(limit));
+        res.json(media);
+    } catch (error) {
+        console.error('Get group media error:', error);
+        res.status(500).json([]);
+    }
+});
+
 // === КАНАЛЫ ===
 
 app.post('/api/channels', authMiddleware, async (req, res) => {
@@ -976,11 +1025,36 @@ app.get('/api/channels/:channelId/posts', authMiddleware, async (req, res) => {
     }
 });
 
+app.get('/api/channels/:channelId/media', authMiddleware, async (req, res) => {
+    try {
+        const { limit = 50 } = req.query;
+        const media = await db.getChannelMedia(req.params.channelId, parseInt(limit));
+        res.json(media);
+    } catch (error) {
+        console.error('Get channel media error:', error);
+        res.status(500).json([]);
+    }
+});
+
 app.post('/api/channels/:channelId/posts', authMiddleware, async (req, res) => {
     try {
         const { text, mediaUrl, mediaType } = req.body;
-        // TODO: проверить что пользователь админ канала
-        const post = await db.createChannelPost(req.params.channelId, req.user.id, text, mediaUrl, mediaType);
+        const channelId = req.params.channelId;
+        
+        // Проверяем права на публикацию
+        const channel = await db.getChannel(channelId);
+        if (!channel) {
+            return res.status(404).json({ success: false, error: 'Канал не найден' });
+        }
+        
+        const isOwner = channel.owner_id === req.user.id;
+        const isAdmin = await db.isChannelAdmin(channelId, req.user.id);
+        
+        if (!isOwner && !isAdmin && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Нет прав на публикацию' });
+        }
+        
+        const post = await db.createChannelPost(channelId, req.user.id, text, mediaUrl, mediaType);
         res.json({ success: true, post });
     } catch (error) {
         console.error('Create channel post error:', error);
@@ -1058,8 +1132,22 @@ app.get('/api/servers/:serverId/channels', authMiddleware, async (req, res) => {
 app.post('/api/servers/:serverId/channels', authMiddleware, async (req, res) => {
     try {
         const { categoryId, name, type } = req.body;
-        // TODO: проверить права
-        const result = await db.createServerChannel(req.params.serverId, categoryId, name, type || 'text');
+        const serverId = req.params.serverId;
+        
+        // Проверяем права на создание каналов
+        const server = await db.getServer(serverId);
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Сервер не найден' });
+        }
+        
+        const isOwner = server.owner_id === req.user.id;
+        // TODO: добавить проверку ролей сервера с правами MANAGE_CHANNELS
+        
+        if (!isOwner && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Нет прав на создание каналов' });
+        }
+        
+        const result = await db.createServerChannel(serverId, categoryId, name, type || 'text');
         res.json(result);
     } catch (error) {
         console.error('Create server channel error:', error);
@@ -1084,6 +1172,17 @@ app.get('/api/server-channels/:channelId/messages', authMiddleware, async (req, 
         res.json(messages);
     } catch (error) {
         console.error('Get server messages error:', error);
+        res.status(500).json([]);
+    }
+});
+
+app.get('/api/servers/:serverId/media', authMiddleware, async (req, res) => {
+    try {
+        const { limit = 50 } = req.query;
+        const media = await db.getServerMedia(req.params.serverId, parseInt(limit));
+        res.json(media);
+    } catch (error) {
+        console.error('Get server media error:', error);
         res.status(500).json([]);
     }
 });
@@ -1290,6 +1389,11 @@ io.on('connection', async (socket) => {
     // Отправка сообщения
     socket.on('send-message', async (data) => {
         try {
+            // Rate limit: 30 сообщений в минуту
+            if (!checkSocketRateLimit(userId, 'send-message', 30, 60000)) {
+                return socket.emit('error', { message: 'Слишком много сообщений, подождите' });
+            }
+            
             const { receiverId, text, messageType = 'text', selfDestructMinutes = null } = data;
             
             if (!receiverId || !text || typeof text !== 'string') {
@@ -1522,7 +1626,23 @@ io.on('connection', async (socket) => {
     // === ЗВОНКИ ===
     
     socket.on('call-user', async (data) => {
+        // Rate limit: 5 звонков в минуту
+        if (!checkSocketRateLimit(userId, 'call-user', 5, 60000)) {
+            return socket.emit('error', { message: 'Слишком много звонков, подождите' });
+        }
+        
         const { to, offer, isVideo } = data;
+        
+        // Проверяем что получатель существует
+        if (!to || typeof to !== 'string') {
+            return socket.emit('call-failed', { reason: 'Неверный получатель' });
+        }
+        
+        const receiver = await db.getUser(to);
+        if (!receiver) {
+            return socket.emit('call-failed', { reason: 'Пользователь не найден' });
+        }
+        
         console.log(`📞 call-user: ${userId} -> ${to}, video: ${isVideo}`);
         
         const receiverData = onlineUsers.get(to);
@@ -1697,9 +1817,6 @@ setInterval(() => {
 // === ЗАПУСК ===
 
 const PORT = process.env.PORT || 3000;
-
-// Флаг готовности сервера
-let isReady = false;
 
 // Запускаем сервер сразу, чтобы Render мог делать health check
 server.listen(PORT, () => {

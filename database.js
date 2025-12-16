@@ -1612,6 +1612,32 @@ async function getGroupMessages(groupId, limit = 50, before = null) {
     }
 }
 
+async function getGroupMedia(groupId, limit = 50) {
+    try {
+        let media;
+        if (USE_SQLITE) {
+            media = sqlite.prepare(`
+                SELECT id, text as url, message_type as type, created_at
+                FROM group_messages
+                WHERE group_id = ? AND message_type IN ('image', 'video', 'gif')
+                ORDER BY created_at DESC LIMIT ?
+            `).all(groupId, limit);
+        } else {
+            const result = await pool.query(`
+                SELECT id, text as url, message_type as type, created_at
+                FROM group_messages
+                WHERE group_id = $1 AND message_type IN ('image', 'video', 'gif')
+                ORDER BY created_at DESC LIMIT $2
+            `, [groupId, limit]);
+            media = result.rows;
+        }
+        return media;
+    } catch (error) {
+        console.error('Get group media error:', error);
+        return [];
+    }
+}
+
 // === КАНАЛЫ (Telegram-style) ===
 
 async function createChannel(ownerId, name, description = '', isPublic = true, avatarUrl = null) {
@@ -1649,6 +1675,21 @@ async function getChannel(channelId) {
     } catch (error) {
         console.error('Get channel error:', error);
         return null;
+    }
+}
+
+async function isChannelAdmin(channelId, userId) {
+    try {
+        if (USE_SQLITE) {
+            const admin = sqlite.prepare('SELECT 1 FROM channel_admins WHERE channel_id = ? AND user_id = ?').get(channelId, userId);
+            return !!admin;
+        } else {
+            const result = await pool.query('SELECT 1 FROM channel_admins WHERE channel_id = $1 AND user_id = $2', [channelId, userId]);
+            return result.rows.length > 0;
+        }
+    } catch (error) {
+        console.error('Check channel admin error:', error);
+        return false;
     }
 }
 
@@ -1755,6 +1796,32 @@ async function getChannelPosts(channelId, limit = 20, before = null) {
         return posts.reverse();
     } catch (error) {
         console.error('Get channel posts error:', error);
+        return [];
+    }
+}
+
+async function getChannelMedia(channelId, limit = 50) {
+    try {
+        let media;
+        if (USE_SQLITE) {
+            media = sqlite.prepare(`
+                SELECT id, media_url as url, media_type as type, created_at
+                FROM channel_posts
+                WHERE channel_id = ? AND media_url IS NOT NULL AND media_url != ''
+                ORDER BY created_at DESC LIMIT ?
+            `).all(channelId, limit);
+        } else {
+            const result = await pool.query(`
+                SELECT id, media_url as url, media_type as type, created_at
+                FROM channel_posts
+                WHERE channel_id = $1 AND media_url IS NOT NULL AND media_url != ''
+                ORDER BY created_at DESC LIMIT $2
+            `, [channelId, limit]);
+            media = result.rows;
+        }
+        return media;
+    } catch (error) {
+        console.error('Get channel media error:', error);
         return [];
     }
 }
@@ -1946,6 +2013,34 @@ async function getServerMessages(channelId, limit = 50, before = null) {
     }
 }
 
+async function getServerMedia(serverId, limit = 50) {
+    try {
+        let media;
+        if (USE_SQLITE) {
+            media = sqlite.prepare(`
+                SELECT sm.id, sm.text as url, sm.message_type as type, sm.created_at
+                FROM server_messages sm
+                JOIN server_channels sc ON sc.id = sm.channel_id
+                WHERE sc.server_id = ? AND sm.message_type IN ('image', 'video', 'gif')
+                ORDER BY sm.created_at DESC LIMIT ?
+            `).all(serverId, limit);
+        } else {
+            const result = await pool.query(`
+                SELECT sm.id, sm.text as url, sm.message_type as type, sm.created_at
+                FROM server_messages sm
+                JOIN server_channels sc ON sc.id = sm.channel_id
+                WHERE sc.server_id = $1 AND sm.message_type IN ('image', 'video', 'gif')
+                ORDER BY sm.created_at DESC LIMIT $2
+            `, [serverId, limit]);
+            media = result.rows;
+        }
+        return media;
+    } catch (error) {
+        console.error('Get server media error:', error);
+        return [];
+    }
+}
+
 async function getServerMembers(serverId) {
     try {
         let members;
@@ -2112,14 +2207,17 @@ module.exports = {
     removeGroupMember,
     saveGroupMessage,
     getGroupMessages,
+    getGroupMedia,
     // Каналы
     createChannel,
     getChannel,
+    isChannelAdmin,
     getUserChannels,
     subscribeToChannel,
     unsubscribeFromChannel,
     createChannelPost,
     getChannelPosts,
+    getChannelMedia,
     // Серверы
     createServer,
     getServer,
@@ -2130,6 +2228,7 @@ module.exports = {
     createServerChannel,
     saveServerMessage,
     getServerMessages,
+    getServerMedia,
     getServerMembers,
     // Закреплённые чаты
     pinChat,

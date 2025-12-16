@@ -1204,21 +1204,208 @@ async function selectServer(serverId) {
     document.querySelectorAll('.server-item').forEach(i => i.classList.remove('active'));
     document.querySelector(`[data-server-id="${serverId}"]`)?.classList.add('active');
     
-    renderServers();
-    updateChatHeader(server.name, `${server.member_count || 0} участников`, server.icon_url);
+    // Показываем панель каналов сервера
+    await showServerChannelsPanel(server);
+}
+
+async function showServerChannelsPanel(server) {
+    const panel = document.getElementById('server-channels-panel');
+    const nameEl = document.getElementById('server-panel-name');
+    const metaEl = document.getElementById('server-panel-meta');
+    const menuBtn = document.getElementById('server-panel-menu');
+    const menu = document.getElementById('server-menu');
     
-    // Очищаем сообщения и показываем заглушку
-    const messagesEl = getEl('messages');
-    if (messagesEl) {
-        messagesEl.innerHTML = '<div class="empty-list">Выберите канал сервера</div>';
+    // Заполняем хедер
+    nameEl.textContent = server.name;
+    metaEl.textContent = `${server.member_count || 0} участников`;
+    
+    // Проверяем права (владелец или админ)
+    const isOwner = server.owner_id === state.currentUser.id;
+    const isAdmin = state.currentUser.role === 'admin';
+    const canManage = isOwner || isAdmin;
+    
+    // Показываем/скрываем кнопку меню
+    menuBtn.style.display = canManage ? 'flex' : 'none';
+    
+    // Загружаем каналы
+    try {
+        const res = await api.get(`/api/servers/${server.id}/channels`);
+        const data = await res.json();
+        renderServerChannels(data.categories || [], data.channels || [], canManage);
+    } catch (e) {
+        console.error('Error loading server channels:', e);
     }
     
-    // Пока отключаем инпут для серверов (нужно выбрать канал)
-    document.getElementById('message-input').disabled = true;
-    document.getElementById('message-input').placeholder = 'Выберите канал...';
-    document.querySelector('.send-btn').disabled = true;
+    // Показываем панель с анимацией
+    panel.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        panel.classList.add('visible');
+    });
+}
+
+function renderServerChannels(categories, channels, canManage) {
+    const list = document.getElementById('server-channels-list');
+    
+    // Группируем каналы по категориям
+    const uncategorized = channels.filter(c => !c.category_id);
+    const categorized = {};
+    
+    categories.forEach(cat => {
+        categorized[cat.id] = {
+            ...cat,
+            channels: channels.filter(c => c.category_id === cat.id)
+        };
+    });
+    
+    let html = '';
+    
+    // Каналы без категории
+    if (uncategorized.length > 0) {
+        html += uncategorized.map(ch => renderServerChannelItem(ch)).join('');
+    }
+    
+    // Категории с каналами
+    Object.values(categorized).forEach(cat => {
+        html += `
+            <div class="server-category" data-category-id="${cat.id}">
+                <div class="server-category-header">
+                    <span class="server-category-arrow">▼</span>
+                    <span>${cat.name}</span>
+                </div>
+                <div class="server-category-channels">
+                    ${cat.channels.map(ch => renderServerChannelItem(ch)).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    if (!html) {
+        html = '<div class="empty-list">Нет каналов</div>';
+    }
+    
+    list.innerHTML = html;
+    
+    // Обработчики кликов на каналы
+    list.querySelectorAll('.server-channel-item').forEach(el => {
+        el.addEventListener('click', () => selectServerChannel(el.dataset.channelId));
+    });
+    
+    // Сворачивание категорий
+    list.querySelectorAll('.server-category-header').forEach(el => {
+        el.addEventListener('click', () => {
+            el.closest('.server-category').classList.toggle('collapsed');
+        });
+    });
+}
+
+function renderServerChannelItem(channel) {
+    const icon = channel.type === 'voice' ? '🔊' : '#';
+    const isActive = state.selectedServerChannel?.id === channel.id;
+    
+    return `
+        <div class="server-channel-item ${isActive ? 'active' : ''}" data-channel-id="${channel.id}" data-channel-type="${channel.type}">
+            <span class="server-channel-icon">${icon}</span>
+            <span class="server-channel-name">${channel.name}</span>
+        </div>
+    `;
+}
+
+async function selectServerChannel(channelId) {
+    if (!state.selectedServer) return;
+    
+    const res = await api.get(`/api/servers/${state.selectedServer.id}/channels`);
+    const data = await res.json();
+    const channel = data.channels?.find(c => c.id === channelId);
+    
+    if (!channel) return;
+    
+    state.selectedServerChannel = channel;
+    state.socket?.emit('join-server-channel', channelId);
+    
+    // Обновляем UI
+    document.querySelectorAll('.server-channel-item').forEach(i => i.classList.remove('active'));
+    document.querySelector(`[data-channel-id="${channelId}"]`)?.classList.add('active');
+    
+    // Обновляем хедер чата
+    const serverName = state.selectedServer.name;
+    updateChatHeader(`${serverName} / #${channel.name}`, channel.topic || '', null);
+    
+    // Загружаем сообщения
+    await loadServerChannelMessages(channelId);
+    
+    // Включаем инпут
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.querySelector('.send-btn');
+    
+    if (channel.type === 'voice') {
+        messageInput.disabled = true;
+        messageInput.placeholder = 'Голосовой канал';
+        sendBtn.disabled = true;
+    } else {
+        messageInput.disabled = false;
+        messageInput.placeholder = `Сообщение в #${channel.name}`;
+        sendBtn.disabled = false;
+    }
     
     handleMobileAfterSelect();
+}
+
+async function loadServerChannelMessages(channelId) {
+    try {
+        const res = await api.get(`/api/server-channels/${channelId}/messages`);
+        const messages = await res.json();
+        
+        const messagesEl = getEl('messages');
+        if (!messagesEl) return;
+        
+        if (messages.length === 0) {
+            messagesEl.innerHTML = '<div class="empty-list">Начните общение!</div>';
+            return;
+        }
+        
+        messagesEl.innerHTML = messages.map(msg => renderServerMessage(msg)).join('');
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch (e) {
+        console.error('Error loading server messages:', e);
+    }
+}
+
+function renderServerMessage(msg) {
+    const isMine = msg.sender_id === state.currentUser.id;
+    const time = new Date(msg.created_at).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+    const avatar = msg.avatar_url 
+        ? `<img src="${msg.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+        : (msg.username?.[0]?.toUpperCase() || '?');
+    
+    return `
+        <div class="message ${isMine ? 'sent' : 'received'}" data-message-id="${msg.id}">
+            <div class="message-avatar" style="background: ${getNameColor(msg)}">${avatar}</div>
+            <div class="message-content">
+                <div class="message-sender" style="color: ${getNameColor(msg)}">${msg.display_name || msg.username}</div>
+                <div class="message-bubble">${escapeHtml(msg.text || '')}</div>
+                <div class="message-time">${time}</div>
+            </div>
+        </div>
+    `;
+}
+
+function hideServerChannelsPanel() {
+    const panel = document.getElementById('server-channels-panel');
+    panel.classList.remove('visible');
+    setTimeout(() => {
+        panel.classList.add('hidden');
+    }, 300);
+    
+    state.selectedServer = null;
+    state.selectedServerChannel = null;
+    
+    // Очищаем хедер
+    updateChatHeader('Выберите чат', '', null);
+    
+    // Отключаем инпут
+    document.getElementById('message-input').disabled = true;
+    document.getElementById('message-input').placeholder = 'Выберите чат...';
+    document.querySelector('.send-btn').disabled = true;
 }
 
 function updateChatHeader(name, subtitle, avatarUrl) {
@@ -3484,20 +3671,22 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('edit-avatar-input')?.addEventListener('change', handleAvatarChange);
     document.getElementById('edit-banner-input')?.addEventListener('change', handleBannerChange);
     
-    // Профиль собеседника (клик на аватар/имя)
-    document.querySelector('.chat-header-info')?.addEventListener('click', (e) => {
+    // Профиль собеседника / информация о чате (клик на аватар/имя)
+    function handleHeaderClick(e) {
         e.stopPropagation();
         if (state.selectedUser) {
             showUserProfile(state.selectedUser.id);
+        } else if (state.selectedGroup) {
+            showGroupInfo(state.selectedGroup.id);
+        } else if (state.selectedChannel) {
+            showChannelInfo(state.selectedChannel.id);
+        } else if (state.selectedServer) {
+            showServerInfo(state.selectedServer.id);
         }
-    });
+    }
     
-    document.querySelector('.chat-header-avatar')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.selectedUser) {
-            showUserProfile(state.selectedUser.id);
-        }
-    });
+    document.querySelector('.chat-header-info')?.addEventListener('click', handleHeaderClick);
+    document.querySelector('.chat-header-avatar')?.addEventListener('click', handleHeaderClick);
     
     // Контекстное меню чата (3 точки)
     const chatMenuBtn = document.getElementById('chat-menu-btn');
@@ -3636,6 +3825,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('close-user-profile')?.addEventListener('click', () => {
         document.getElementById('user-profile-modal').classList.add('hidden');
+    });
+    
+    // Закрытие модалок групп/каналов/серверов
+    document.getElementById('close-group-info')?.addEventListener('click', () => {
+        document.getElementById('group-info-modal').classList.add('hidden');
+    });
+    document.getElementById('close-channel-info')?.addEventListener('click', () => {
+        document.getElementById('channel-info-modal').classList.add('hidden');
+    });
+    document.getElementById('close-server-info')?.addEventListener('click', () => {
+        document.getElementById('server-info-modal').classList.add('hidden');
+    });
+    
+    // Закрытие по клику на overlay
+    ['group-info-modal', 'channel-info-modal', 'server-info-modal'].forEach(modalId => {
+        document.querySelector(`#${modalId} .modal-overlay`)?.addEventListener('click', () => {
+            document.getElementById(modalId).classList.add('hidden');
+        });
     });
     
     // === НАСТРОЙКИ ===
@@ -4194,6 +4401,244 @@ async function showUserProfile(userId) {
     } catch (e) {
         console.error('Error loading user profile:', e);
     }
+}
+
+// === ИНФОРМАЦИЯ О ГРУППАХ/КАНАЛАХ/СЕРВЕРАХ ===
+
+async function showGroupInfo(groupId) {
+    try {
+        const [groupRes, membersRes, mediaRes] = await Promise.all([
+            api.get(`/api/groups/${groupId}`),
+            api.get(`/api/groups/${groupId}/members`),
+            api.get(`/api/groups/${groupId}/media`)
+        ]);
+        
+        const group = await groupRes.json();
+        const members = await membersRes.json();
+        const media = await mediaRes.json();
+        
+        if (!group) return;
+        
+        // Аватар
+        const avatarEl = document.getElementById('group-info-avatar');
+        if (group.avatar_url) {
+            avatarEl.style.backgroundImage = `url(${group.avatar_url})`;
+            avatarEl.innerHTML = '';
+        } else {
+            avatarEl.style.backgroundImage = '';
+            avatarEl.innerHTML = '<img src="/assets/group.svg" alt="" class="icon-lg">';
+        }
+        
+        // Инфо
+        document.getElementById('group-info-name').textContent = group.name;
+        document.getElementById('group-info-meta').textContent = `${members.length} участников`;
+        document.getElementById('group-info-desc').textContent = group.description || 'Нет описания';
+        
+        // Участники
+        const membersList = document.getElementById('group-members-list');
+        membersList.innerHTML = members.map(m => `
+            <div class="chat-info-member" data-user-id="${m.user_id}">
+                <div class="chat-info-member-avatar" style="${m.avatar_url ? `background-image: url(${m.avatar_url})` : ''}">
+                    ${m.avatar_url ? '' : (m.username?.[0]?.toUpperCase() || '?')}
+                </div>
+                <div class="chat-info-member-info">
+                    <div class="chat-info-member-name">${m.display_name || m.username}</div>
+                    <div class="chat-info-member-role ${m.role}">${m.role === 'owner' ? 'Владелец' : m.role === 'admin' ? 'Админ' : ''}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Клик на участника
+        membersList.querySelectorAll('.chat-info-member').forEach(el => {
+            el.addEventListener('click', () => {
+                document.getElementById('group-info-modal').classList.add('hidden');
+                showUserProfile(el.dataset.userId);
+            });
+        });
+        
+        // Медиа
+        renderMediaGrid('group-media-grid', media);
+        
+        // Табы
+        setupInfoTabs('group-info-modal');
+        
+        document.getElementById('group-info-modal').classList.remove('hidden');
+    } catch (e) {
+        console.error('Error loading group info:', e);
+    }
+}
+
+async function showChannelInfo(channelId) {
+    try {
+        const [channelRes, mediaRes] = await Promise.all([
+            api.get(`/api/channels/${channelId}`),
+            api.get(`/api/channels/${channelId}/media`)
+        ]);
+        
+        const channel = await channelRes.json();
+        const media = await mediaRes.json();
+        
+        if (!channel) return;
+        
+        // Аватар
+        const avatarEl = document.getElementById('channel-info-avatar');
+        if (channel.avatar_url) {
+            avatarEl.style.backgroundImage = `url(${channel.avatar_url})`;
+            avatarEl.innerHTML = '';
+        } else {
+            avatarEl.style.backgroundImage = '';
+            avatarEl.innerHTML = '<img src="/assets/megaphone.svg" alt="" class="icon-lg">';
+        }
+        
+        // Инфо
+        document.getElementById('channel-info-name').textContent = channel.name;
+        document.getElementById('channel-info-meta').textContent = `${channel.subscriber_count || 0} подписчиков`;
+        document.getElementById('channel-info-desc').textContent = channel.description || 'Нет описания';
+        
+        // Ссылка
+        const linkEl = document.getElementById('channel-info-link');
+        const channelLink = `${window.location.origin}/channel/${channelId}`;
+        linkEl.innerHTML = `
+            <span class="chat-info-link-text">${channelLink}</span>
+            <img src="/assets/copy.svg" alt="" class="chat-info-link-copy">
+        `;
+        linkEl.onclick = () => {
+            navigator.clipboard.writeText(channelLink);
+            showToast('Ссылка скопирована!');
+        };
+        
+        // Медиа
+        renderMediaGrid('channel-media-grid', media);
+        
+        document.getElementById('channel-info-modal').classList.remove('hidden');
+    } catch (e) {
+        console.error('Error loading channel info:', e);
+    }
+}
+
+async function showServerInfo(serverId) {
+    try {
+        const [serverRes, membersRes, mediaRes] = await Promise.all([
+            api.get(`/api/servers/${serverId}`),
+            api.get(`/api/servers/${serverId}/members`),
+            api.get(`/api/servers/${serverId}/media`)
+        ]);
+        
+        const server = await serverRes.json();
+        const members = await membersRes.json();
+        const media = await mediaRes.json();
+        
+        if (!server) return;
+        
+        // Аватар
+        const avatarEl = document.getElementById('server-info-avatar');
+        if (server.icon_url) {
+            avatarEl.style.backgroundImage = `url(${server.icon_url})`;
+            avatarEl.innerHTML = '';
+        } else {
+            avatarEl.style.backgroundImage = '';
+            avatarEl.innerHTML = '<img src="/assets/Castle.svg" alt="" class="icon-lg">';
+        }
+        
+        // Баннер
+        const bannerEl = document.getElementById('server-info-banner');
+        if (server.banner_url) {
+            bannerEl.style.backgroundImage = `url(${server.banner_url})`;
+        } else {
+            bannerEl.style.backgroundImage = '';
+        }
+        
+        // Инфо
+        document.getElementById('server-info-name').textContent = server.name;
+        document.getElementById('server-info-meta').textContent = `${members.length} участников`;
+        document.getElementById('server-info-desc').textContent = server.description || 'Нет описания';
+        
+        // Участники
+        const membersList = document.getElementById('server-members-list');
+        membersList.innerHTML = members.map(m => `
+            <div class="chat-info-member" data-user-id="${m.user_id}">
+                <div class="chat-info-member-avatar" style="${m.avatar_url ? `background-image: url(${m.avatar_url})` : ''}">
+                    ${m.avatar_url ? '' : (m.username?.[0]?.toUpperCase() || '?')}
+                </div>
+                <div class="chat-info-member-info">
+                    <div class="chat-info-member-name">${m.nickname || m.display_name || m.username}</div>
+                    <div class="chat-info-member-role">${m.role || ''}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Клик на участника
+        membersList.querySelectorAll('.chat-info-member').forEach(el => {
+            el.addEventListener('click', () => {
+                document.getElementById('server-info-modal').classList.add('hidden');
+                showUserProfile(el.dataset.userId);
+            });
+        });
+        
+        // Медиа
+        renderMediaGrid('server-media-grid', media);
+        
+        // Табы
+        setupInfoTabs('server-info-modal');
+        
+        document.getElementById('server-info-modal').classList.remove('hidden');
+    } catch (e) {
+        console.error('Error loading server info:', e);
+    }
+}
+
+function renderMediaGrid(containerId, media) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (!media || media.length === 0) {
+        container.innerHTML = '<div class="chat-info-empty">Медиа пока нет</div>';
+        return;
+    }
+    
+    container.innerHTML = media.map(item => {
+        const url = item.text || item.media_url;
+        const type = item.message_type || item.media_type || 'image';
+        
+        if (type === 'video' || type === 'mp4') {
+            return `
+                <div class="chat-info-media-item" data-url="${url}">
+                    <video src="${url}" muted></video>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="chat-info-media-item" data-url="${url}">
+                    <img src="${url}" alt="" loading="lazy">
+                </div>
+            `;
+        }
+    }).join('');
+    
+    // Клик для просмотра
+    container.querySelectorAll('.chat-info-media-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const url = item.dataset.url;
+            window.open(url, '_blank');
+        });
+    });
+}
+
+function setupInfoTabs(modalId) {
+    const modal = document.getElementById(modalId);
+    const tabs = modal.querySelectorAll('.chat-info-tab');
+    const contents = modal.querySelectorAll('.chat-info-tab-content');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            
+            tab.classList.add('active');
+            const tabName = tab.dataset.tab;
+            modal.querySelector(`#${modalId.replace('-modal', '')}-${tabName}-tab`)?.classList.add('active');
+        });
+    });
 }
 
 function showSettings() {

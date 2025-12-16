@@ -1,8 +1,22 @@
 const jwt = require('jsonwebtoken');
 
-// JWT секрет из переменных окружения
-const JWT_SECRET = process.env.JWT_SECRET || 'kvant-super-secret-key-change-in-production';
+// JWT секрет из переменных окружения (ОБЯЗАТЕЛЬНО!)
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '7d';
+
+// Проверка наличия секрета при загрузке модуля
+if (!JWT_SECRET) {
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: JWT_SECRET не установлен!');
+    console.error('   Добавьте JWT_SECRET в .env файл');
+    if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+    } else {
+        console.warn('⚠️  Используется небезопасный дефолтный секрет (только для разработки!)');
+    }
+}
+
+// Fallback только для разработки
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || 'dev-only-insecure-secret-do-not-use-in-production';
 
 /**
  * Генерация JWT токена
@@ -10,7 +24,7 @@ const JWT_EXPIRES_IN = '7d';
 function generateToken(user) {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'user' },
-        JWT_SECRET,
+        EFFECTIVE_JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
     );
 }
@@ -20,7 +34,7 @@ function generateToken(user) {
  */
 function verifyToken(token) {
     try {
-        return jwt.verify(token, JWT_SECRET);
+        return jwt.verify(token, EFFECTIVE_JWT_SECRET);
     } catch (error) {
         return null;
     }
@@ -104,5 +118,5 @@ module.exports = {
     ownerMiddleware,
     adminMiddleware,
     socketAuthMiddleware,
-    JWT_SECRET
+    JWT_SECRET: EFFECTIVE_JWT_SECRET
 };

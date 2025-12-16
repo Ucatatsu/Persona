@@ -154,6 +154,37 @@
         <div class="users-list sidebar-tab" id="channels-list" data-tab="channels" role="list" aria-label="Список каналов"></div>
         <div class="users-list sidebar-tab" id="servers-list" data-tab="servers" role="list" aria-label="Список серверов"></div>
       </div>
+      
+      <!-- Панель каналов сервера (выезжает поверх списка) -->
+      <div class="server-channels-panel hidden" id="server-channels-panel">
+        <div class="server-panel-header">
+          <button class="server-panel-back" id="server-panel-back" aria-label="Назад">
+            <img src="/assets/arrow-left.svg" alt="" class="icon">
+          </button>
+          <div class="server-panel-info" id="server-panel-info">
+            <div class="server-panel-name" id="server-panel-name"></div>
+            <div class="server-panel-meta" id="server-panel-meta"></div>
+          </div>
+          <button class="server-panel-menu" id="server-panel-menu" aria-label="Меню сервера">
+            <img src="/assets/menu dots vertical.svg" alt="" class="icon">
+          </button>
+        </div>
+        
+        <!-- Меню сервера (для админов) -->
+        <div class="server-menu hidden" id="server-menu">
+          <button class="server-menu-item" id="server-create-channel">
+            <img src="/assets/Plus.svg" alt="" class="icon-sm"> Создать канал
+          </button>
+          <button class="server-menu-item" id="server-manage-roles">
+            <img src="/assets/Badge-check.svg" alt="" class="icon-sm"> Управление ролями
+          </button>
+          <button class="server-menu-item" id="server-settings">
+            <img src="/assets/settings.svg" alt="" class="icon-sm"> Настройки сервера
+          </button>
+        </div>
+        
+        <div class="server-channels-list" id="server-channels-list"></div>
+      </div>
       <div class="sidebar-footer" id="user-panel" role="button" tabindex="0" aria-label="Открыть карточку профиля">
         <div class="current-user-avatar" id="current-user-avatar"></div>
         <div class="current-user-details">
@@ -864,7 +895,7 @@
           <div class="about-content">
             <img src="icon.png" alt="Квант" class="about-logo">
             <h3>Квант</h3>
-            <p class="about-version">Версия 1A9a0</p>
+            <p class="about-version">Версия 1B0a0</p>
             <p class="about-desc">Современный мессенджер с чистым стилем</p>
             <div class="about-links">
               <a href="#" class="legal-link about-link" data-doc="terms">📄 Условия использования</a>
@@ -924,6 +955,164 @@
         <div class="profile-username" id="user-profile-username"></div>
         <div class="profile-tag" id="user-profile-tag"></div>
         <div class="profile-bio" id="user-profile-bio"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно информации о группе -->
+  <div id="group-info-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content chat-info-modal-content">
+      <div class="chat-info-banner" id="group-info-banner"></div>
+      <div class="chat-info-avatar-wrapper">
+        <div class="chat-info-avatar" id="group-info-avatar">
+          <img src="/assets/group.svg" alt="" class="icon-lg">
+        </div>
+      </div>
+      <button class="modal-close" id="close-group-info" aria-label="Закрыть">&times;</button>
+      <div class="chat-info-body">
+        <div class="chat-info-name" id="group-info-name"></div>
+        <div class="chat-info-meta" id="group-info-meta"></div>
+        <div class="chat-info-desc" id="group-info-desc"></div>
+        
+        <div class="chat-info-tabs">
+          <button class="chat-info-tab active" data-tab="members">Участники</button>
+          <button class="chat-info-tab" data-tab="media">Медиа</button>
+        </div>
+        
+        <div class="chat-info-tab-content active" id="group-members-tab">
+          <div class="chat-info-members-list" id="group-members-list"></div>
+        </div>
+        <div class="chat-info-tab-content" id="group-media-tab">
+          <div class="chat-info-media-grid" id="group-media-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно информации о канале -->
+  <div id="channel-info-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content chat-info-modal-content">
+      <div class="chat-info-banner" id="channel-info-banner"></div>
+      <div class="chat-info-avatar-wrapper">
+        <div class="chat-info-avatar" id="channel-info-avatar">
+          <img src="/assets/megaphone.svg" alt="" class="icon-lg">
+        </div>
+      </div>
+      <button class="modal-close" id="close-channel-info" aria-label="Закрыть">&times;</button>
+      <div class="chat-info-body">
+        <div class="chat-info-name" id="channel-info-name"></div>
+        <div class="chat-info-meta" id="channel-info-meta"></div>
+        <div class="chat-info-desc" id="channel-info-desc"></div>
+        <div class="chat-info-link" id="channel-info-link"></div>
+        
+        <div class="chat-info-tabs">
+          <button class="chat-info-tab active" data-tab="media">Медиа</button>
+        </div>
+        
+        <div class="chat-info-tab-content active" id="channel-media-tab">
+          <div class="chat-info-media-grid" id="channel-media-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно информации о сервере -->
+  <div id="server-info-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content chat-info-modal-content">
+      <div class="chat-info-banner" id="server-info-banner"></div>
+      <div class="chat-info-avatar-wrapper">
+        <div class="chat-info-avatar" id="server-info-avatar">
+          <img src="/assets/Castle.svg" alt="" class="icon-lg">
+        </div>
+      </div>
+      <button class="modal-close" id="close-server-info" aria-label="Закрыть">&times;</button>
+      <div class="chat-info-body">
+        <div class="chat-info-name" id="server-info-name"></div>
+        <div class="chat-info-meta" id="server-info-meta"></div>
+        <div class="chat-info-desc" id="server-info-desc"></div>
+        
+        <div class="chat-info-tabs">
+          <button class="chat-info-tab active" data-tab="members">Участники</button>
+          <button class="chat-info-tab" data-tab="media">Медиа</button>
+        </div>
+        
+        <div class="chat-info-tab-content active" id="server-members-tab">
+          <div class="chat-info-members-list" id="server-members-list"></div>
+        </div>
+        <div class="chat-info-tab-content" id="server-media-tab">
+          <div class="chat-info-media-grid" id="server-media-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно создания канала на сервере -->
+  <div id="create-server-channel-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Создать канал</h2>
+        <button class="modal-close" id="close-create-channel" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Тип канала</label>
+          <div class="channel-type-selector">
+            <button class="channel-type-btn active" data-type="text">
+              <span class="channel-type-icon">#</span>
+              <span>Текстовый</span>
+            </button>
+            <button class="channel-type-btn" data-type="voice">
+              <span class="channel-type-icon">🔊</span>
+              <span>Голосовой</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="new-channel-name">Название канала</label>
+          <input type="text" id="new-channel-name" placeholder="общий" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label for="new-channel-category">Категория</label>
+          <select id="new-channel-category">
+            <option value="">Без категории</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Доступ</label>
+          <div class="channel-access-list" id="channel-access-list">
+            <div class="channel-access-item">
+              <span>@everyone</span>
+              <input type="checkbox" checked>
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" id="create-channel-btn">Создать канал</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно управления ролями -->
+  <div id="manage-roles-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content roles-modal-content">
+      <div class="modal-header">
+        <h2>Управление ролями</h2>
+        <button class="modal-close" id="close-manage-roles" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="roles-container">
+        <div class="roles-sidebar">
+          <div class="roles-list" id="roles-list"></div>
+          <button class="btn-secondary roles-add-btn" id="add-role-btn">
+            <img src="/assets/Plus.svg" alt="" class="icon-sm"> Новая роль
+          </button>
+        </div>
+        <div class="roles-editor" id="roles-editor">
+          <div class="roles-empty">Выберите роль для редактирования</div>
+        </div>
       </div>
     </div>
   </div>
