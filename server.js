@@ -957,6 +957,72 @@ app.get('/api/groups/:groupId/media', authMiddleware, async (req, res) => {
     }
 });
 
+// Загрузка аватарки группы (только для владельца)
+app.post('/api/groups/:groupId/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        
+        // Проверяем что пользователь - владелец группы
+        const group = await db.getGroup(groupId);
+        if (!group) {
+            return res.status(404).json({ success: false, error: 'Группа не найдена' });
+        }
+        if (group.owner_id !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Только владелец может менять аватарку' });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'Файл не загружен' });
+        }
+        
+        let avatarUrl;
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            avatarUrl = await uploadToCloudinary(req.file.buffer, 'group-avatars');
+        } else {
+            avatarUrl = `/uploads/${req.file.filename}`;
+        }
+        
+        await db.updateGroupAvatar(groupId, avatarUrl);
+        res.json({ success: true, avatarUrl });
+    } catch (error) {
+        console.error('Upload group avatar error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка загрузки' });
+    }
+});
+
+// Загрузка баннера группы (только для владельца)
+app.post('/api/groups/:groupId/banner', authMiddleware, upload.single('banner'), async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        
+        // Проверяем что пользователь - владелец группы
+        const group = await db.getGroup(groupId);
+        if (!group) {
+            return res.status(404).json({ success: false, error: 'Группа не найдена' });
+        }
+        if (group.owner_id !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Только владелец может менять баннер' });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'Файл не загружен' });
+        }
+        
+        let bannerUrl;
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            bannerUrl = await uploadToCloudinary(req.file.buffer, 'group-banners');
+        } else {
+            bannerUrl = `/uploads/${req.file.filename}`;
+        }
+        
+        await db.updateGroupBanner(groupId, bannerUrl);
+        res.json({ success: true, bannerUrl });
+    } catch (error) {
+        console.error('Upload group banner error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка загрузки' });
+    }
+});
+
 // === КАНАЛЫ ===
 
 app.post('/api/channels', authMiddleware, async (req, res) => {

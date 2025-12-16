@@ -10269,6 +10269,32 @@ input[type="range"]:focus::-moz-range-thumb {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.chat-info-modal-content .modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.chat-info-modal-content .modal-close:hover {
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .chat-info-banner {
@@ -10277,6 +10303,34 @@ input[type="range"]:focus::-moz-range-thumb {
   background-size: cover;
   background-position: center;
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Edit button on banner */
+.chat-info-edit-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.chat-info-edit-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.chat-info-edit-btn .icon-sm {
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) invert(1);
 }
 
 .chat-info-avatar-wrapper {
@@ -10285,6 +10339,34 @@ input[type="range"]:focus::-moz-range-thumb {
   margin-top: -50px;
   position: relative;
   z-index: 1;
+}
+
+/* Edit button on avatar */
+.chat-info-avatar-edit {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(20px);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-dark);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.chat-info-avatar-edit:hover {
+  background: var(--accent-light);
+}
+
+.chat-info-avatar-edit .icon-sm {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1);
 }
 
 .chat-info-avatar {
@@ -10997,4 +11079,66 @@ input[type="range"]:focus::-moz-range-thumb {
     border-bottom: 1px solid var(--glass-border);
     max-height: 200px;
   }
+}
+
+
+/* Edit buttons for group/channel/server info */
+.chat-info-edit-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.chat-info-edit-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.chat-info-edit-btn .icon-sm {
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) invert(1);
+}
+
+.chat-info-banner {
+  position: relative;
+}
+
+.chat-info-avatar-wrapper {
+  position: relative;
+}
+
+.chat-info-avatar-edit {
+  position: absolute;
+  bottom: 0;
+  right: calc(50% - 50px);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-dark);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.chat-info-avatar-edit:hover {
+  transform: scale(1.1);
+}
+
+.chat-info-avatar-edit .icon-sm {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1);
 }

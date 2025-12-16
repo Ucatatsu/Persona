@@ -1638,6 +1638,42 @@ async function getGroupMedia(groupId, limit = 50) {
     }
 }
 
+async function updateGroupAvatar(groupId, avatarUrl) {
+    try {
+        if (USE_SQLITE) {
+            sqlite.prepare('UPDATE group_chats SET avatar_url = ? WHERE id = ?').run(avatarUrl, groupId);
+        } else {
+            await pool.query('UPDATE group_chats SET avatar_url = $1 WHERE id = $2', [avatarUrl, groupId]);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Update group avatar error:', error);
+        return { success: false, error: 'Ошибка обновления аватарки' };
+    }
+}
+
+async function updateGroupBanner(groupId, bannerUrl) {
+    try {
+        // Сначала проверим есть ли колонка banner_url
+        if (USE_SQLITE) {
+            // Добавляем колонку если её нет
+            try {
+                sqlite.exec('ALTER TABLE group_chats ADD COLUMN banner_url TEXT');
+            } catch (e) {
+                // Колонка уже существует
+            }
+            sqlite.prepare('UPDATE group_chats SET banner_url = ? WHERE id = ?').run(bannerUrl, groupId);
+        } else {
+            await pool.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS banner_url TEXT').catch(() => {});
+            await pool.query('UPDATE group_chats SET banner_url = $1 WHERE id = $2', [bannerUrl, groupId]);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Update group banner error:', error);
+        return { success: false, error: 'Ошибка обновления баннера' };
+    }
+}
+
 // === КАНАЛЫ (Telegram-style) ===
 
 async function createChannel(ownerId, name, description = '', isPublic = true, avatarUrl = null) {
@@ -2208,6 +2244,8 @@ module.exports = {
     saveGroupMessage,
     getGroupMessages,
     getGroupMedia,
+    updateGroupAvatar,
+    updateGroupBanner,
     // Каналы
     createChannel,
     getChannel,

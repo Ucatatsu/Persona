@@ -963,13 +963,22 @@
   <div id="group-info-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="modal-content chat-info-modal-content">
-      <div class="chat-info-banner" id="group-info-banner"></div>
+      <button class="modal-close" id="close-group-info" aria-label="Закрыть">&times;</button>
+      <div class="chat-info-banner" id="group-info-banner">
+        <button class="chat-info-edit-btn hidden" id="edit-group-banner-btn" title="Изменить баннер">
+          <img src="/assets/edit.svg" alt="" class="icon-sm">
+        </button>
+        <input type="file" id="group-banner-input" accept="image/*" hidden>
+      </div>
       <div class="chat-info-avatar-wrapper">
         <div class="chat-info-avatar" id="group-info-avatar">
           <img src="/assets/group.svg" alt="" class="icon-lg">
         </div>
+        <button class="chat-info-avatar-edit hidden" id="edit-group-avatar-btn" title="Изменить аватар">
+          <img src="/assets/edit.svg" alt="" class="icon-sm">
+        </button>
+        <input type="file" id="group-avatar-input" accept="image/*" hidden>
       </div>
-      <button class="modal-close" id="close-group-info" aria-label="Закрыть">&times;</button>
       <div class="chat-info-body">
         <div class="chat-info-name" id="group-info-name"></div>
         <div class="chat-info-meta" id="group-info-meta"></div>

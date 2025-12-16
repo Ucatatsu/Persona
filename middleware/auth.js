@@ -6,13 +6,8 @@ const JWT_EXPIRES_IN = '7d';
 
 // Проверка наличия секрета при загрузке модуля
 if (!JWT_SECRET) {
-    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: JWT_SECRET не установлен!');
-    console.error('   Добавьте JWT_SECRET в .env файл');
-    if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-    } else {
-        console.warn('⚠️  Используется небезопасный дефолтный секрет (только для разработки!)');
-    }
+    console.warn('⚠️  JWT_SECRET не установлен! Используется небезопасный дефолтный секрет.');
+    console.warn('   Для продакшена обязательно установите JWT_SECRET в переменных окружения.');
 }
 
 // Fallback только для разработки

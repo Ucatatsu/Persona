@@ -3845,6 +3845,82 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
+    // === РЕДАКТИРОВАНИЕ АВАТАРКИ/БАННЕРА ГРУППЫ ===
+    
+    // Кнопка редактирования аватарки группы
+    document.getElementById('edit-group-avatar-btn')?.addEventListener('click', () => {
+        document.getElementById('group-avatar-input').click();
+    });
+    
+    // Кнопка редактирования баннера группы
+    document.getElementById('edit-group-banner-btn')?.addEventListener('click', () => {
+        document.getElementById('group-banner-input').click();
+    });
+    
+    // Загрузка аватарки группы
+    document.getElementById('group-avatar-input')?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const groupId = document.getElementById('group-info-modal').dataset.groupId;
+        if (!groupId) return;
+        
+        const formData = new FormData();
+        formData.append('avatar', file);
+        
+        try {
+            const res = await api.uploadFile(`/api/groups/${groupId}/avatar`, formData);
+            const data = await res.json();
+            
+            if (data.success) {
+                showToast('Аватарка группы обновлена!');
+                // Обновляем аватарку в модалке
+                const avatarEl = document.getElementById('group-info-avatar');
+                avatarEl.style.backgroundImage = `url(${data.avatarUrl})`;
+                avatarEl.innerHTML = '';
+                // Обновляем в списке групп
+                updateGroupsList();
+            } else {
+                showToast(data.error || 'Ошибка загрузки', 'error');
+            }
+        } catch (err) {
+            console.error('Upload group avatar error:', err);
+            showToast('Ошибка загрузки', 'error');
+        }
+        
+        e.target.value = '';
+    });
+    
+    // Загрузка баннера группы
+    document.getElementById('group-banner-input')?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const groupId = document.getElementById('group-info-modal').dataset.groupId;
+        if (!groupId) return;
+        
+        const formData = new FormData();
+        formData.append('banner', file);
+        
+        try {
+            const res = await api.uploadFile(`/api/groups/${groupId}/banner`, formData);
+            const data = await res.json();
+            
+            if (data.success) {
+                showToast('Баннер группы обновлён!');
+                // Обновляем баннер в модалке
+                document.getElementById('group-info-banner').style.backgroundImage = `url(${data.bannerUrl})`;
+            } else {
+                showToast(data.error || 'Ошибка загрузки', 'error');
+            }
+        } catch (err) {
+            console.error('Upload group banner error:', err);
+            showToast('Ошибка загрузки', 'error');
+        }
+        
+        e.target.value = '';
+    });
+    
     // === НАСТРОЙКИ ===
     
     document.getElementById('settings-btn')?.addEventListener('click', showSettings);
@@ -4419,6 +4495,17 @@ async function showGroupInfo(groupId) {
         
         if (!group) return;
         
+        // Проверяем владельца
+        const isOwner = group.owner_id === state.currentUser.id;
+        
+        // Баннер
+        const bannerEl = document.getElementById('group-info-banner');
+        if (group.banner_url) {
+            bannerEl.style.backgroundImage = `url(${group.banner_url})`;
+        } else {
+            bannerEl.style.backgroundImage = '';
+        }
+        
         // Аватар
         const avatarEl = document.getElementById('group-info-avatar');
         if (group.avatar_url) {
@@ -4428,6 +4515,10 @@ async function showGroupInfo(groupId) {
             avatarEl.style.backgroundImage = '';
             avatarEl.innerHTML = '<img src="/assets/group.svg" alt="" class="icon-lg">';
         }
+        
+        // Показываем/скрываем кнопки редактирования
+        document.getElementById('edit-group-banner-btn')?.classList.toggle('hidden', !isOwner);
+        document.getElementById('edit-group-avatar-btn')?.classList.toggle('hidden', !isOwner);
         
         // Инфо
         document.getElementById('group-info-name').textContent = group.name;
@@ -4461,6 +4552,9 @@ async function showGroupInfo(groupId) {
         
         // Табы
         setupInfoTabs('group-info-modal');
+        
+        // Сохраняем ID группы для редактирования
+        document.getElementById('group-info-modal').dataset.groupId = groupId;
         
         document.getElementById('group-info-modal').classList.remove('hidden');
     } catch (e) {
@@ -4624,10 +4718,21 @@ function renderMediaGrid(containerId, media) {
     });
 }
 
+// Храним инициализированные модалки чтобы не добавлять обработчики повторно
+const initializedInfoModals = new Set();
+
 function setupInfoTabs(modalId) {
+    // Если уже инициализировано — просто сбрасываем на первый таб
     const modal = document.getElementById(modalId);
     const tabs = modal.querySelectorAll('.chat-info-tab');
     const contents = modal.querySelectorAll('.chat-info-tab-content');
+    
+    // Сбрасываем на первый таб
+    tabs.forEach((t, i) => t.classList.toggle('active', i === 0));
+    contents.forEach((c, i) => c.classList.toggle('active', i === 0));
+    
+    if (initializedInfoModals.has(modalId)) return;
+    initializedInfoModals.add(modalId);
     
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -4636,7 +4741,9 @@ function setupInfoTabs(modalId) {
             
             tab.classList.add('active');
             const tabName = tab.dataset.tab;
-            modal.querySelector(`#${modalId.replace('-modal', '')}-${tabName}-tab`)?.classList.add('active');
+            // Формируем ID: group-info-modal -> group, channel-info-modal -> channel
+            const prefix = modalId.replace('-info-modal', '');
+            modal.querySelector(`#${prefix}-${tabName}-tab`)?.classList.add('active');
         });
     });
 }
