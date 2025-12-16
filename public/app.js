@@ -1367,8 +1367,28 @@ async function selectServerChannel(channelId) {
     
     if (!channel) return;
     
+    // Для голосового канала — подключаемся к войсу, но не меняем чат
+    if (channel.type === 'voice') {
+        state.selectedServerChannel = channel;
+        state.socket?.emit('join-voice-channel', { serverId: state.selectedServer.id, channelId });
+        
+        // Обновляем UI — показываем что мы в голосовом канале
+        document.querySelectorAll('.server-channel-item').forEach(i => i.classList.remove('in-voice'));
+        document.querySelector(`[data-channel-id="${channelId}"]`)?.classList.add('in-voice');
+        
+        showToast(`Подключение к 🔊 ${channel.name}...`);
+        // TODO: Реализовать WebRTC подключение к голосовому каналу
+        return;
+    }
+    
+    // Для текстового канала — обычное поведение
     state.selectedServerChannel = channel;
     state.socket?.emit('join-server-channel', channelId);
+    
+    // Сбрасываем выбранного пользователя/группу при переходе в текстовый канал сервера
+    state.selectedUser = null;
+    state.selectedGroup = null;
+    state.selectedChannel = null;
     
     // Обновляем UI
     document.querySelectorAll('.server-channel-item').forEach(i => i.classList.remove('active'));
@@ -1384,16 +1404,9 @@ async function selectServerChannel(channelId) {
     // Включаем инпут
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.querySelector('.send-btn');
-    
-    if (channel.type === 'voice') {
-        messageInput.disabled = true;
-        messageInput.placeholder = 'Голосовой канал';
-        sendBtn.disabled = true;
-    } else {
-        messageInput.disabled = false;
-        messageInput.placeholder = `Сообщение в #${channel.name}`;
-        sendBtn.disabled = false;
-    }
+    messageInput.disabled = false;
+    messageInput.placeholder = `Сообщение в #${channel.name}`;
+    sendBtn.disabled = false;
     
     handleMobileAfterSelect();
 }
@@ -1563,14 +1576,15 @@ function renderUsers(users) {
         const displayName = localNickname || user.display_name || user.username;
         const isMuted = isUserMuted(user.id);
         const isPremiumUser = user.isPremium || user.role === 'admin';
-        const premiumPlan = user.premiumPlan || user.premium_plan || 'premium';
+        const premiumPlan = (user.premiumPlan || user.premium_plan || 'premium').toString().toLowerCase().trim();
         const avatarClass = 'user-avatar';
         const nameStyle = user.name_color ? `style="--name-color: ${escapeAttr(user.name_color)}" data-name-color` : '';
         
         // Бейдж P или P+ в списке контактов
         let premiumBadge = '';
         if (isPremiumUser) {
-            if (premiumPlan === 'premium_plus') {
+            const isPremiumPlus = premiumPlan === 'premium_plus' || premiumPlan === 'premiumplus' || premiumPlan === 'premium+';
+            if (isPremiumPlus) {
                 premiumBadge = ' <span class="premium-indicator premium-plus-badge">P+</span>';
             } else {
                 premiumBadge = ' <span class="premium-indicator premium-badge">P</span>';
@@ -6141,7 +6155,7 @@ function selectRoleForEdit(roleId, roles) {
         <div class="role-edit-form">
             <div class="form-group">
                 <label>Название роли</label>
-                <input type="text" id="edit-role-name" value="${role.name}" maxlength="50">
+                <input type="text" id="edit-role-name" value="${escapeAttr(role.name)}" maxlength="50">
             </div>
             <div class="form-group">
                 <label>Цвет</label>
@@ -6167,11 +6181,15 @@ function selectRoleForEdit(roleId, roles) {
                 </label>
             </div>
             <div class="role-actions">
-                <button class="btn-primary" onclick="saveRole('${roleId}')">Сохранить</button>
-                ${!role.is_default ? `<button class="btn-danger" onclick="deleteRole('${roleId}')">Удалить</button>` : ''}
+                <button class="btn-primary" id="save-role-btn">Сохранить</button>
+                ${!role.is_default ? `<button class="btn-danger" id="delete-role-btn">Удалить</button>` : ''}
             </div>
         </div>
     `;
+    
+    // Добавляем обработчики событий
+    document.getElementById('save-role-btn')?.addEventListener('click', () => saveRole(roleId));
+    document.getElementById('delete-role-btn')?.addEventListener('click', () => deleteRole(roleId));
 }
 
 async function saveRole(roleId) {
