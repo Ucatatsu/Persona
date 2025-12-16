@@ -1330,10 +1330,14 @@ function renderServerChannels(categories, channels, canManage) {
         });
     });
     
-    // Контекстное меню на пустом месте списка
+    // Контекстное меню на пустом месте списка или на самом списке
     if (canManage) {
         list.addEventListener('contextmenu', (e) => {
-            if (e.target === list || e.target.classList.contains('empty-list')) {
+            // Если клик не на канале и не на категории - показываем меню создания
+            const isOnChannel = e.target.closest('.server-channel-item');
+            const isOnCategory = e.target.closest('.server-category-header');
+            
+            if (!isOnChannel && !isOnCategory) {
                 e.preventDefault();
                 showServerListContextMenu(e);
             }

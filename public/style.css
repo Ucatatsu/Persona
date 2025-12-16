@@ -5293,19 +5293,33 @@ input:focus {
   color: var(--name-color, var(--text));
 }
 
-/* Premium индикатор */
+/* Premium индикатор - базовые стили */
 .premium-indicator {
-  font-size: 12px;
-  margin-left: 4px;
+  display: inline-block;
+  font-size: 10px;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  vertical-align: middle;
+  line-height: 1;
 }
 
 /* Золотое свечение для P */
 .premium-indicator.premium-badge {
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  color: #000 !important;
+  text-shadow: none;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
   animation: premiumGlow 2s ease-in-out infinite;
 }
 
 /* Фиолетовое свечение для P+ */
 .premium-indicator.premium-plus-badge {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #fff !important;
+  text-shadow: none;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
   animation: premiumPlusGlow 2s ease-in-out infinite;
 }
 
@@ -7930,6 +7944,7 @@ input[type="range"]:focus::-moz-range-thumb {
   overflow: hidden;
   position: relative;
   transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  transform: translateX(0);
 }
 
 /* Когда открыта панель сервера - списки уходят влево */
