@@ -4975,6 +4975,10 @@ input:focus {
   height: 16px;
   white-space: nowrap;
   overflow: visible;
+  /* Сброс стилей от родителя с data-name-color */
+  -webkit-text-fill-color: initial;
+  -webkit-background-clip: padding-box;
+  background-clip: padding-box;
 }
 
 /* P badge (золотой) */
@@ -4987,22 +4991,22 @@ input:focus {
 
 /* P+ badge (фиолетовый) */
 .user-item .premium-plus-badge {
-  background: linear-gradient(135deg, #a855f7, #6366f1);
+  background: linear-gradient(135deg, #a855f7, #6366f1) !important;
   color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  -webkit-background-clip: padding-box !important;
+  background-clip: padding-box !important;
   text-shadow: none;
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
   min-width: 24px;
   padding: 2px 5px;
 }
 
-/* Fallback текст для P+ если пустой */
-.user-item .premium-plus-badge:empty::after {
-  content: 'P+';
-}
-
-/* Fallback текст для P если пустой */
-.user-item .premium-badge:empty::after {
-  content: 'P';
+/* P badge (золотой) - сброс text-fill-color */
+.user-item .premium-badge {
+  -webkit-text-fill-color: #000 !important;
+  -webkit-background-clip: padding-box !important;
+  background-clip: padding-box !important;
 }
 
 /* Кастомный тег */
