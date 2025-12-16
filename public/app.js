@@ -5505,7 +5505,72 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+    
+    // === ПАНЕЛЬ КАНАЛОВ СЕРВЕРА ===
+    
+    // Кнопка "Назад" в панели сервера
+    document.getElementById('server-panel-back')?.addEventListener('click', () => {
+        hideServerChannelsPanel();
+    });
+    
+    // Кнопка меню сервера (три точки)
+    const serverMenuBtn = document.getElementById('server-panel-menu');
+    const serverMenu = document.getElementById('server-menu');
+    
+    serverMenuBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        serverMenu?.classList.toggle('hidden');
+    });
+    
+    // Закрытие меню при клике вне
+    document.addEventListener('click', (e) => {
+        if (!serverMenu?.contains(e.target) && e.target !== serverMenuBtn) {
+            serverMenu?.classList.add('hidden');
+        }
+    });
+    
+    // Пункты меню сервера
+    document.getElementById('server-create-channel')?.addEventListener('click', () => {
+        serverMenu?.classList.add('hidden');
+        openCreateServerChannelModal();
+    });
+    
+    document.getElementById('server-manage-roles')?.addEventListener('click', () => {
+        serverMenu?.classList.add('hidden');
+        openServerRolesModal();
+    });
+    
+    document.getElementById('server-settings')?.addEventListener('click', () => {
+        serverMenu?.classList.add('hidden');
+        openServerSettingsModal();
+    });
+    
+    // Клик на хедер панели сервера (открыть инфо)
+    document.getElementById('server-panel-info')?.addEventListener('click', () => {
+        if (state.selectedServer) {
+            showServerInfo(state.selectedServer.id);
+        }
+    });
 });
+
+// Функции для модалок сервера (заглушки)
+function openCreateServerChannelModal() {
+    const modal = document.getElementById('create-server-channel-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.getElementById('new-channel-name').value = '';
+    } else {
+        showToast('Функция в разработке', 'info');
+    }
+}
+
+function openServerRolesModal() {
+    showToast('Управление ролями в разработке', 'info');
+}
+
+function openServerSettingsModal() {
+    showToast('Настройки сервера в разработке', 'info');
+}
 
 
 // === GLOBAL SEARCH ===
