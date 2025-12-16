@@ -323,6 +323,7 @@ button {
   border-radius: 16px;
   backdrop-filter: blur(20px);
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar-header {
@@ -10614,25 +10615,23 @@ input[type="range"]:focus::-moz-range-thumb {
 .server-channels-panel {
   position: absolute;
   top: 0;
-  right: 0;
+  left: 0;
   bottom: 0;
-  width: calc(100% - 60px);
+  width: 100%;
   background: var(--bg-darkest);
-  border-left: 1px solid var(--glass-border);
-  z-index: 50;
+  z-index: 5;
   display: flex;
   flex-direction: column;
-  transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.server-channels-panel.visible {
+.server-channels-panel:not(.hidden) {
   transform: translateX(0);
 }
 
 .server-channels-panel.hidden {
-  display: flex;
-  transform: translateX(100%);
+  transform: translateX(-100%);
+  pointer-events: none;
 }
 
 .server-panel-header {
