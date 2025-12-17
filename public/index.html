@@ -1093,35 +1093,19 @@
     <div class="modal-overlay"></div>
     <div class="modal-content chat-info-modal-content">
       <button class="modal-close" id="close-group-info" aria-label="Закрыть">&times;</button>
-      <div class="chat-info-banner" id="group-info-banner">
-        <button class="chat-info-edit-btn hidden" id="edit-group-banner-btn" title="Изменить баннер">
-          <img src="/assets/edit.svg" alt="" class="icon-sm">
-        </button>
-        <input type="file" id="group-banner-input" accept="image/*" hidden>
-      </div>
+      <button class="chat-info-edit-main-btn hidden" id="edit-group-btn" title="Редактировать">
+        <img src="/assets/edit.svg" alt="" class="icon-sm">
+      </button>
+      <div class="chat-info-banner" id="group-info-banner"></div>
       <div class="chat-info-avatar-wrapper">
         <div class="chat-info-avatar" id="group-info-avatar">
           <img src="/assets/group.svg" alt="" class="icon-lg">
         </div>
-        <button class="chat-info-avatar-edit hidden" id="edit-group-avatar-btn" title="Изменить аватар">
-          <img src="/assets/edit.svg" alt="" class="icon-sm">
-        </button>
-        <input type="file" id="group-avatar-input" accept="image/*" hidden>
       </div>
       <div class="chat-info-body">
-        <div class="chat-info-name-row">
-          <div class="chat-info-name" id="group-info-name"></div>
-          <button class="chat-info-edit-name-btn hidden" id="edit-group-name-btn" title="Редактировать">
-            <img src="/assets/edit.svg" alt="" class="icon-sm">
-          </button>
-        </div>
+        <div class="chat-info-name" id="group-info-name"></div>
         <div class="chat-info-meta" id="group-info-meta"></div>
-        <div class="chat-info-desc-row">
-          <div class="chat-info-desc" id="group-info-desc"></div>
-          <button class="chat-info-edit-desc-btn hidden" id="edit-group-desc-btn" title="Редактировать описание">
-            <img src="/assets/edit.svg" alt="" class="icon-sm">
-          </button>
-        </div>
+        <div class="chat-info-desc" id="group-info-desc"></div>
         
         <div class="chat-info-tabs">
           <button class="chat-info-tab active" data-tab="members">Участники</button>
@@ -1137,32 +1121,60 @@
       </div>
     </div>
   </div>
+  
+  <!-- Модалка редактирования группы -->
+  <div id="edit-group-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content edit-chat-modal-content">
+      <div class="modal-header">
+        <h2>Редактировать группу</h2>
+        <button class="modal-close" id="close-edit-group" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="edit-chat-banner" id="edit-group-banner-preview">
+          <span class="edit-chat-banner-text">Нажмите чтобы изменить баннер</span>
+        </div>
+        <input type="file" id="edit-group-banner-input" accept="image/*" hidden>
+        
+        <div class="edit-chat-avatar-wrapper">
+          <div class="edit-chat-avatar" id="edit-group-avatar-preview">
+            <img src="/assets/group.svg" alt="" class="icon-lg">
+          </div>
+          <input type="file" id="edit-group-avatar-input" accept="image/*" hidden>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-group-name-input">Название</label>
+          <input type="text" id="edit-group-name-input" placeholder="Название группы" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label for="edit-group-desc-input">Описание</label>
+          <textarea id="edit-group-desc-input" placeholder="Описание группы" rows="3" maxlength="500"></textarea>
+        </div>
+        
+        <button class="btn-primary" id="save-group-btn">Сохранить</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Модальное окно информации о канале -->
   <div id="channel-info-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="modal-content chat-info-modal-content">
+      <button class="modal-close" id="close-channel-info" aria-label="Закрыть">&times;</button>
+      <button class="chat-info-edit-main-btn hidden" id="edit-channel-btn" title="Редактировать">
+        <img src="/assets/edit.svg" alt="" class="icon-sm">
+      </button>
       <div class="chat-info-banner" id="channel-info-banner"></div>
       <div class="chat-info-avatar-wrapper">
         <div class="chat-info-avatar" id="channel-info-avatar">
           <img src="/assets/megaphone.svg" alt="" class="icon-lg">
         </div>
       </div>
-      <button class="modal-close" id="close-channel-info" aria-label="Закрыть">&times;</button>
       <div class="chat-info-body">
-        <div class="chat-info-name-row">
-          <div class="chat-info-name" id="channel-info-name"></div>
-          <button class="chat-info-edit-name-btn hidden" id="edit-channel-name-btn" title="Редактировать">
-            <img src="/assets/edit.svg" alt="" class="icon-sm">
-          </button>
-        </div>
+        <div class="chat-info-name" id="channel-info-name"></div>
         <div class="chat-info-meta" id="channel-info-meta"></div>
-        <div class="chat-info-desc-row">
-          <div class="chat-info-desc" id="channel-info-desc"></div>
-          <button class="chat-info-edit-desc-btn hidden" id="edit-channel-desc-btn" title="Редактировать описание">
-            <img src="/assets/edit.svg" alt="" class="icon-sm">
-          </button>
-        </div>
+        <div class="chat-info-desc" id="channel-info-desc"></div>
         <div class="chat-info-link" id="channel-info-link"></div>
         
         <div class="chat-info-tabs">
@@ -1175,32 +1187,55 @@
       </div>
     </div>
   </div>
+  
+  <!-- Модалка редактирования канала -->
+  <div id="edit-channel-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content edit-chat-modal-content">
+      <div class="modal-header">
+        <h2>Редактировать канал</h2>
+        <button class="modal-close" id="close-edit-channel" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="edit-chat-avatar-wrapper">
+          <div class="edit-chat-avatar" id="edit-channel-avatar-preview">
+            <img src="/assets/megaphone.svg" alt="" class="icon-lg">
+          </div>
+          <input type="file" id="edit-channel-avatar-input" accept="image/*" hidden>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-channel-name-input">Название</label>
+          <input type="text" id="edit-channel-name-input" placeholder="Название канала" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label for="edit-channel-desc-input">Описание</label>
+          <textarea id="edit-channel-desc-input" placeholder="Описание канала" rows="3" maxlength="500"></textarea>
+        </div>
+        
+        <button class="btn-primary" id="save-channel-btn">Сохранить</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Модальное окно информации о сервере -->
   <div id="server-info-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="modal-content chat-info-modal-content">
+      <button class="modal-close" id="close-server-info" aria-label="Закрыть">&times;</button>
+      <button class="chat-info-edit-main-btn hidden" id="edit-server-btn" title="Редактировать">
+        <img src="/assets/edit.svg" alt="" class="icon-sm">
+      </button>
       <div class="chat-info-banner" id="server-info-banner"></div>
       <div class="chat-info-avatar-wrapper">
         <div class="chat-info-avatar" id="server-info-avatar">
           <img src="/assets/Castle.svg" alt="" class="icon-lg">
         </div>
       </div>
-      <button class="modal-close" id="close-server-info" aria-label="Закрыть">&times;</button>
       <div class="chat-info-body">
-        <div class="chat-info-name-row">
-          <div class="chat-info-name" id="server-info-name"></div>
-          <button class="chat-info-edit-name-btn hidden" id="edit-server-name-btn" title="Редактировать">
-            <img src="/assets/edit.svg" alt="" class="icon-sm">
-          </button>
-        </div>
+        <div class="chat-info-name" id="server-info-name"></div>
         <div class="chat-info-meta" id="server-info-meta"></div>
-        <div class="chat-info-desc-row">
-          <div class="chat-info-desc" id="server-info-desc"></div>
-          <button class="chat-info-edit-desc-btn hidden" id="edit-server-desc-btn" title="Редактировать описание">
-            <img src="/assets/edit.svg" alt="" class="icon-sm">
-          </button>
-        </div>
+        <div class="chat-info-desc" id="server-info-desc"></div>
         <div class="chat-info-link" id="server-info-link"></div>
         
         <div class="chat-info-tabs">
@@ -1214,6 +1249,41 @@
         <div class="chat-info-tab-content" id="server-media-tab">
           <div class="chat-info-media-grid" id="server-media-grid"></div>
         </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Модалка редактирования сервера -->
+  <div id="edit-server-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content edit-chat-modal-content">
+      <div class="modal-header">
+        <h2>Редактировать сервер</h2>
+        <button class="modal-close" id="close-edit-server" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="edit-chat-banner" id="edit-server-banner-preview">
+          <span class="edit-chat-banner-text">Нажмите чтобы изменить баннер</span>
+        </div>
+        <input type="file" id="edit-server-banner-input" accept="image/*" hidden>
+        
+        <div class="edit-chat-avatar-wrapper">
+          <div class="edit-chat-avatar" id="edit-server-avatar-preview">
+            <img src="/assets/Castle.svg" alt="" class="icon-lg">
+          </div>
+          <input type="file" id="edit-server-avatar-input" accept="image/*" hidden>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-server-name-input">Название</label>
+          <input type="text" id="edit-server-name-input" placeholder="Название сервера" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label for="edit-server-desc-input">Описание</label>
+          <textarea id="edit-server-desc-input" placeholder="Описание сервера" rows="3" maxlength="500"></textarea>
+        </div>
+        
+        <button class="btn-primary" id="save-server-btn">Сохранить</button>
       </div>
     </div>
   </div>

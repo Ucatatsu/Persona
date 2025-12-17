@@ -12217,76 +12217,103 @@ select option {
   position: relative;
 }
 
-.chat-info-avatar-edit {
+/* Main edit button (one button for all) */
+.chat-info-edit-main-btn {
   position: absolute;
-  bottom: 0;
-  right: calc(50% - 50px);
-  width: 28px;
-  height: 28px;
+  top: 12px;
+  right: 48px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--bg-dark);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s;
-}
-
-.chat-info-avatar-edit:hover {
-  transform: scale(1.1);
-}
-
-.chat-info-avatar-edit .icon-sm {
-  width: 14px;
-  height: 14px;
-  filter: brightness(0) invert(1);
-}
-
-/* Name and description edit rows */
-.chat-info-name-row,
-.chat-info-desc-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.chat-info-name-row {
-  justify-content: center;
-}
-
-.chat-info-edit-name-btn,
-.chat-info-edit-desc-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.5);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.2s, transform 0.2s;
-  flex-shrink: 0;
+  z-index: 10;
 }
 
-.chat-info-edit-name-btn:hover,
-.chat-info-edit-desc-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.1);
+.chat-info-edit-main-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.05);
 }
 
-.chat-info-edit-name-btn .icon-sm,
-.chat-info-edit-desc-btn .icon-sm {
-  width: 12px;
-  height: 12px;
+.chat-info-edit-main-btn .icon-sm {
+  width: 18px;
+  height: 18px;
   filter: brightness(0) invert(1);
-  opacity: 0.7;
 }
 
-.chat-info-edit-name-btn:hover .icon-sm,
-.chat-info-edit-desc-btn:hover .icon-sm {
-  opacity: 1;
+/* Edit chat modal */
+.edit-chat-modal-content {
+  max-width: 420px;
+}
+
+.edit-chat-banner {
+  width: 100%;
+  height: 120px;
+  background: var(--bg-light);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 16px;
+  transition: opacity 0.2s;
+}
+
+.edit-chat-banner:hover {
+  opacity: 0.8;
+}
+
+.edit-chat-banner-text {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.edit-chat-avatar-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.edit-chat-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--bg-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 0.2s;
+}
+
+.edit-chat-avatar:hover {
+  opacity: 0.8;
+}
+
+.edit-chat-avatar .icon-lg {
+  width: 32px;
+  height: 32px;
+  filter: brightness(0) invert(1);
+  opacity: 0.5;
+}
+
+/* Hide text when has image */
+.edit-chat-banner[style*="background-image"] .edit-chat-banner-text,
+.edit-chat-avatar[style*="background-image"] .icon-lg {
+  display: none;
+}
+
+.chat-info-edit-main-btn.hidden {
+  display: none !important;
 }
 
 /* === INVITE MODAL === */
