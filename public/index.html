@@ -561,6 +561,7 @@
         <section class="settings-section active" id="section-appearance" role="tabpanel">
           <h2 id="settings-title">Оформление</h2>
           
+          <!-- Тема -->
           <div class="settings-group">
             <h3>Тема</h3>
             <div class="theme-selector theme-grid" role="radiogroup" aria-label="Выбор темы">
@@ -572,79 +573,155 @@
                 <div class="theme-preview light"></div>
                 <span>Светлая</span>
               </div>
+              <div class="theme-option" data-theme="midnight" role="radio" tabindex="0" aria-checked="false">
+                <div class="theme-preview midnight"></div>
+                <span>Полночь</span>
+              </div>
               <div class="theme-option premium-theme" data-theme="neon" role="radio" tabindex="0" aria-checked="false">
                 <div class="theme-preview neon"></div>
-                <span>Неон</span>
+                <span>Неон <span class="theme-badge">P</span></span>
               </div>
               <div class="theme-option premium-theme" data-theme="sunset" role="radio" tabindex="0" aria-checked="false">
                 <div class="theme-preview sunset"></div>
-                <span>Закат</span>
+                <span>Закат <span class="theme-badge">P</span></span>
               </div>
               <div class="theme-option premium-theme" data-theme="ocean" role="radio" tabindex="0" aria-checked="false">
                 <div class="theme-preview ocean"></div>
-                <span>Океан</span>
+                <span>Океан <span class="theme-badge">P</span></span>
+              </div>
+              <div class="theme-option premium-theme" data-theme="forest" role="radio" tabindex="0" aria-checked="false">
+                <div class="theme-preview forest"></div>
+                <span>Лес <span class="theme-badge">P</span></span>
+              </div>
+              <div class="theme-option premium-theme" data-theme="cherry" role="radio" tabindex="0" aria-checked="false">
+                <div class="theme-preview cherry"></div>
+                <span>Сакура <span class="theme-badge">P</span></span>
+              </div>
+              <div class="theme-option premium-theme" data-theme="amoled" role="radio" tabindex="0" aria-checked="false">
+                <div class="theme-preview amoled"></div>
+                <span>AMOLED <span class="theme-badge">P</span></span>
               </div>
             </div>
           </div>
           
+          <!-- Акцентный цвет -->
+          <div class="settings-group">
+            <h3>Акцентный цвет</h3>
+            <div class="color-selector" role="radiogroup" aria-label="Акцентный цвет">
+              <div class="color-option active" data-color="#4fc3f7" style="--color: #4fc3f7" role="radio" tabindex="0" title="Голубой"></div>
+              <div class="color-option" data-color="#7c4dff" style="--color: #7c4dff" role="radio" tabindex="0" title="Фиолетовый"></div>
+              <div class="color-option" data-color="#ff4081" style="--color: #ff4081" role="radio" tabindex="0" title="Розовый"></div>
+              <div class="color-option" data-color="#00e676" style="--color: #00e676" role="radio" tabindex="0" title="Зелёный"></div>
+              <div class="color-option" data-color="#ffab00" style="--color: #ffab00" role="radio" tabindex="0" title="Оранжевый"></div>
+              <div class="color-option" data-color="#ff5722" style="--color: #ff5722" role="radio" tabindex="0" title="Красный"></div>
+              <div class="color-option" data-color="#e91e63" style="--color: #e91e63" role="radio" tabindex="0" title="Малиновый"></div>
+              <div class="color-option" data-color="#9c27b0" style="--color: #9c27b0" role="radio" tabindex="0" title="Пурпурный"></div>
+            </div>
+          </div>
+          
+          <!-- Фон чата -->
           <div class="settings-group">
             <h3>Фон чата</h3>
             <div class="bg-selector" role="radiogroup" aria-label="Выбор фона">
-              <div class="bg-option active" data-bg="default" role="radio" tabindex="0" aria-checked="true">
+              <div class="bg-option active" data-bg="default" role="radio" tabindex="0" aria-checked="true" title="Луна">
                 <div class="bg-preview" style="background: url('background.jpg') center/cover"></div>
               </div>
-              <div class="bg-option" data-bg="gradient1" role="radio" tabindex="0" aria-checked="false">
+              <div class="bg-option" data-bg="gradient1" role="radio" tabindex="0" title="Космос">
                 <div class="bg-preview" style="background: linear-gradient(135deg, #1a1a2e, #16213e)"></div>
               </div>
-              <div class="bg-option" data-bg="gradient2" role="radio" tabindex="0" aria-checked="false">
+              <div class="bg-option" data-bg="gradient2" role="radio" tabindex="0" title="Галактика">
                 <div class="bg-preview" style="background: linear-gradient(135deg, #0f0c29, #302b63, #24243e)"></div>
               </div>
-              <div class="bg-option" data-bg="gradient3" role="radio" tabindex="0" aria-checked="false">
+              <div class="bg-option" data-bg="gradient3" role="radio" tabindex="0" title="Уголь">
                 <div class="bg-preview" style="background: linear-gradient(135deg, #232526, #414345)"></div>
               </div>
-              <div class="bg-option" data-bg="solid" role="radio" tabindex="0" aria-checked="false">
+              <div class="bg-option" data-bg="gradient4" role="radio" tabindex="0" title="Аврора">
+                <div class="bg-preview" style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364)"></div>
+              </div>
+              <div class="bg-option" data-bg="gradient5" role="radio" tabindex="0" title="Закат">
+                <div class="bg-preview" style="background: linear-gradient(135deg, #2c1654, #4a1942, #6b1d3a)"></div>
+              </div>
+              <div class="bg-option" data-bg="solid" role="radio" tabindex="0" title="Однотонный">
                 <div class="bg-preview" style="background: #0a1628"></div>
               </div>
-              <div class="bg-option" data-bg="custom" role="radio" tabindex="0" aria-checked="false">
-                <div class="bg-preview custom-bg">📷</div>
-                <input type="file" id="custom-bg-input" accept="image/*" hidden aria-hidden="true">
+              <div class="bg-option" data-bg="custom" role="radio" tabindex="0" title="Своё фото">
+                <div class="bg-preview custom-bg">
+                  <img src="/assets/image.svg" alt="" class="icon">
+                </div>
+                <input type="file" id="custom-bg-input" accept="image/*" hidden>
               </div>
             </div>
-            <div class="settings-item bg-mode-setting" id="bg-mode-setting" style="display: none;">
-              <div class="settings-item-info">
-                <span class="settings-item-title">Режим отображения</span>
-                <span class="settings-item-desc">Как показывать фоновое изображение</span>
+            
+            <!-- Настройки фона -->
+            <div class="bg-settings-panel" id="bg-settings-panel">
+              <div class="settings-item">
+                <div class="settings-item-info">
+                  <span class="settings-item-title">Режим отображения</span>
+                </div>
+                <div class="bg-mode-selector" role="radiogroup">
+                  <button class="bg-mode-btn active" data-mode="cover" title="Заполнить">
+                    <img src="/assets/expand-arrows.svg" alt="" class="icon-sm">
+                  </button>
+                  <button class="bg-mode-btn" data-mode="contain" title="Вместить">
+                    <img src="/assets/compress-arrows.svg" alt="" class="icon-sm">
+                  </button>
+                </div>
               </div>
-              <div class="bg-mode-selector" role="radiogroup">
-                <button class="bg-mode-btn active" data-mode="cover" title="Заполнить экран (может обрезать)">
-                  <span><img src="/assets/expand-arrows.svg" alt="" class="icon"></span>
-                  <span>Заполнить</span>
-                </button>
-                <button class="bg-mode-btn" data-mode="contain" title="Показать целиком (могут быть полосы)">
-                  <span><img src="/assets/compress-arrows.svg" alt="" class="icon"></span>
-                  <span>Вместить</span>
-                </button>
+              <div class="settings-item">
+                <div class="settings-item-info">
+                  <span class="settings-item-title">Размытие</span>
+                </div>
+                <div class="slider-control">
+                  <input type="range" id="bg-blur-slider" min="0" max="20" value="0" class="styled-slider">
+                  <span class="slider-value" id="bg-blur-value">0px</span>
+                </div>
+              </div>
+              <div class="settings-item">
+                <div class="settings-item-info">
+                  <span class="settings-item-title">Затемнение</span>
+                </div>
+                <div class="slider-control">
+                  <input type="range" id="bg-dim-slider" min="0" max="80" value="0" class="styled-slider">
+                  <span class="slider-value" id="bg-dim-value">0%</span>
+                </div>
               </div>
             </div>
           </div>
           
+          <!-- Интерфейс -->
           <div class="settings-group">
-            <h3>Прозрачность</h3>
-            <div class="settings-item opacity-setting">
+            <h3>Интерфейс</h3>
+            <div class="settings-item">
               <div class="settings-item-info">
                 <span class="settings-item-title">Прозрачность панелей</span>
-                <span class="settings-item-desc">Прозрачность боковой панели и хедера</span>
+                <span class="settings-item-desc">Прозрачность сайдбара и хедера</span>
               </div>
-              <div class="opacity-control">
-                <span class="opacity-icon">◐</span>
-                <input type="range" id="opacity-slider" min="20" max="100" value="85">
-                <span class="opacity-value" id="opacity-value">85%</span>
+              <div class="slider-control">
+                <input type="range" id="opacity-slider" min="20" max="100" value="85" class="styled-slider">
+                <span class="slider-value" id="opacity-value">85%</span>
+              </div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Плотность интерфейса</span>
+              </div>
+              <div class="density-selector" role="radiogroup">
+                <button class="density-btn" data-density="compact" title="Компактный">
+                  <span class="density-icon compact"></span>
+                </button>
+                <button class="density-btn active" data-density="normal" title="Обычный">
+                  <span class="density-icon normal"></span>
+                </button>
+                <button class="density-btn" data-density="cozy" title="Просторный">
+                  <span class="density-icon cozy"></span>
+                </button>
               </div>
             </div>
           </div>
           
+          <!-- Сообщения -->
           <div class="settings-group">
-            <h3>Размер сообщений</h3>
+            <h3>Сообщения</h3>
             <div class="settings-item">
               <div class="settings-item-info">
                 <span class="settings-item-title">Размер текста</span>
@@ -655,46 +732,64 @@
                 <button class="size-btn" data-size="large" aria-label="Большой">A</button>
               </div>
             </div>
-          </div>
-          
-          <div class="settings-group">
-            <h3>Акцентный цвет</h3>
-            <div class="color-selector" role="radiogroup" aria-label="Акцентный цвет">
-              <div class="color-option active" data-color="#4fc3f7" style="background: #4fc3f7" 
-                   role="radio" tabindex="0" aria-label="Голубой"></div>
-              <div class="color-option" data-color="#7c4dff" style="background: #7c4dff" 
-                   role="radio" tabindex="0" aria-label="Фиолетовый"></div>
-              <div class="color-option" data-color="#ff4081" style="background: #ff4081" 
-                   role="radio" tabindex="0" aria-label="Розовый"></div>
-              <div class="color-option" data-color="#00e676" style="background: #00e676" 
-                   role="radio" tabindex="0" aria-label="Зелёный"></div>
-              <div class="color-option" data-color="#ffab00" style="background: #ffab00" 
-                   role="radio" tabindex="0" aria-label="Оранжевый"></div>
-              <div class="color-option" data-color="#ff5722" style="background: #ff5722" 
-                   role="radio" tabindex="0" aria-label="Красный"></div>
-            </div>
-          </div>
-          
-          <div class="settings-group">
             <div class="settings-item">
               <div class="settings-item-info">
-                <span class="settings-item-title">Компактный режим</span>
-                <span class="settings-item-desc">Уменьшить отступы между сообщениями</span>
+                <span class="settings-item-title">Скругление пузырей</span>
               </div>
-              <label class="toggle">
-                <input type="checkbox" id="setting-compact">
-                <span class="toggle-slider"></span>
-              </label>
+              <div class="slider-control">
+                <input type="range" id="bubble-radius-slider" min="0" max="24" value="18" class="styled-slider">
+                <span class="slider-value" id="bubble-radius-value">18px</span>
+              </div>
             </div>
             <div class="settings-item">
               <div class="settings-item-info">
                 <span class="settings-item-title">Показывать аватарки</span>
-                <span class="settings-item-desc">Отображать аватарки в сообщениях</span>
+                <span class="settings-item-desc">Аватарки рядом с сообщениями</span>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="setting-avatars" checked>
                 <span class="toggle-slider"></span>
               </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Анимации сообщений</span>
+                <span class="settings-item-desc">Плавное появление новых сообщений</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-animations" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Время отправки</span>
+                <span class="settings-item-desc">Показывать время под сообщениями</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-timestamps" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Предпросмотр -->
+          <div class="settings-group">
+            <h3>Предпросмотр</h3>
+            <div class="message-preview-container">
+              <div class="message-preview">
+                <div class="preview-message received">
+                  <div class="preview-avatar">К</div>
+                  <div class="preview-bubble">Привет! Как дела? 👋</div>
+                </div>
+                <div class="preview-message sent">
+                  <div class="preview-bubble">Отлично! Тестирую новые настройки 🎨</div>
+                </div>
+                <div class="preview-message received">
+                  <div class="preview-avatar">К</div>
+                  <div class="preview-bubble">Круто выглядит!</div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

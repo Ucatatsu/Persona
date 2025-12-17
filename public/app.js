@@ -2893,6 +2893,72 @@ function applyPanelOpacity(opacity) {
     document.documentElement.style.setProperty('--panel-opacity', value);
 }
 
+function applyBgBlur(blur) {
+    document.documentElement.style.setProperty('--bg-blur', `${blur}px`);
+    const chatScreen = document.getElementById('chat-screen');
+    if (chatScreen) {
+        if (blur > 0) {
+            chatScreen.style.backdropFilter = `blur(${blur}px)`;
+        } else {
+            chatScreen.style.backdropFilter = '';
+        }
+    }
+}
+
+function applyBgDim(dim) {
+    document.documentElement.style.setProperty('--bg-dim', dim / 100);
+    const chatScreen = document.getElementById('chat-screen');
+    if (chatScreen) {
+        // Добавляем overlay для затемнения
+        let overlay = chatScreen.querySelector('.bg-dim-overlay');
+        if (dim > 0) {
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'bg-dim-overlay';
+                overlay.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:-1;';
+                chatScreen.style.position = 'relative';
+                chatScreen.insertBefore(overlay, chatScreen.firstChild);
+            }
+            overlay.style.background = `rgba(0,0,0,${dim/100})`;
+        } else if (overlay) {
+            overlay.remove();
+        }
+    }
+}
+
+function applyBubbleRadius(radius) {
+    document.documentElement.style.setProperty('--bubble-radius', `${radius}px`);
+    // Обновляем превью
+    document.querySelectorAll('.preview-bubble').forEach(el => {
+        el.style.borderRadius = `${radius}px`;
+    });
+}
+
+function applyDensity(density) {
+    const root = document.documentElement;
+    switch (density) {
+        case 'compact':
+            root.style.setProperty('--message-gap', '4px');
+            root.style.setProperty('--message-padding', '8px 12px');
+            break;
+        case 'cozy':
+            root.style.setProperty('--message-gap', '16px');
+            root.style.setProperty('--message-padding', '14px 18px');
+            break;
+        default: // normal
+            root.style.setProperty('--message-gap', '8px');
+            root.style.setProperty('--message-padding', '12px 16px');
+    }
+}
+
+function applyAnimations(enabled) {
+    document.documentElement.classList.toggle('no-animations', !enabled);
+}
+
+function applyTimestamps(show) {
+    document.documentElement.classList.toggle('hide-timestamps', !show);
+}
+
 function applyTheme(theme) {
     const root = document.documentElement;
     
@@ -2903,8 +2969,8 @@ function applyTheme(theme) {
         theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     
-    // Premium темы
-    if (['neon', 'sunset', 'ocean'].includes(theme)) {
+    // Темы через CSS data-theme (premium и midnight)
+    if (['neon', 'sunset', 'ocean', 'forest', 'cherry', 'amoled', 'midnight'].includes(theme)) {
         root.setAttribute('data-theme', theme);
         return;
     }
@@ -2931,6 +2997,13 @@ function applyTheme(theme) {
         root.style.setProperty('--glass-border', 'rgba(79, 195, 247, 0.15)');
     }
 }
+
+// Системная тема
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (state.settings.theme === 'system') {
+        applyTheme('system');
+    }
+});
 
 
 // === WEBRTC ЗВОНКИ ===
@@ -7018,11 +7091,88 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Компактный режим
-    document.getElementById('setting-compact')?.addEventListener('change', (e) => {
-        state.settings.compact = e.target.checked;
+    // Размытие фона
+    const bgBlurSlider = document.getElementById('bg-blur-slider');
+    const bgBlurValue = document.getElementById('bg-blur-value');
+    if (bgBlurSlider) {
+        bgBlurSlider.value = state.settings.bgBlur ?? 0;
+        bgBlurValue.textContent = `${bgBlurSlider.value}px`;
+        applyBgBlur(state.settings.bgBlur ?? 0);
+        
+        bgBlurSlider.addEventListener('input', (e) => {
+            const blur = parseInt(e.target.value);
+            state.settings.bgBlur = blur;
+            bgBlurValue.textContent = `${blur}px`;
+            applyBgBlur(blur);
+            saveSettings();
+        });
+    }
+    
+    // Затемнение фона
+    const bgDimSlider = document.getElementById('bg-dim-slider');
+    const bgDimValue = document.getElementById('bg-dim-value');
+    if (bgDimSlider) {
+        bgDimSlider.value = state.settings.bgDim ?? 0;
+        bgDimValue.textContent = `${bgDimSlider.value}%`;
+        applyBgDim(state.settings.bgDim ?? 0);
+        
+        bgDimSlider.addEventListener('input', (e) => {
+            const dim = parseInt(e.target.value);
+            state.settings.bgDim = dim;
+            bgDimValue.textContent = `${dim}%`;
+            applyBgDim(dim);
+            saveSettings();
+        });
+    }
+    
+    // Скругление пузырей
+    const bubbleRadiusSlider = document.getElementById('bubble-radius-slider');
+    const bubbleRadiusValue = document.getElementById('bubble-radius-value');
+    if (bubbleRadiusSlider) {
+        bubbleRadiusSlider.value = state.settings.bubbleRadius ?? 18;
+        bubbleRadiusValue.textContent = `${bubbleRadiusSlider.value}px`;
+        applyBubbleRadius(state.settings.bubbleRadius ?? 18);
+        
+        bubbleRadiusSlider.addEventListener('input', (e) => {
+            const radius = parseInt(e.target.value);
+            state.settings.bubbleRadius = radius;
+            bubbleRadiusValue.textContent = `${radius}px`;
+            applyBubbleRadius(radius);
+            saveSettings();
+        });
+    }
+    
+    // Плотность интерфейса
+    document.querySelectorAll('.density-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.density-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.settings.density = btn.dataset.density;
+            applyDensity(btn.dataset.density);
+            saveSettings();
+        });
+    });
+    
+    // Инициализация плотности
+    if (state.settings.density) {
+        document.querySelectorAll('.density-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.density === state.settings.density);
+        });
+        applyDensity(state.settings.density);
+    }
+    
+    // Анимации сообщений
+    document.getElementById('setting-animations')?.addEventListener('change', (e) => {
+        state.settings.animations = e.target.checked;
         saveSettings();
-        applySettings();
+        applyAnimations(e.target.checked);
+    });
+    
+    // Время отправки
+    document.getElementById('setting-timestamps')?.addEventListener('change', (e) => {
+        state.settings.timestamps = e.target.checked;
+        saveSettings();
+        applyTimestamps(e.target.checked);
     });
     
     // Показывать аватарки
@@ -7183,7 +7333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.theme-option').forEach(opt => {
         opt.addEventListener('click', () => {
             // Проверка премиум-тем
-            const premiumThemes = ['neon', 'sunset', 'ocean'];
+            const premiumThemes = ['neon', 'sunset', 'ocean', 'forest', 'cherry', 'amoled'];
             if (premiumThemes.includes(opt.dataset.theme)) {
                 const isPremium = state.currentUserProfile?.isPremium || state.currentUser?.role === 'admin';
                 if (!isPremium) {
@@ -7357,53 +7507,6 @@ function adjustColor(color, amount) {
     const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
-
-function applyTheme(theme) {
-    const root = document.documentElement;
-    
-    // Убираем data-theme атрибут
-    root.removeAttribute('data-theme');
-    
-    if (theme === 'system') {
-        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    
-    // Premium темы
-    if (['neon', 'sunset', 'ocean'].includes(theme)) {
-        root.setAttribute('data-theme', theme);
-        return;
-    }
-    
-    if (theme === 'light') {
-        root.style.setProperty('--bg-darkest', '#f5f5f5');
-        root.style.setProperty('--bg-dark', '#e8e8e8');
-        root.style.setProperty('--bg-medium', '#ddd');
-        root.style.setProperty('--bg-light', '#ccc');
-        root.style.setProperty('--text', '#1a1a1a');
-        root.style.setProperty('--text-muted', '#666');
-        root.style.setProperty('--message-received', '#e0e0e0');
-        root.style.setProperty('--glass', 'rgba(255, 255, 255, 0.8)');
-        root.style.setProperty('--glass-border', 'rgba(0, 0, 0, 0.1)');
-    } else {
-        root.style.setProperty('--bg-darkest', '#0a1628');
-        root.style.setProperty('--bg-dark', '#0f2140');
-        root.style.setProperty('--bg-medium', '#162d50');
-        root.style.setProperty('--bg-light', '#1e3a5f');
-        root.style.setProperty('--text', '#e2e8f0');
-        root.style.setProperty('--text-muted', '#94a3b8');
-        root.style.setProperty('--message-received', '#162d50');
-        root.style.setProperty('--glass', 'rgba(15, 33, 64, 0.6)');
-        root.style.setProperty('--glass-border', 'rgba(79, 195, 247, 0.15)');
-    }
-}
-
-// Системная тема
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (state.settings.theme === 'system') {
-        applyTheme('system');
-    }
-});
-
 
 // === SIDEBAR NAVIGATION ===
 document.addEventListener('DOMContentLoaded', () => {
