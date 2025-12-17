@@ -12310,3 +12310,119 @@ select option {
   padding: 12px 24px;
   font-size: 14px;
 }
+
+/* === INVITE PREVIEW MODAL === */
+.invite-preview-modal .invite-preview-content {
+  width: 500px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.invite-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.invite-preview-header .invite-avatar {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.invite-preview-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.invite-preview-info .invite-title {
+  font-size: 18px;
+  margin: 0 0 4px 0;
+}
+
+.invite-preview-info .invite-description {
+  font-size: 13px;
+  margin: 0 0 4px 0;
+  opacity: 0.8;
+}
+
+.invite-preview-info .invite-stats {
+  font-size: 12px;
+}
+
+.invite-preview-content-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  min-height: 200px;
+  max-height: 400px;
+}
+
+.invite-preview-loading,
+.invite-preview-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+}
+
+.invite-preview-post {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.invite-preview-post:last-child {
+  border-bottom: none;
+}
+
+.invite-preview-media {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.invite-preview-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.invite-preview-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.invite-preview-footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.invite-preview-footer .btn {
+  flex: 1;
+}
+
+.invite-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.invite-close-btn:hover {
+  color: var(--text);
+}

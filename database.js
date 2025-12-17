@@ -381,6 +381,10 @@ async function initDB() {
         // Миграция: делаем все серверы публичными
         try { sqlite.exec('UPDATE servers SET is_public = 1 WHERE is_public = 0'); } catch {}
         
+        // Миграция: добавляем invite_slug для каналов и серверов
+        try { sqlite.exec('ALTER TABLE channels ADD COLUMN invite_slug TEXT UNIQUE'); } catch {}
+        try { sqlite.exec('ALTER TABLE servers ADD COLUMN invite_slug TEXT UNIQUE'); } catch {}
+        
         console.log('✅ SQLite база данных инициализирована');
         return;
     }
@@ -715,6 +719,10 @@ async function initDB() {
 
         // Миграция: делаем все серверы публичными
         await client.query('UPDATE servers SET is_public = true WHERE is_public = false').catch(() => {});
+
+        // Миграция: добавляем invite_slug для каналов и серверов
+        await client.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS invite_slug TEXT UNIQUE').catch(() => {});
+        await client.query('ALTER TABLE servers ADD COLUMN IF NOT EXISTS invite_slug TEXT UNIQUE').catch(() => {});
 
         console.log('✅ PostgreSQL база данных инициализирована');
     } finally {
@@ -1751,6 +1759,52 @@ async function getChannel(channelId) {
     }
 }
 
+// Получить канал по ID или invite_slug
+async function getChannelByIdOrSlug(idOrSlug) {
+    try {
+        let channel;
+        if (USE_SQLITE) {
+            channel = sqlite.prepare('SELECT * FROM channels WHERE id = ? OR invite_slug = ?').get(idOrSlug, idOrSlug);
+        } else {
+            const result = await pool.query('SELECT * FROM channels WHERE id = $1 OR invite_slug = $1', [idOrSlug]);
+            channel = result.rows[0];
+        }
+        return channel || null;
+    } catch (error) {
+        console.error('Get channel by id or slug error:', error);
+        return null;
+    }
+}
+
+// Обновить invite_slug канала
+async function updateChannelSlug(channelId, slug) {
+    try {
+        // Проверяем уникальность
+        if (slug) {
+            let existing;
+            if (USE_SQLITE) {
+                existing = sqlite.prepare('SELECT id FROM channels WHERE invite_slug = ? AND id != ?').get(slug, channelId);
+            } else {
+                const result = await pool.query('SELECT id FROM channels WHERE invite_slug = $1 AND id != $2', [slug, channelId]);
+                existing = result.rows[0];
+            }
+            if (existing) {
+                return { success: false, error: 'Этот slug уже занят' };
+            }
+        }
+        
+        if (USE_SQLITE) {
+            sqlite.prepare('UPDATE channels SET invite_slug = ? WHERE id = ?').run(slug || null, channelId);
+        } else {
+            await pool.query('UPDATE channels SET invite_slug = $1 WHERE id = $2', [slug || null, channelId]);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Update channel slug error:', error);
+        return { success: false, error: 'Ошибка обновления' };
+    }
+}
+
 async function isChannelAdmin(channelId, userId) {
     try {
         if (USE_SQLITE) {
@@ -1954,6 +2008,52 @@ async function getServer(serverId) {
     } catch (error) {
         console.error('Get server error:', error);
         return null;
+    }
+}
+
+// Получить сервер по ID или invite_slug
+async function getServerByIdOrSlug(idOrSlug) {
+    try {
+        let server;
+        if (USE_SQLITE) {
+            server = sqlite.prepare('SELECT * FROM servers WHERE id = ? OR invite_slug = ?').get(idOrSlug, idOrSlug);
+        } else {
+            const result = await pool.query('SELECT * FROM servers WHERE id = $1 OR invite_slug = $1', [idOrSlug]);
+            server = result.rows[0];
+        }
+        return server || null;
+    } catch (error) {
+        console.error('Get server by id or slug error:', error);
+        return null;
+    }
+}
+
+// Обновить invite_slug сервера
+async function updateServerSlug(serverId, slug) {
+    try {
+        // Проверяем уникальность
+        if (slug) {
+            let existing;
+            if (USE_SQLITE) {
+                existing = sqlite.prepare('SELECT id FROM servers WHERE invite_slug = ? AND id != ?').get(slug, serverId);
+            } else {
+                const result = await pool.query('SELECT id FROM servers WHERE invite_slug = $1 AND id != $2', [slug, serverId]);
+                existing = result.rows[0];
+            }
+            if (existing) {
+                return { success: false, error: 'Этот slug уже занят' };
+            }
+        }
+        
+        if (USE_SQLITE) {
+            sqlite.prepare('UPDATE servers SET invite_slug = ? WHERE id = ?').run(slug || null, serverId);
+        } else {
+            await pool.query('UPDATE servers SET invite_slug = $1 WHERE id = $2', [slug || null, serverId]);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Update server slug error:', error);
+        return { success: false, error: 'Ошибка обновления' };
     }
 }
 
@@ -2478,6 +2578,8 @@ module.exports = {
     // Каналы
     createChannel,
     getChannel,
+    getChannelByIdOrSlug,
+    updateChannelSlug,
     isChannelAdmin,
     getUserChannels,
     subscribeToChannel,
@@ -2488,6 +2590,8 @@ module.exports = {
     // Серверы
     createServer,
     getServer,
+    getServerByIdOrSlug,
+    updateServerSlug,
     getUserServers,
     joinServer,
     leaveServer,

@@ -1454,10 +1454,10 @@ app.delete('/api/servers/:serverId/roles/:roleId', authMiddleware, async (req, r
 
 // === INVITE LINKS ===
 
-// Получить информацию о канале по инвайт-ссылке (публичный роут)
-app.get('/api/invite/channel/:channelId', async (req, res) => {
+// Получить информацию о канале по инвайт-ссылке (ID или slug, публичный роут)
+app.get('/api/invite/channel/:idOrSlug', async (req, res) => {
     try {
-        const channel = await db.getChannel(req.params.channelId);
+        const channel = await db.getChannelByIdOrSlug(req.params.idOrSlug);
         if (!channel) {
             return res.status(404).json({ error: 'Канал не найден' });
         }
@@ -1468,7 +1468,8 @@ app.get('/api/invite/channel/:channelId', async (req, res) => {
             description: channel.description,
             avatar_url: channel.avatar_url,
             subscriber_count: channel.subscriber_count,
-            is_public: channel.is_public
+            is_public: channel.is_public,
+            invite_slug: channel.invite_slug
         });
     } catch (error) {
         console.error('Get channel invite info error:', error);
@@ -1476,10 +1477,10 @@ app.get('/api/invite/channel/:channelId', async (req, res) => {
     }
 });
 
-// Получить информацию о сервере по инвайт-ссылке (публичный роут)
-app.get('/api/invite/server/:serverId', async (req, res) => {
+// Получить информацию о сервере по инвайт-ссылке (ID или slug, публичный роут)
+app.get('/api/invite/server/:idOrSlug', async (req, res) => {
     try {
-        const server = await db.getServer(req.params.serverId);
+        const server = await db.getServerByIdOrSlug(req.params.idOrSlug);
         if (!server) {
             return res.status(404).json({ error: 'Сервер не найден' });
         }
@@ -1490,7 +1491,8 @@ app.get('/api/invite/server/:serverId', async (req, res) => {
             description: server.description,
             icon_url: server.icon_url,
             member_count: server.member_count,
-            is_public: server.is_public
+            is_public: server.is_public,
+            invite_slug: server.invite_slug
         });
     } catch (error) {
         console.error('Get server invite info error:', error);
@@ -1498,10 +1500,14 @@ app.get('/api/invite/server/:serverId', async (req, res) => {
     }
 });
 
-// Присоединиться к каналу по инвайт-ссылке
-app.post('/api/invite/channel/:channelId/join', authMiddleware, async (req, res) => {
+// Присоединиться к каналу по инвайт-ссылке (ID или slug)
+app.post('/api/invite/channel/:idOrSlug/join', authMiddleware, async (req, res) => {
     try {
-        const result = await db.subscribeToChannel(req.params.channelId, req.user.id);
+        const channel = await db.getChannelByIdOrSlug(req.params.idOrSlug);
+        if (!channel) {
+            return res.status(404).json({ success: false, error: 'Канал не найден' });
+        }
+        const result = await db.subscribeToChannel(channel.id, req.user.id);
         res.json(result);
     } catch (error) {
         console.error('Join channel via invite error:', error);
@@ -1509,14 +1515,89 @@ app.post('/api/invite/channel/:channelId/join', authMiddleware, async (req, res)
     }
 });
 
-// Присоединиться к серверу по инвайт-ссылке
-app.post('/api/invite/server/:serverId/join', authMiddleware, async (req, res) => {
+// Присоединиться к серверу по инвайт-ссылке (ID или slug)
+app.post('/api/invite/server/:idOrSlug/join', authMiddleware, async (req, res) => {
     try {
-        const result = await db.joinServer(req.params.serverId, req.user.id);
+        const server = await db.getServerByIdOrSlug(req.params.idOrSlug);
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Сервер не найден' });
+        }
+        const result = await db.joinServer(server.id, req.user.id);
         res.json(result);
     } catch (error) {
         console.error('Join server via invite error:', error);
         res.status(500).json({ success: false, error: 'Ошибка присоединения' });
+    }
+});
+
+// Обновить invite_slug канала (только владелец)
+app.put('/api/channels/:channelId/slug', authMiddleware, async (req, res) => {
+    try {
+        const { slug } = req.body;
+        const channel = await db.getChannel(req.params.channelId);
+        
+        if (!channel) {
+            return res.status(404).json({ success: false, error: 'Канал не найден' });
+        }
+        if (channel.owner_id !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Нет прав' });
+        }
+        
+        // Валидация slug
+        if (slug && !/^[a-zA-Z0-9_-]{3,32}$/.test(slug)) {
+            return res.status(400).json({ success: false, error: 'Slug: 3-32 символа, только буквы, цифры, _ и -' });
+        }
+        
+        const result = await db.updateChannelSlug(req.params.channelId, slug);
+        res.json(result);
+    } catch (error) {
+        console.error('Update channel slug error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
+// Обновить invite_slug сервера (только владелец)
+app.put('/api/servers/:serverId/slug', authMiddleware, async (req, res) => {
+    try {
+        const { slug } = req.body;
+        const server = await db.getServer(req.params.serverId);
+        
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Сервер не найден' });
+        }
+        if (server.owner_id !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Нет прав' });
+        }
+        
+        // Валидация slug
+        if (slug && !/^[a-zA-Z0-9_-]{3,32}$/.test(slug)) {
+            return res.status(400).json({ success: false, error: 'Slug: 3-32 символа, только буквы, цифры, _ и -' });
+        }
+        
+        const result = await db.updateServerSlug(req.params.serverId, slug);
+        res.json(result);
+    } catch (error) {
+        console.error('Update server slug error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
+// Получить посты канала для просмотра (без подписки)
+app.get('/api/invite/channel/:idOrSlug/posts', async (req, res) => {
+    try {
+        const channel = await db.getChannelByIdOrSlug(req.params.idOrSlug);
+        if (!channel) {
+            return res.status(404).json({ error: 'Канал не найден' });
+        }
+        if (!channel.is_public) {
+            return res.status(403).json({ error: 'Канал приватный' });
+        }
+        const { limit = 20 } = req.query;
+        const posts = await db.getChannelPosts(channel.id, parseInt(limit));
+        res.json(posts);
+    } catch (error) {
+        console.error('Get channel posts for preview error:', error);
+        res.status(500).json([]);
     }
 });
 

@@ -900,6 +900,9 @@ async function showChat() {
     
     // Обработка инвайт-ссылок после загрузки
     handleInviteLink();
+    
+    // Проверяем сохранённый инвайт (если был до авторизации)
+    checkPendingInvite();
 }
 
 // Загрузка настроек с сервера
@@ -3845,6 +3848,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', ensureSoundsInitialized, { once: true });
     document.addEventListener('keydown', ensureSoundsInitialized, { once: true });
     
+    // Сохраняем инвайт-ссылку до авторизации
+    savePendingInvite();
+    
     // Восстановление сессии
     if (restoreSession()) {
         showChat();
@@ -6450,17 +6456,18 @@ function copyServerInviteLink() {
 // Обработка инвайт-ссылок при загрузке страницы
 async function handleInviteLink() {
     const path = window.location.pathname;
-    const inviteMatch = path.match(/^\/invite\/(channel|server)\/([a-f0-9-]+)$/i);
+    // Поддержка любых slug (буквы, цифры, _, -, UUID)
+    const inviteMatch = path.match(/^\/invite\/(channel|server)\/([a-zA-Z0-9_-]+)$/i);
     
     if (!inviteMatch) return;
     
-    const [, type, id] = inviteMatch;
+    const [, type, idOrSlug] = inviteMatch;
     
     // Очищаем URL
     window.history.replaceState({}, '', '/');
     
     try {
-        const res = await api.get(`/api/invite/${type}/${id}`);
+        const res = await api.get(`/api/invite/${type}/${idOrSlug}`);
         if (!res.ok) {
             showToast('Приглашение не найдено или недействительно', 'error');
             return;
@@ -6468,16 +6475,35 @@ async function handleInviteLink() {
         
         const data = await res.json();
         
-        // Показываем модалку с информацией и кнопкой присоединения
-        showInviteModal(type, data);
+        // Показываем превью с контентом
+        showInvitePreview(type, data);
     } catch (error) {
         console.error('Handle invite link error:', error);
         showToast('Ошибка обработки приглашения', 'error');
     }
 }
 
-// Показать модалку приглашения
-function showInviteModal(type, data) {
+// Сохранить инвайт-ссылку для обработки после авторизации
+function savePendingInvite() {
+    const path = window.location.pathname;
+    const inviteMatch = path.match(/^\/invite\/(channel|server)\/([a-zA-Z0-9_-]+)$/i);
+    if (inviteMatch) {
+        localStorage.setItem('kvant_pending_invite', path);
+    }
+}
+
+// Проверить и обработать сохранённый инвайт
+function checkPendingInvite() {
+    const pending = localStorage.getItem('kvant_pending_invite');
+    if (pending) {
+        localStorage.removeItem('kvant_pending_invite');
+        window.history.replaceState({}, '', pending);
+        handleInviteLink();
+    }
+}
+
+// Показать превью канала/сервера с контентом
+async function showInvitePreview(type, data) {
     const isChannel = type === 'channel';
     const icon = isChannel ? '📢' : '🏰';
     const typeName = isChannel ? 'канал' : 'сервер';
@@ -6485,57 +6511,115 @@ function showInviteModal(type, data) {
     const memberCount = isChannel ? data.subscriber_count : data.member_count;
     const memberLabel = isChannel ? 'подписчиков' : 'участников';
     
+    // Проверяем, уже подписан ли пользователь
+    const alreadyJoined = isChannel 
+        ? state.channels.some(c => c.id === data.id)
+        : state.servers.some(s => s.id === data.id);
+    
     const modal = document.createElement('div');
-    modal.className = 'modal invite-modal';
+    modal.className = 'modal invite-preview-modal';
     modal.innerHTML = `
         <div class="modal-overlay"></div>
-        <div class="modal-content invite-modal-content">
-            <div class="invite-header">
+        <div class="modal-content invite-preview-content">
+            <button class="modal-close invite-close-btn">&times;</button>
+            <div class="invite-preview-header">
                 <div class="invite-avatar ${isChannel ? 'channel-avatar' : 'server-avatar'}" 
                      style="${avatarUrl ? `background-image: url(${avatarUrl})` : ''}">
                     ${avatarUrl ? '' : icon}
                 </div>
-                <h2 class="invite-title">${escapeHtml(data.name)}</h2>
-                ${data.description ? `<p class="invite-description">${escapeHtml(data.description)}</p>` : ''}
-                <div class="invite-stats">${memberCount || 0} ${memberLabel}</div>
+                <div class="invite-preview-info">
+                    <h2 class="invite-title">${escapeHtml(data.name)}</h2>
+                    ${data.description ? `<p class="invite-description">${escapeHtml(data.description)}</p>` : ''}
+                    <div class="invite-stats">${memberCount || 0} ${memberLabel}</div>
+                </div>
             </div>
-            <div class="invite-actions">
-                <button class="btn btn-primary invite-join-btn" data-type="${type}" data-id="${data.id}">
-                    Присоединиться к ${typeName}у
-                </button>
-                <button class="btn btn-secondary invite-cancel-btn">Отмена</button>
+            <div class="invite-preview-content-area">
+                <div class="invite-preview-loading">Загрузка...</div>
+            </div>
+            <div class="invite-preview-footer">
+                ${alreadyJoined ? `
+                    <button class="btn btn-primary invite-open-btn" data-type="${type}" data-id="${data.id}">
+                        Открыть ${typeName}
+                    </button>
+                ` : `
+                    <button class="btn btn-primary invite-join-btn" data-type="${type}" data-id="${data.id}">
+                        Присоединиться к ${typeName}у
+                    </button>
+                `}
+                <button class="btn btn-secondary invite-cancel-btn">Закрыть</button>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     
+    // Загружаем контент для превью
+    const contentArea = modal.querySelector('.invite-preview-content-area');
+    if (isChannel) {
+        try {
+            const res = await fetch(`/api/invite/channel/${data.id}/posts?limit=10`);
+            if (res.ok) {
+                const posts = await res.json();
+                if (posts.length > 0) {
+                    contentArea.innerHTML = posts.map(post => `
+                        <div class="invite-preview-post">
+                            ${post.media_url ? `<img src="${escapeAttr(post.media_url)}" class="invite-preview-media" alt="">` : ''}
+                            ${post.text ? `<div class="invite-preview-text">${escapeHtml(post.text)}</div>` : ''}
+                            <div class="invite-preview-time">${formatTime(post.created_at)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    contentArea.innerHTML = '<div class="invite-preview-empty">Пока нет постов</div>';
+                }
+            } else {
+                contentArea.innerHTML = '<div class="invite-preview-empty">Не удалось загрузить посты</div>';
+            }
+        } catch (e) {
+            contentArea.innerHTML = '<div class="invite-preview-empty">Ошибка загрузки</div>';
+        }
+    } else {
+        // Для серверов показываем описание
+        contentArea.innerHTML = `<div class="invite-preview-empty">Присоединитесь, чтобы увидеть каналы сервера</div>`;
+    }
+    
     // Обработчики
-    modal.querySelector('.modal-overlay').addEventListener('click', () => modal.remove());
-    modal.querySelector('.invite-cancel-btn').addEventListener('click', () => modal.remove());
-    modal.querySelector('.invite-join-btn').addEventListener('click', async (e) => {
+    const closeModal = () => modal.remove();
+    modal.querySelector('.modal-overlay').addEventListener('click', closeModal);
+    modal.querySelector('.invite-cancel-btn').addEventListener('click', closeModal);
+    modal.querySelector('.invite-close-btn').addEventListener('click', closeModal);
+    
+    // Кнопка "Открыть" (если уже подписан)
+    modal.querySelector('.invite-open-btn')?.addEventListener('click', () => {
+        modal.remove();
+        if (isChannel) {
+            switchSidebarTab('channels');
+            selectChannel(data.id);
+        } else {
+            switchSidebarTab('servers');
+            selectServer(data.id);
+        }
+    });
+    
+    // Кнопка "Присоединиться"
+    modal.querySelector('.invite-join-btn')?.addEventListener('click', async (e) => {
         const btn = e.target;
-        const joinType = btn.dataset.type;
-        const joinId = btn.dataset.id;
-        
         btn.disabled = true;
         btn.textContent = 'Присоединение...';
         
         try {
-            const res = await api.post(`/api/invite/${joinType}/${joinId}/join`);
+            const res = await api.post(`/api/invite/${type}/${data.id}/join`);
             if (res.ok) {
                 showToast(`Вы присоединились к ${typeName}у!`, 'success');
                 modal.remove();
                 
-                // Обновляем списки и открываем
-                if (joinType === 'channel') {
+                if (isChannel) {
                     await loadChannels();
                     switchSidebarTab('channels');
-                    selectChannel(joinId);
+                    selectChannel(data.id);
                 } else {
                     await loadServers();
                     switchSidebarTab('servers');
-                    selectServer(joinId);
+                    selectServer(data.id);
                 }
             } else {
                 const error = await res.json();
@@ -6550,6 +6634,11 @@ function showInviteModal(type, data) {
             btn.textContent = `Присоединиться к ${typeName}у`;
         }
     });
+}
+
+// Показать простую модалку приглашения (для поиска)
+function showInviteModal(type, data) {
+    showInvitePreview(type, data);
 }
 
 // Скрыть все контекстные меню
