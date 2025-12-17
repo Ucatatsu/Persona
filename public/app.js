@@ -2037,14 +2037,20 @@ function createMessageElement(msg, isSent) {
     
     // Автодетект изображений по URL (для старых сообщений без message_type)
     if (!isMedia && !isVideo && msg.text) {
+        const text = msg.text.trim();
         const imageExtensions = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i;
         const videoExtensions = /\.(mp4|webm)(\?.*)?$/i;
         const cloudinaryImage = /res\.cloudinary\.com.*\/(image|video)\/upload/i;
         
-        if (imageExtensions.test(msg.text) || (cloudinaryImage.test(msg.text) && !msg.text.includes('/video/'))) {
-            isMedia = true;
-        } else if (videoExtensions.test(msg.text) || (cloudinaryImage.test(msg.text) && msg.text.includes('/video/'))) {
-            isVideo = true;
+        // Проверяем только если это чистый URL (без другого текста)
+        const isJustUrl = /^https?:\/\/\S+$/i.test(text);
+        
+        if (isJustUrl) {
+            if (imageExtensions.test(text) || (cloudinaryImage.test(text) && !text.includes('/video/'))) {
+                isMedia = true;
+            } else if (videoExtensions.test(text) || (cloudinaryImage.test(text) && text.includes('/video/'))) {
+                isVideo = true;
+            }
         }
     }
     
@@ -2060,7 +2066,8 @@ function createMessageElement(msg, isSent) {
                 <div class="video-mute-indicator">🔇</div>
             </div>`;
     } else {
-        bubbleContent = escapeHtml(msg.text);
+        // Преобразуем URL в кликабельные ссылки
+        bubbleContent = linkifyText(escapeHtml(msg.text));
     }
     
     div.innerHTML = `
@@ -2872,12 +2879,23 @@ function escapeAttr(text) {
     return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// Преобразует URL в кликабельные ссылки
+function linkifyText(text) {
+    const urlRegex = /(https?:\/\/[^\s<]+)/gi;
+    return text.replace(urlRegex, (url) => {
+        // Проверяем это инвайт-ссылка на канал/сервер
+        const inviteMatch = url.match(/\/invite\/(channel|server)\/([^\/\s]+)/);
+        if (inviteMatch) {
+            return `<a href="${url}" class="message-link invite-link" onclick="event.preventDefault(); handleInviteLink('${url}')">${url}</a>`;
+        }
+        return `<a href="${url}" class="message-link" target="_blank" rel="noopener">${url}</a>`;
+    });
+}
+
 function formatTime(dateStr) {
     const date = new Date(dateStr);
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
-
-// === УТИЛИТЫ ===
 
 function escapeHtml(text) {
     const div = document.createElement('div');

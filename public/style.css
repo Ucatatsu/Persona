@@ -3475,13 +3475,21 @@ textarea:focus {
 }
 
 /* Ссылки в сообщениях */
-.message-bubble a {
+.message-bubble a,
+.message-link {
   color: inherit;
   text-decoration: underline;
+  word-break: break-all;
 }
 
-.message-bubble a:hover {
+.message-bubble a:hover,
+.message-link:hover {
   opacity: 0.8;
+}
+
+.invite-link {
+  color: var(--accent);
+  cursor: pointer;
 }
 
 /* Улучшенный фокус для форм */
@@ -10870,6 +10878,8 @@ input[type="range"]:focus::-moz-range-thumb {
   justify-content: center;
   background-size: cover;
   background-position: center;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .chat-info-avatar .icon-lg {
