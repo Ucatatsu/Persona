@@ -378,6 +378,9 @@ async function initDB() {
         // Миграция: добавляем premium_plan в users
         try { sqlite.exec("ALTER TABLE users ADD COLUMN premium_plan TEXT DEFAULT 'premium'"); } catch {}
         
+        // Миграция: делаем все серверы публичными
+        try { sqlite.exec('UPDATE servers SET is_public = 1 WHERE is_public = 0'); } catch {}
+        
         console.log('✅ SQLite база данных инициализирована');
         return;
     }
@@ -709,6 +712,9 @@ async function initDB() {
             )
         `);
         await client.query('CREATE INDEX IF NOT EXISTS idx_pinned_chats_user ON pinned_chats(user_id)').catch(() => {});
+
+        // Миграция: делаем все серверы публичными
+        await client.query('UPDATE servers SET is_public = true WHERE is_public = false').catch(() => {});
 
         console.log('✅ PostgreSQL база данных инициализирована');
     } finally {
@@ -1901,7 +1907,7 @@ async function createServer(ownerId, name, description = '', iconUrl = null) {
         const created_at = new Date().toISOString();
         
         if (USE_SQLITE) {
-            sqlite.prepare('INSERT INTO servers (id, name, description, icon_url, owner_id, member_count, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)').run(id, name, description, iconUrl, ownerId, created_at);
+            sqlite.prepare('INSERT INTO servers (id, name, description, icon_url, owner_id, is_public, member_count, created_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?)').run(id, name, description, iconUrl, ownerId, created_at);
             const everyoneRoleId = uuidv4();
             sqlite.prepare('INSERT INTO server_roles (id, server_id, name, is_default, position) VALUES (?, ?, ?, 1, 0)').run(everyoneRoleId, id, '@everyone');
             sqlite.prepare('INSERT INTO server_members (id, server_id, user_id) VALUES (?, ?, ?)').run(uuidv4(), id, ownerId);
@@ -1914,7 +1920,7 @@ async function createServer(ownerId, name, description = '', iconUrl = null) {
             sqlite.prepare('INSERT INTO server_categories (id, server_id, name, position) VALUES (?, ?, ?, 1)').run(voiceCategoryId, id, 'Голосовые каналы');
             sqlite.prepare('INSERT INTO server_channels (id, server_id, category_id, name, type, position) VALUES (?, ?, ?, ?, ?, 0)').run(uuidv4(), id, voiceCategoryId, 'Общий', 'voice');
         } else {
-            await pool.query('INSERT INTO servers (id, name, description, icon_url, owner_id, member_count, created_at) VALUES ($1, $2, $3, $4, $5, 1, $6)', [id, name, description, iconUrl, ownerId, created_at]);
+            await pool.query('INSERT INTO servers (id, name, description, icon_url, owner_id, is_public, member_count, created_at) VALUES ($1, $2, $3, $4, $5, true, 1, $6)', [id, name, description, iconUrl, ownerId, created_at]);
             const everyoneRoleId = uuidv4();
             await pool.query('INSERT INTO server_roles (id, server_id, name, is_default, position) VALUES ($1, $2, $3, true, 0)', [everyoneRoleId, id, '@everyone']);
             await pool.query('INSERT INTO server_members (id, server_id, user_id) VALUES ($1, $2, $3)', [uuidv4(), id, ownerId]);

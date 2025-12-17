@@ -6914,23 +6914,47 @@ async function performGlobalSearch(query) {
         
         // Обработчики кликов
         document.querySelectorAll('.search-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 const type = item.dataset.type;
                 const id = item.dataset.id;
                 
                 if (type === 'user') {
                     selectUser(id, item.dataset.name);
+                    closeSearchModal();
                 } else if (type === 'message') {
                     selectUser(item.dataset.chatId, item.dataset.sender);
+                    closeSearchModal();
                 } else if (type === 'channel') {
-                    switchSidebarTab('channels');
-                    selectChannel(id);
+                    // Проверяем, подписан ли пользователь на канал
+                    const existingChannel = state.channels.find(c => c.id === id);
+                    if (existingChannel) {
+                        switchSidebarTab('channels');
+                        selectChannel(id);
+                        closeSearchModal();
+                    } else {
+                        // Показываем модалку присоединения
+                        closeSearchModal();
+                        const channelData = channels.find(c => c.id === id);
+                        if (channelData) {
+                            showInviteModal('channel', channelData);
+                        }
+                    }
                 } else if (type === 'server') {
-                    switchSidebarTab('servers');
-                    selectServer(id);
+                    // Проверяем, состоит ли пользователь на сервере
+                    const existingServer = state.servers.find(s => s.id === id);
+                    if (existingServer) {
+                        switchSidebarTab('servers');
+                        selectServer(id);
+                        closeSearchModal();
+                    } else {
+                        // Показываем модалку присоединения
+                        closeSearchModal();
+                        const serverData = servers.find(s => s.id === id);
+                        if (serverData) {
+                            showInviteModal('server', serverData);
+                        }
+                    }
                 }
-                
-                closeSearchModal();
             });
         });
         
