@@ -338,10 +338,7 @@ app.post('/api/login', authLimiter, async (req, res) => {
 let serverReady = false;
 app.get('/health', (_req, res) => {
     // Всегда возвращаем 200, чтобы Render не убивал сервер
-    res.status(200).json({ 
-        status: serverReady ? 'ready' : 'starting', 
-        timestamp: Date.now() 
-    });
+    res.status(200).send('OK');
 });
 
 // Функция для установки готовности
