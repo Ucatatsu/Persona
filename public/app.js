@@ -3159,16 +3159,34 @@ let incomingCallData = null;
 // ВАЖНО: Для надёжной работы через мобильный интернет нужны TURN серверы
 const iceServers = {
     iceServers: [
-        // STUN серверы Google
+        // STUN серверы Google (бесплатные, надёжные)
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        // TURN серверы OpenRelay (бесплатные, актуальные)
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // Metered TURN серверы (бесплатный tier, более надёжные)
         {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:a.relay.metered.ca:80',
+            username: 'e8dd65c92ae0c7e7e3c5e8f0',
+            credential: 'uWdWNmkhvyqTW1QP'
         },
+        {
+            urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+            username: 'e8dd65c92ae0c7e7e3c5e8f0',
+            credential: 'uWdWNmkhvyqTW1QP'
+        },
+        {
+            urls: 'turn:a.relay.metered.ca:443',
+            username: 'e8dd65c92ae0c7e7e3c5e8f0',
+            credential: 'uWdWNmkhvyqTW1QP'
+        },
+        {
+            urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+            username: 'e8dd65c92ae0c7e7e3c5e8f0',
+            credential: 'uWdWNmkhvyqTW1QP'
+        },
+        // OpenRelay резервные
         {
             urls: 'turn:openrelay.metered.ca:443',
             username: 'openrelayproject',
@@ -3178,18 +3196,6 @@ const iceServers = {
             urls: 'turn:openrelay.metered.ca:443?transport=tcp',
             username: 'openrelayproject',
             credential: 'openrelayproject'
-        },
-        // Резервные TURN серверы (Xirsys free tier)
-        {
-            urls: 'turn:turn.bistri.com:80',
-            username: 'homeo',
-            credential: 'homeo'
-        },
-        // Numb STUN/TURN (бесплатный)
-        {
-            urls: 'turn:numb.viagenie.ca',
-            username: 'webrtc@live.com',
-            credential: 'muazkh'
         }
     ],
     iceCandidatePoolSize: 10,
@@ -3758,34 +3764,40 @@ async function toggleMute() {
 async function toggleVideo() {
     if (!localStream || !peerConnection || !currentCallUser) return;
     
-    const videoTrack = localStream.getVideoTracks()[0];
+    let videoTrack = localStream.getVideoTracks()[0];
+    const videoSender = peerConnection.getSenders().find(s => s.track?.kind === 'video' || s.track === null);
     
-    if (videoTrack) {
-        // Переключаем существующий видео трек
-        videoTrack.enabled = !videoTrack.enabled;
+    // Проверяем текущее состояние видео
+    const isVideoEnabled = videoTrack?.enabled && videoTrack?.readyState === 'live';
+    
+    if (isVideoEnabled) {
+        // Выключаем видео
+        videoTrack.enabled = false;
         
-        // Уведомляем собеседника о состоянии видео
+        // Уведомляем собеседника
         state.socket.emit('video-state-changed', {
             to: currentCallUser.id,
-            videoEnabled: videoTrack.enabled
+            videoEnabled: false
         });
         
-        // Находим sender и обновляем трек
-        const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-            // Заменяем трек на null или обратно для синхронизации с собеседником
-            await sender.replaceTrack(videoTrack.enabled ? videoTrack : null);
+        // Заменяем трек на null в sender
+        if (videoSender) {
+            await videoSender.replaceTrack(null);
         }
         
-        if (videoTrack.enabled) {
-            document.getElementById('call-videos').classList.remove('hidden');
-            document.getElementById('local-video').srcObject = localStream;
-        } else {
-            checkHideVideos();
-        }
+        checkHideVideos();
     } else {
-        // Добавляем новый видео трек
+        // Включаем видео - всегда пересоздаём трек для надёжности
         try {
+            console.log('📹 Включаем видео, создаём новый трек...');
+            
+            // Останавливаем старый трек если есть
+            if (videoTrack) {
+                videoTrack.stop();
+                localStream.removeTrack(videoTrack);
+            }
+            
+            // Создаём новый видео трек
             const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
             const newVideoTrack = newStream.getVideoTracks()[0];
             
@@ -3793,14 +3805,14 @@ async function toggleVideo() {
             document.getElementById('local-video').srcObject = localStream;
             document.getElementById('call-videos').classList.remove('hidden');
             
-            // Проверяем есть ли уже video sender
-            const existingSender = peerConnection.getSenders().find(s => s.track === null || s.track?.kind === 'video');
-            if (existingSender) {
-                await existingSender.replaceTrack(newVideoTrack);
+            // Заменяем или добавляем трек в sender
+            if (videoSender) {
+                await videoSender.replaceTrack(newVideoTrack);
+                console.log('📹 Видео трек заменён в sender');
             } else {
                 peerConnection.addTrack(newVideoTrack, localStream);
+                console.log('📹 Видео трек добавлен, нужен renegotiation');
                 
-                // Нужен renegotiation только если добавили новый трек
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 
@@ -3809,8 +3821,15 @@ async function toggleVideo() {
                     offer: offer
                 });
             }
+            
+            // Уведомляем собеседника
+            state.socket.emit('video-state-changed', {
+                to: currentCallUser.id,
+                videoEnabled: true
+            });
+            
         } catch (e) {
-            console.error('Не удалось включить видео:', e);
+            console.error('📹 Не удалось включить видео:', e);
             alert('Не удалось получить доступ к камере');
             return;
         }
@@ -3818,6 +3837,7 @@ async function toggleVideo() {
     
     updateVideoButtonState();
 }
+
 
 function updateVideoButtonState() {
     const videoTrack = localStream?.getVideoTracks()[0];
