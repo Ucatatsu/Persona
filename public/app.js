@@ -3173,41 +3173,40 @@ let incomingCallData = null;
 
 // ICE серверы для WebRTC
 // ВАЖНО: Для надёжной работы через мобильный интернет нужны TURN серверы
+// Open Relay - бесплатные публичные TURN серверы
 const iceServers = {
     iceServers: [
-        // STUN серверы
-        { urls: 'stun:stun.relay.metered.ca:80' },
+        // STUN серверы (бесплатные)
         { urls: 'stun:stun.l.google.com:19302' },
-        // TURN серверы Metered.ca - TCP на 443 (не блокируется операторами)
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        // Open Relay TURN серверы
         {
-            urls: 'turn:global.relay.metered.ca:443?transport=tcp',
-            username: '569a0840c6ddd4085c474f32',
-            credential: 'dyQoNr8tELSuIR//'
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         },
         {
-            urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-            username: '569a0840c6ddd4085c474f32',
-            credential: 'dyQoNr8tELSuIR//'
-        },
-        // UDP варианты (могут блокироваться)
-        {
-            urls: 'turn:global.relay.metered.ca:80',
-            username: '569a0840c6ddd4085c474f32',
-            credential: 'dyQoNr8tELSuIR//'
+            urls: 'turn:openrelay.metered.ca:80?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         },
         {
-            urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-            username: '569a0840c6ddd4085c474f32',
-            credential: 'dyQoNr8tELSuIR//'
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         },
         {
-            urls: 'turn:global.relay.metered.ca:443',
-            username: '569a0840c6ddd4085c474f32',
-            credential: 'dyQoNr8tELSuIR//'
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         }
-    ],
-    iceCandidatePoolSize: 10,
-    iceTransportPolicy: 'relay' // Принудительно использовать только TURN
+    ]
 };
 
 function startCall(video = false) {
