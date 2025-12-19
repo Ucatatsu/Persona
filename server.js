@@ -9,6 +9,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const validator = require('validator');
 const cloudinary = require('cloudinary').v2;
@@ -31,6 +32,17 @@ const app = express();
 
 // Доверяем прокси (Render, Heroku и т.д.)
 app.set('trust proxy', 1);
+
+// === СЖАТИЕ ===
+app.use(compression({
+    level: 6, // Баланс между скоростью и сжатием
+    threshold: 1024, // Сжимать только файлы > 1KB
+    filter: (req, res) => {
+        // Не сжимаем уже сжатые форматы
+        if (req.headers['x-no-compression']) return false;
+        return compression.filter(req, res);
+    }
+}));
 
 // === БЕЗОПАСНОСТЬ ===
 
@@ -227,7 +239,22 @@ setInterval(() => {
     }
 }, 5 * 60 * 1000);
 
-app.use(express.static('public'));
+// Статика с кэшированием
+app.use(express.static('public', {
+    maxAge: '1d', // Кэш на 1 день
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+        // Долгий кэш для ассетов
+        if (filePath.includes('/assets/') || filePath.endsWith('.svg')) {
+            res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 дней
+        }
+        // Короткий кэш для HTML/JS/CSS (чтобы обновления приходили)
+        if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 час
+        }
+    }
+}));
 app.use(express.json({ limit: '1mb' }));
 
 // Онлайн пользователи: userId -> { sockets: Set<socketId>, lastSeen, status, hideOnline }
@@ -2293,6 +2320,14 @@ io.on('connection', async (socket) => {
         const { to } = data;
         if (to) {
             emitToUser(to, 'screen-share-stopped', { from: userId });
+        }
+    });
+
+    // Состояние видео изменилось (камера вкл/выкл)
+    socket.on('video-state-changed', (data) => {
+        const { to, videoEnabled } = data;
+        if (to) {
+            emitToUser(to, 'video-state-changed', { from: userId, videoEnabled });
         }
     });
 

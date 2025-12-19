@@ -10,8 +10,15 @@
 .users-list,
 .modal-content,
 .settings-content {
-  will-change: transform;
-  contain: layout style;
+  will-change: auto; /* will-change: transform вызывает лаги при скролле */
+  contain: layout style paint;
+}
+
+/* Виртуальный скролл - скрываем элементы вне viewport */
+.users-list,
+.messages {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
 }
 
 /* Отключаем тяжёлые эффекты на слабых устройствах */
@@ -25,12 +32,55 @@
   }
 }
 
-/* GPU ускорение для анимаций */
+/* GPU ускорение только для активных анимаций */
 .message,
 .user-item,
 .modal {
-  transform: translateZ(0);
   backface-visibility: hidden;
+}
+
+/* Оптимизация для скролла */
+.messages,
+.users-list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto; /* smooth вызывает лаги */
+}
+
+/* Отключаем blur на слабых устройствах */
+@media (max-width: 1024px), (hover: none) {
+  .sidebar,
+  .message-form,
+  .modal-content,
+  .chat-header-pill,
+  .emoji-picker,
+  .user-card-popup,
+  .context-menu {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--bg-dark) !important;
+  }
+}
+
+/* Отключаем анимации при массовой загрузке */
+.messages.loading .message {
+  animation: none !important;
+}
+
+/* Оптимизация hover эффектов */
+.user-item {
+  transition: background 0.15s ease;
+}
+
+.user-item:hover {
+  transform: none; /* Убираем transform - вызывает repaint */
+}
+
+/* Ленивая загрузка изображений */
+.message-media {
+  content-visibility: auto;
 }
 
 :root {
@@ -632,32 +682,19 @@ button {
   padding: 12px;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s ease; /* Только background, не all */
   margin-bottom: 4px;
   position: relative;
-  overflow: hidden;
 }
 
-.user-item::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(79, 195, 247, 0.15), transparent);
-  transform: translateX(-100%);
-  transition: transform 0.5s ease;
-}
-
-.user-item:hover::before {
-  transform: translateX(100%);
-}
+/* Убран тяжёлый ::before эффект для производительности */
 
 .user-item:hover {
   background: rgba(79, 195, 247, 0.1);
-  transform: translateX(4px);
 }
 
 .user-item:active {
-  transform: scale(0.98);
+  opacity: 0.8;
 }
 
 .user-item.active {
@@ -676,12 +713,6 @@ button {
   height: 60%;
   background: var(--accent);
   border-radius: 0 3px 3px 0;
-  animation: activeIndicator 0.3s ease;
-}
-
-@keyframes activeIndicator {
-  from { height: 0; opacity: 0; }
-  to { height: 60%; opacity: 1; }
 }
 
 .user-avatar {
@@ -696,7 +727,7 @@ button {
   font-size: 16px;
   flex-shrink: 0;
   position: relative;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Убран transition для производительности */
 }
 
 .user-item:hover .user-avatar {
@@ -743,13 +774,9 @@ button {
   opacity: 0.8;
 }
 
+/* Отключаем pulse анимации - они тратят GPU */
 @keyframes onlinePulse {
-  0%, 100% { 
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-  }
-  50% { 
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
-  }
+  0%, 100% { opacity: 1; }
 }
 
 .offline .online-indicator,
@@ -979,35 +1006,23 @@ button {
   }
 }
 
-/* Анимация появления для отправленных сообщений */
+/* Упрощённые анимации сообщений для плавности */
 .message.sent {
-  animation: messageSent 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: messageFadeIn 0.15s ease-out;
 }
 
-@keyframes messageSent {
-  from {
-    opacity: 0;
-    transform: translateX(20px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-/* Анимация появления для полученных сообщений */
 .message.received {
-  animation: messageReceived 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: messageFadeIn 0.15s ease-out;
 }
 
-@keyframes messageReceived {
+@keyframes messageFadeIn {
   from {
     opacity: 0;
-    transform: translateX(-20px) scale(0.9);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -1179,8 +1194,8 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.7);
+  /* backdrop-filter убран - слишком тяжёлый */
 }
 
 .modal-content {
@@ -1197,13 +1212,11 @@ button {
 @keyframes modalIn {
   from { 
     opacity: 0; 
-    transform: scale(0.9) translateY(-20px);
-    filter: blur(4px);
+    transform: scale(0.95) translateY(-10px);
   }
   to { 
     opacity: 1; 
     transform: scale(1) translateY(0);
-    filter: blur(0);
   }
 }
 
@@ -1837,99 +1850,148 @@ button {
 }
 
 
-/* ===== ACTIVE CALL BAR (Telegram style) ===== */
+/* ===== ACTIVE CALL PILL (Dynamic Island style) ===== */
 .active-call-bar {
-  grid-column: 3;
-  position: absolute;
-  top: calc(var(--panel-height) + 24px);
-  left: calc(var(--sidebar-width, 320px) + 24px);
-  right: 24px;
-  height: 44px;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-  border-radius: 12px;
+  /* Позиционирование в хедере слева от основного pill */
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  z-index: 50;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 50px;
+  margin-right: 12px;
   cursor: pointer;
-  animation: slideDown 0.3s ease;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  z-index: 50;
+  /* Dynamic Island animation */
+  max-width: 0;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: right center;
+  overflow: hidden;
+  transition: 
+    max-width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    padding 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    margin 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+.active-call-bar:not(.hidden) {
+  max-width: 300px;
+  opacity: 1;
+  transform: scaleX(1);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+}
+
+.active-call-bar.hidden {
+  max-width: 0;
+  padding: 8px 0;
+  margin-right: 0;
+  opacity: 0;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+.active-call-bar:hover:not(.hidden) {
+  box-shadow: 0 0 25px rgba(34, 197, 94, 0.5);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(34, 197, 94, 0.15));
 }
 
 .call-bar-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .call-bar-icon {
-  font-size: 16px;
-  animation: pulse-icon 1.5s ease-in-out infinite;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-@keyframes pulse-icon {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.call-bar-icon .icon-sm {
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) invert(1);
 }
 
 .call-bar-text {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 12px;
+  color: var(--online);
+}
+
+.call-bar-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .call-bar-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .call-bar-timer {
-  font-size: 14px;
-  opacity: 0.9;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
+  color: var(--online);
+  line-height: 1.2;
 }
 
 .call-bar-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  margin-left: 4px;
 }
 
 .call-bar-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+}
+
+.call-bar-btn .icon-sm {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1);
 }
 
 .call-bar-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
 }
 
 .call-bar-end {
-  background: rgba(239, 68, 68, 0.8);
+  background: rgba(239, 68, 68, 0.3);
 }
 
 .call-bar-end:hover {
-  background: rgba(239, 68, 68, 1);
+  background: rgba(239, 68, 68, 0.6);
 }
 
 @media (max-width: 768px) {
   .active-call-bar {
-    left: 8px;
-    right: 8px;
-    top: calc(var(--panel-height) + 16px);
+    margin-right: 8px;
   }
 }
 

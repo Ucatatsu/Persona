@@ -269,6 +269,25 @@
         </button>
       </div>
       
+      <!-- Call Pill (Dynamic Island для звонков) -->
+      <div class="active-call-bar hidden" id="active-call-bar" role="status">
+        <div class="call-bar-info">
+          <span class="call-bar-icon"><img src="/assets/phone-call.svg" alt="" class="icon-sm"></span>
+          <div class="call-bar-details">
+            <span class="call-bar-name" id="call-bar-name"></span>
+            <span class="call-bar-timer" id="call-bar-timer">00:00</span>
+          </div>
+        </div>
+        <div class="call-bar-actions">
+          <button class="call-bar-btn" id="call-bar-expand" title="Развернуть" aria-label="Развернуть звонок">
+            <img src="/assets/Expand.svg" alt="" class="icon-sm">
+          </button>
+          <button class="call-bar-btn call-bar-end" id="call-bar-end" title="Завершить" aria-label="Завершить звонок">
+            <img src="/assets/cross.svg" alt="" class="icon-sm">
+          </button>
+        </div>
+      </div>
+      
       <!-- Pill-контейнер по центру -->
       <div class="chat-header-pill" id="chat-user-info-btn" role="button" tabindex="0" 
            aria-label="Информация о собеседнике">
@@ -315,24 +334,6 @@
         </button>
       </div>
     </header>
-    
-    <!-- Полоска активного звонка -->
-    <div class="active-call-bar hidden" id="active-call-bar" role="status">
-      <div class="call-bar-info">
-        <span class="call-bar-icon"><img src="/assets/phone-call.svg" alt="" class="icon-sm"></span>
-        <span class="call-bar-text">Звонок</span>
-        <span class="call-bar-name" id="call-bar-name"></span>
-        <span class="call-bar-timer" id="call-bar-timer">00:00</span>
-      </div>
-      <div class="call-bar-actions">
-        <button class="call-bar-btn" id="call-bar-expand" title="Развернуть" aria-label="Развернуть звонок">
-          <img src="/assets/Expand.svg" alt="" class="icon-sm">
-        </button>
-        <button class="call-bar-btn call-bar-end" id="call-bar-end" title="Завершить" aria-label="Завершить звонок">
-          <img src="/assets/cross.svg" alt="" class="icon-sm">
-        </button>
-      </div>
-    </div>
     
     <main class="messages" id="messages" role="log" aria-label="Сообщения" aria-live="polite"></main>
     

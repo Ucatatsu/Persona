@@ -192,6 +192,26 @@ function throttle(fn, limit) {
     };
 }
 
+// Выполнить задачу когда браузер свободен
+const runWhenIdle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
+
+// Batch DOM updates
+let pendingUpdates = [];
+let updateScheduled = false;
+
+function scheduleDOMUpdate(fn) {
+    pendingUpdates.push(fn);
+    if (!updateScheduled) {
+        updateScheduled = true;
+        requestAnimationFrame(() => {
+            const updates = pendingUpdates;
+            pendingUpdates = [];
+            updateScheduled = false;
+            updates.forEach(f => f());
+        });
+    }
+}
+
 // Кэширование DOM элементов
 function getEl(id) {
     if (!state.dom[id]) {
@@ -584,10 +604,15 @@ function initSocket() {
         }
     });
     
-    state.socket.on('online-users', (users) => {
-        state.onlineUsers = users; // Теперь объект { odataId: status }
+    // Throttled обновление онлайн-статусов (не чаще раза в 500ms)
+    const throttledOnlineUpdate = throttle(() => {
         updateContactsList();
         updateChatStatus();
+    }, 500);
+    
+    state.socket.on('online-users', (users) => {
+        state.onlineUsers = users; // Теперь объект { odataId: status }
+        throttledOnlineUpdate();
     });
     
     state.socket.on('message-sent', (message) => {
@@ -668,6 +693,7 @@ function initSocket() {
     state.socket.on('video-renegotiate-answer', handleVideoRenegotiateAnswer);
     state.socket.on('screen-share-started', handleScreenShareStarted);
     state.socket.on('screen-share-stopped', handleScreenShareStopped);
+    state.socket.on('video-state-changed', handleVideoStateChanged);
     
     // Редактирование и удаление сообщений
     state.socket.on('message-edited', (data) => {
@@ -1850,7 +1876,7 @@ const updateContactsList = debounce(() => {
     } else {
         loadContacts();
     }
-}, 150);
+}, 300); // Увеличено для плавности
 
 // Оптимизированный рендеринг с DocumentFragment и делегированием событий
 function renderUsers(users) {
@@ -1997,6 +2023,9 @@ function renderMessages(messages) {
     const messagesDiv = getEl('messages');
     const fragment = document.createDocumentFragment();
     
+    // Отключаем анимации при массовой загрузке
+    messagesDiv.classList.add('loading');
+    
     messages.forEach(msg => {
         const isSent = msg.sender_id === state.currentUser.id;
         
@@ -2013,6 +2042,8 @@ function renderMessages(messages) {
     // Используем requestAnimationFrame для плавной прокрутки
     requestAnimationFrame(() => {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        // Включаем анимации обратно после рендера
+        messagesDiv.classList.remove('loading');
     });
 }
 
@@ -2642,11 +2673,17 @@ function appendMessage(msg) {
     const messagesDiv = getEl('messages');
     const isSent = msg.sender_id === state.currentUser.id;
     
+    // Проверяем, находится ли пользователь внизу (читает новые сообщения)
+    const isAtBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop - messagesDiv.clientHeight < 100;
+    
     messagesDiv.appendChild(createMessageElement(msg, isSent));
     
-    requestAnimationFrame(() => {
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    });
+    // Скроллим только если пользователь был внизу или это его сообщение
+    if (isAtBottom || isSent) {
+        requestAnimationFrame(() => {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+    }
 }
 
 function sendMessage() {
@@ -3229,8 +3266,28 @@ async function initCall(video) {
                 document.getElementById('call-videos').classList.remove('hidden');
             }
             
+            // Обработка отключения трека
             event.track.onended = () => {
+                console.log('📥 Remote track ended:', event.track.kind);
+                if (event.track.kind === 'video') {
+                    remoteVideo.srcObject = null;
+                }
                 checkHideVideos();
+            };
+            
+            // Обработка mute/unmute (когда трек отключается без удаления)
+            event.track.onmute = () => {
+                console.log('📥 Remote track muted:', event.track.kind);
+                if (event.track.kind === 'video') {
+                    checkHideVideos();
+                }
+            };
+            
+            event.track.onunmute = () => {
+                console.log('📥 Remote track unmuted:', event.track.kind);
+                if (event.track.kind === 'video') {
+                    document.getElementById('call-videos').classList.remove('hidden');
+                }
             };
         };
         
@@ -3386,8 +3443,28 @@ async function acceptCall() {
                 document.getElementById('call-videos').classList.remove('hidden');
             }
             
+            // Обработка отключения трека
             event.track.onended = () => {
+                console.log('📥 Remote track ended (acceptCall):', event.track.kind);
+                if (event.track.kind === 'video') {
+                    remoteVideo.srcObject = null;
+                }
                 checkHideVideos();
+            };
+            
+            // Обработка mute/unmute
+            event.track.onmute = () => {
+                console.log('📥 Remote track muted (acceptCall):', event.track.kind);
+                if (event.track.kind === 'video') {
+                    checkHideVideos();
+                }
+            };
+            
+            event.track.onunmute = () => {
+                console.log('📥 Remote track unmuted (acceptCall):', event.track.kind);
+                if (event.track.kind === 'video') {
+                    document.getElementById('call-videos').classList.remove('hidden');
+                }
             };
         };
         
@@ -3560,7 +3637,28 @@ function handleScreenShareStarted(data) {
 function handleScreenShareStopped(data) {
     // Собеседник закончил демонстрацию экрана
     console.log('Screen share stopped by:', data.from);
+    
+    // Скрываем remote video если это была демонстрация экрана
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo) {
+        remoteVideo.srcObject = null;
+    }
+    
     checkHideVideos();
+}
+
+function handleVideoStateChanged(data) {
+    // Собеседник включил/выключил камеру
+    console.log('Video state changed by:', data.from, 'enabled:', data.videoEnabled);
+    
+    const remoteVideo = document.getElementById('remote-video');
+    if (!remoteVideo) return;
+    
+    if (!data.videoEnabled) {
+        // Собеседник выключил камеру - скрываем его видео
+        remoteVideo.srcObject = null;
+        checkHideVideos();
+    }
 }
 
 function startCallTimer() {
@@ -3655,6 +3753,12 @@ async function toggleVideo() {
         // Переключаем существующий видео трек
         videoTrack.enabled = !videoTrack.enabled;
         
+        // Уведомляем собеседника о состоянии видео
+        state.socket.emit('video-state-changed', {
+            to: currentCallUser.id,
+            videoEnabled: videoTrack.enabled
+        });
+        
         // Находим sender и обновляем трек
         const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
@@ -3718,12 +3822,23 @@ function updateVideoButtonState() {
 }
 
 function checkHideVideos() {
-    const localHasVideo = localStream?.getVideoTracks().some(t => t.enabled);
+    const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
-    const remoteHasVideo = remoteVideo?.srcObject?.getVideoTracks().some(t => t.enabled);
+    const callVideos = document.getElementById('call-videos');
     
+    const localHasVideo = localStream?.getVideoTracks().some(t => t.enabled && !t.muted);
+    const remoteHasVideo = remoteVideo?.srcObject?.getVideoTracks().some(t => t.enabled && !t.muted && t.readyState === 'live');
+    
+    console.log('checkHideVideos:', { localHasVideo, remoteHasVideo, isScreenSharing });
+    
+    // Скрываем local video если нет видео
+    if (localVideo && !localHasVideo && !isScreenSharing) {
+        localVideo.srcObject = null;
+    }
+    
+    // Скрываем весь контейнер если нет ни одного видео
     if (!localHasVideo && !remoteHasVideo && !isScreenSharing) {
-        document.getElementById('call-videos').classList.add('hidden');
+        callVideos?.classList.add('hidden');
     }
 }
 
@@ -3843,16 +3958,18 @@ function appendCallMessage(msg) {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Call bar
+// Call bar (Dynamic Island style)
 function showCallBar() {
     if (currentCallUser) {
+        const bar = document.getElementById('active-call-bar');
         document.getElementById('call-bar-name').textContent = currentCallUser.username;
-        document.getElementById('active-call-bar').classList.remove('hidden');
+        bar.classList.remove('hidden');
     }
 }
 
 function hideCallBar() {
-    document.getElementById('active-call-bar').classList.add('hidden');
+    const bar = document.getElementById('active-call-bar');
+    bar.classList.add('hidden');
 }
 
 function updateCallBarTimer() {
