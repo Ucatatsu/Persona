@@ -2084,6 +2084,52 @@ button {
   border: 2px solid var(--accent);
   background: #000;
   object-fit: cover;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: box-shadow 0.2s, transform 0.1s;
+  z-index: 10;
+}
+
+#local-video:active {
+  cursor: grabbing;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+  transform: scale(1.02);
+}
+
+#local-video.dragging {
+  cursor: grabbing;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+  transition: none;
+}
+
+/* Позиции для local-video */
+#local-video.pos-top-left {
+  top: 16px;
+  bottom: auto;
+  left: 16px;
+  right: auto;
+}
+
+#local-video.pos-top-right {
+  top: 16px;
+  bottom: auto;
+  right: 16px;
+  left: auto;
+}
+
+#local-video.pos-bottom-left {
+  bottom: 16px;
+  top: auto;
+  left: 16px;
+  right: auto;
+}
+
+#local-video.pos-bottom-right {
+  bottom: 16px;
+  top: auto;
+  right: 16px;
+  left: auto;
 }
 
 .call-actions {

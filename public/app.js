@@ -3826,18 +3826,26 @@ function checkHideVideos() {
     const remoteVideo = document.getElementById('remote-video');
     const callVideos = document.getElementById('call-videos');
     
-    const localHasVideo = localStream?.getVideoTracks().some(t => t.enabled && !t.muted);
+    // Проверяем есть ли активное видео
+    const localHasVideo = isScreenSharing || (localStream?.getVideoTracks().some(t => t.enabled && !t.muted));
+    const localSrcValid = localVideo?.srcObject?.getVideoTracks().some(t => t.readyState === 'live');
     const remoteHasVideo = remoteVideo?.srcObject?.getVideoTracks().some(t => t.enabled && !t.muted && t.readyState === 'live');
     
-    console.log('checkHideVideos:', { localHasVideo, remoteHasVideo, isScreenSharing });
+    console.log('checkHideVideos:', { localHasVideo, localSrcValid, remoteHasVideo, isScreenSharing });
     
-    // Скрываем local video если нет видео
-    if (localVideo && !localHasVideo && !isScreenSharing) {
+    // Скрываем local video если нет видео и не демонстрация экрана
+    if (localVideo && !localHasVideo && !localSrcValid) {
         localVideo.srcObject = null;
     }
     
+    // Скрываем remote video если нет видео
+    if (remoteVideo && !remoteHasVideo) {
+        remoteVideo.srcObject = null;
+    }
+    
     // Скрываем весь контейнер если нет ни одного видео
-    if (!localHasVideo && !remoteHasVideo && !isScreenSharing) {
+    const shouldHide = !localHasVideo && !localSrcValid && !remoteHasVideo;
+    if (shouldHide) {
         callVideos?.classList.add('hidden');
     }
 }
@@ -3851,20 +3859,21 @@ async function toggleScreenShare() {
         await stopScreenShare();
     } else {
         try {
+            // Запрашиваем только видео, аудио оставляем от микрофона
             screenStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     cursor: 'always',
                     displaySurface: 'monitor'
                 },
-                audio: true
+                audio: false // НЕ берём аудио от экрана, чтобы не ломать микрофон
             });
             
             const screenTrack = screenStream.getVideoTracks()[0];
             
             // Находим видео sender и заменяем трек
-            const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) {
-                await sender.replaceTrack(screenTrack);
+            const videoSender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+            if (videoSender) {
+                await videoSender.replaceTrack(screenTrack);
             } else {
                 // Если нет видео трека, добавляем новый и делаем renegotiation
                 peerConnection.addTrack(screenTrack, screenStream);
@@ -3902,35 +3911,141 @@ async function toggleScreenShare() {
 async function stopScreenShare() {
     if (!isScreenSharing || !peerConnection) return;
     
+    // Останавливаем треки демонстрации экрана
     if (screenStream) {
         screenStream.getTracks().forEach(track => track.stop());
         screenStream = null;
     }
     
+    const localVideo = document.getElementById('local-video');
     const videoTrack = localStream?.getVideoTracks()[0];
-    const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+    const videoSender = peerConnection.getSenders().find(s => s.track?.kind === 'video' || s.track === null);
     
-    if (videoTrack && videoTrack.enabled && sender) {
+    if (videoTrack && videoTrack.enabled && videoSender) {
         // Возвращаем камеру
-        await sender.replaceTrack(videoTrack);
-        document.getElementById('local-video').srcObject = localStream;
-    } else if (sender) {
-        // Если камеры нет, отправляем null трек
-        await sender.replaceTrack(null);
-        checkHideVideos();
+        await videoSender.replaceTrack(videoTrack);
+        localVideo.srcObject = localStream;
     } else {
-        checkHideVideos();
+        // Если камеры нет, очищаем local video и отправляем null трек
+        localVideo.srcObject = null;
+        if (videoSender) {
+            await videoSender.replaceTrack(null);
+        }
     }
     
     // Уведомляем собеседника об окончании демонстрации
     if (currentCallUser && state.socket) {
         state.socket.emit('screen-share-stopped', { to: currentCallUser.id });
+        // Также отправляем что видео выключено
+        state.socket.emit('video-state-changed', {
+            to: currentCallUser.id,
+            videoEnabled: !!(videoTrack && videoTrack.enabled)
+        });
     }
     
     isScreenSharing = false;
     document.getElementById('screen-share-btn')?.classList.remove('active');
     const screenBtnIcon = document.getElementById('screen-btn-icon');
     if (screenBtnIcon) screenBtnIcon.src = '/assets/screen-share.svg';
+    
+    // Проверяем нужно ли скрыть видео контейнер
+    checkHideVideos();
+}
+
+// Drag для local-video (перетаскивание по углам)
+function initLocalVideoDrag() {
+    const localVideo = document.getElementById('local-video');
+    if (!localVideo) return;
+    
+    let isDragging = false;
+    let startX, startY;
+    let currentPos = 'bottom-right'; // Начальная позиция
+    
+    const positions = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+    
+    function getPosition(x, y, container) {
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        const isTop = y < centerY;
+        const isLeft = x < centerX;
+        
+        if (isTop && isLeft) return 'top-left';
+        if (isTop && !isLeft) return 'top-right';
+        if (!isTop && isLeft) return 'bottom-left';
+        return 'bottom-right';
+    }
+    
+    function setPosition(pos) {
+        positions.forEach(p => localVideo.classList.remove(`pos-${p}`));
+        localVideo.classList.add(`pos-${pos}`);
+        currentPos = pos;
+    }
+    
+    // Mouse events
+    localVideo.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        localVideo.classList.add('dragging');
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const container = document.getElementById('call-videos');
+        if (!container) return;
+        
+        const newPos = getPosition(e.clientX, e.clientY, container);
+        if (newPos !== currentPos) {
+            setPosition(newPos);
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            localVideo.classList.remove('dragging');
+        }
+    });
+    
+    // Touch events
+    localVideo.addEventListener('touchstart', (e) => {
+        isDragging = true;
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        localVideo.classList.add('dragging');
+    }, { passive: true });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        
+        const container = document.getElementById('call-videos');
+        if (!container) return;
+        
+        const touch = e.touches[0];
+        const newPos = getPosition(touch.clientX, touch.clientY, container);
+        if (newPos !== currentPos) {
+            setPosition(newPos);
+        }
+    }, { passive: true });
+    
+    document.addEventListener('touchend', () => {
+        if (isDragging) {
+            isDragging = false;
+            localVideo.classList.remove('dragging');
+        }
+    });
+    
+    // Двойной клик для смены позиции
+    localVideo.addEventListener('dblclick', () => {
+        const currentIndex = positions.indexOf(currentPos);
+        const nextIndex = (currentIndex + 1) % positions.length;
+        setPosition(positions[nextIndex]);
+    });
 }
 
 function appendCallMessage(msg) {
@@ -4699,6 +4814,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('accept-call-btn')?.addEventListener('click', acceptCall);
     document.getElementById('decline-call-btn')?.addEventListener('click', declineCall);
+    
+    // Drag для local-video
+    initLocalVideoDrag();
     
     // Call bar
     document.getElementById('active-call-bar')?.addEventListener('click', (e) => {
