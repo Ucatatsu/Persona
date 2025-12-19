@@ -3207,7 +3207,7 @@ const iceServers = {
         }
     ],
     iceCandidatePoolSize: 10,
-    iceTransportPolicy: 'all'
+    iceTransportPolicy: 'relay' // Принудительно использовать только TURN
 };
 
 function startCall(video = false) {

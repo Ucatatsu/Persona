@@ -5934,14 +5934,14 @@ input:focus {
 /* Контекстное меню чата */
 .chat-context-menu {
   position: fixed;
-  background: var(--glass);
+  background: rgba(15, 25, 45, 0.98);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 8px 0;
   min-width: 200px;
   backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 10000;
   animation: menuSlideIn 0.2s ease;
 }
 
@@ -11565,12 +11565,12 @@ input[type="range"]:focus::-moz-range-thumb {
 /* Базовые стили для контекстных меню */
 .context-menu {
   position: fixed;
-  background: var(--glass);
+  background: rgba(15, 25, 45, 0.98);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 8px;
   min-width: 200px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(20px);
   z-index: 10001;
   animation: contextMenuIn 0.15s ease-out;
