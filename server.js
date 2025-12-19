@@ -52,7 +52,7 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
+            scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
             imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
             connectSrc: ["'self'", "wss:", "ws:"],
             mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com"],
