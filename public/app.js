@@ -3202,8 +3202,9 @@ async function getIceServers() {
             });
             
             cachedIceServers = { 
-                iceServers: data.iceServers
-                // Убрали iceTransportPolicy: 'relay' — пусть WebRTC сам выберет лучший путь
+                iceServers: data.iceServers,
+                iceTransportPolicy: 'relay', // Принудительно TURN — NAT обрывает прямые соединения
+                iceCandidatePoolSize: 10
             };
             iceServersExpiry = now + 5 * 60 * 1000; // 5 минут
             console.log('✅ TURN credentials получены:', data.iceServers.length, 'серверов (relay-only mode)');

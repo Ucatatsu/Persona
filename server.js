@@ -405,57 +405,36 @@ app.get('/api/vapid-public-key', (_req, res) => {
     }
 });
 
-// TURN credentials (Xirsys)
+// TURN credentials - используем публичные серверы OpenRelay
 app.get('/api/turn-credentials', authMiddleware, async (_req, res) => {
-    try {
-        const ident = process.env.XIRSYS_IDENT;
-        const secret = process.env.XIRSYS_SECRET;
-        const channel = process.env.XIRSYS_CHANNEL || 'default';
-        
-        if (!ident || !secret) {
-            return res.status(503).json({ error: 'TURN сервер не настроен' });
+    // OpenRelay - бесплатные публичные TURN серверы
+    // https://www.metered.ca/tools/openrelay/
+    const iceServers = [
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        {
+            urls: 'turn:global.relay.metered.ca:80',
+            username: 'e8dd65c92f6ec24f42cfe786',
+            credential: 'kMgDyyPqNK/u/yrH'
+        },
+        {
+            urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+            username: 'e8dd65c92f6ec24f42cfe786',
+            credential: 'kMgDyyPqNK/u/yrH'
+        },
+        {
+            urls: 'turn:global.relay.metered.ca:443',
+            username: 'e8dd65c92f6ec24f42cfe786',
+            credential: 'kMgDyyPqNK/u/yrH'
+        },
+        {
+            urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+            username: 'e8dd65c92f6ec24f42cfe786',
+            credential: 'kMgDyyPqNK/u/yrH'
         }
-        
-        const response = await fetch(`https://global.xirsys.net/_turn/${channel}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Basic ' + Buffer.from(`${ident}:${secret}`).toString('base64'),
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.s === 'ok' && data.v) {
-            // Xirsys возвращает 'url', а WebRTC ожидает 'urls'
-            const iceServers = data.v.iceServers.map(server => {
-                const result = {};
-                // Конвертируем url -> urls
-                if (server.url) {
-                    result.urls = server.url;
-                }
-                if (server.urls) {
-                    result.urls = server.urls;
-                }
-                if (server.username) {
-                    result.username = server.username;
-                }
-                if (server.credential) {
-                    result.credential = server.credential;
-                }
-                return result;
-            });
-            
-            console.log('✅ TURN credentials получены:', iceServers.length, 'серверов');
-            res.json({ iceServers });
-        } else {
-            console.error('Xirsys error:', data);
-            res.status(500).json({ error: 'Ошибка получения TURN credentials' });
-        }
-    } catch (error) {
-        console.error('TURN credentials error:', error);
-        res.status(500).json({ error: 'Ошибка сервера' });
-    }
+    ];
+    
+    console.log('✅ OpenRelay TURN credentials отправлены');
+    res.json({ iceServers });
 });
 
 // === ЗАЩИЩЁННЫЕ РОУТЫ ===
