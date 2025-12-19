@@ -3162,44 +3162,35 @@ const iceServers = {
         // STUN серверы Google (бесплатные, надёжные)
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        // Бесплатные публичные TURN серверы
-        // 1. Numb (viagenie) - проверенный бесплатный
+        // Metered.ca TURN серверы (зарегистрированный аккаунт)
         {
-            urls: 'turn:numb.viagenie.ca:3478',
-            username: 'webrtc@live.com',
-            credential: 'muazkh'
-        },
-        // 2. OpenRelay от Metered (публичный)
-        {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:a.relay.metered.ca:80',
+            username: '569a0840c6ddd4085c474f32',
+            credential: 'dyQoNr8tELSuIR//'
         },
         {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+            username: '569a0840c6ddd4085c474f32',
+            credential: 'dyQoNr8tELSuIR//'
         },
         {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        },
-        // 3. Twilio free tier TURN (публичные тестовые)
-        {
-            urls: 'turn:global.turn.twilio.com:3478?transport=udp',
-            username: 'f4b4035eaa76f4a55de5f4351567653ee4ff6fa97b50b6b334fcc1be9c27f3e3',
-            credential: 'w1uxM55V9yVoqyVFjt+mxDBV0F5YRPhmjwbLsGYu1PQ='
+            urls: 'turn:a.relay.metered.ca:443',
+            username: '569a0840c6ddd4085c474f32',
+            credential: 'dyQoNr8tELSuIR//'
         },
         {
-            urls: 'turn:global.turn.twilio.com:443?transport=tcp',
-            username: 'f4b4035eaa76f4a55de5f4351567653ee4ff6fa97b50b6b334fcc1be9c27f3e3',
-            credential: 'w1uxM55V9yVoqyVFjt+mxDBV0F5YRPhmjwbLsGYu1PQ='
+            urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+            username: '569a0840c6ddd4085c474f32',
+            credential: 'dyQoNr8tELSuIR//'
+        },
+        {
+            urls: 'turns:a.relay.metered.ca:443?transport=tcp',
+            username: '569a0840c6ddd4085c474f32',
+            credential: 'dyQoNr8tELSuIR//'
         }
     ],
     iceCandidatePoolSize: 10,
-    iceTransportPolicy: 'all' // Пробуем все варианты (relay и direct)
+    iceTransportPolicy: 'all'
 };
 
 function startCall(video = false) {
