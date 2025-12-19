@@ -2976,6 +2976,7 @@ function isMobile() {
 function handleMobileAfterSelect() {
     if (isMobile()) {
         document.querySelector('.sidebar')?.classList.add('hidden-mobile');
+        document.getElementById('chat-screen')?.classList.add('chat-open');
         
         // Лёгкая вибрация
         if (navigator.vibrate) {
@@ -4877,11 +4878,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('back-btn')?.addEventListener('click', () => {
         document.querySelector('.sidebar')?.classList.remove('hidden-mobile');
+        document.getElementById('chat-screen')?.classList.remove('chat-open');
     });
     
     window.addEventListener('resize', () => {
         if (!isMobile()) {
             document.querySelector('.sidebar')?.classList.remove('hidden-mobile');
+            document.getElementById('chat-screen')?.classList.remove('chat-open');
         }
     });
     
