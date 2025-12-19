@@ -427,7 +427,27 @@ app.get('/api/turn-credentials', authMiddleware, async (_req, res) => {
         const data = await response.json();
         
         if (data.s === 'ok' && data.v) {
-            res.json({ iceServers: data.v.iceServers });
+            // Xirsys возвращает 'url', а WebRTC ожидает 'urls'
+            const iceServers = data.v.iceServers.map(server => {
+                const result = {};
+                // Конвертируем url -> urls
+                if (server.url) {
+                    result.urls = server.url;
+                }
+                if (server.urls) {
+                    result.urls = server.urls;
+                }
+                if (server.username) {
+                    result.username = server.username;
+                }
+                if (server.credential) {
+                    result.credential = server.credential;
+                }
+                return result;
+            });
+            
+            console.log('✅ TURN credentials получены:', iceServers.length, 'серверов');
+            res.json({ iceServers });
         } else {
             console.error('Xirsys error:', data);
             res.status(500).json({ error: 'Ошибка получения TURN credentials' });

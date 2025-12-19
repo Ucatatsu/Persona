@@ -3171,6 +3171,10 @@ let isScreenSharing = false;
 let isMuted = false;
 let incomingCallData = null;
 
+// Буфер для ICE кандидатов (приходят до установки remote description)
+let pendingIceCandidates = [];
+let isRemoteDescriptionSet = false;
+
 // ICE серверы для WebRTC
 // ВАЖНО: Для надёжной работы через мобильный интернет нужны TURN серверы
 // ICE серверы получаем динамически с сервера (Xirsys)
@@ -3190,20 +3194,29 @@ async function getIceServers() {
         const res = await api.get('/api/turn-credentials');
         if (res.ok) {
             const data = await res.json();
+            
+            // Логируем полученные серверы для диагностики
+            console.log('📡 Полученные ICE серверы:');
+            data.iceServers.forEach((server, i) => {
+                console.log(`  ${i + 1}. ${server.urls || server.url} ${server.username ? '(с credentials)' : ''}`);
+            });
+            
             cachedIceServers = { 
                 iceServers: data.iceServers,
                 iceTransportPolicy: 'relay' // Принудительно только TURN
             };
             iceServersExpiry = now + 5 * 60 * 1000; // 5 минут
-            console.log('✅ TURN credentials получены:', data.iceServers.length, 'серверов (relay-only)');
+            console.log('✅ TURN credentials получены:', data.iceServers.length, 'серверов (relay-only mode)');
             return cachedIceServers;
+        } else {
+            console.error('❌ Ошибка получения TURN credentials:', res.status, res.statusText);
         }
     } catch (e) {
         console.error('❌ Ошибка получения TURN credentials:', e);
     }
     
-    // Fallback на Google STUN (только для локальных сетей)
-    console.warn('⚠️ Используем fallback STUN серверы');
+    // Fallback на Google STUN (только для локальных сетей!)
+    console.warn('⚠️ ВНИМАНИЕ: Используем fallback STUN серверы - звонки будут работать ТОЛЬКО в локальной сети!');
     return {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -3246,6 +3259,10 @@ function startCall(video = false) {
 
 async function initCall(video) {
     console.log('📞 initCall started:', { video });
+    
+    // Сбрасываем состояние ICE буфера
+    pendingIceCandidates = [];
+    isRemoteDescriptionSet = false;
     
     try {
         console.log('🎤 Запрашиваем доступ к медиа...');
@@ -3343,10 +3360,17 @@ async function initCall(video) {
                 statusEl.textContent = 'Соединено';
                 if (!callTimer) startCallTimer();
             } else if (peerConnection.iceConnectionState === 'failed') {
-                statusEl.textContent = 'Ошибка соединения';
-                console.error('❌ ICE connection failed! Возможно TURN серверы недоступны');
-                // Показываем пользователю понятное сообщение
-                showToast('Не удалось установить соединение. Проверьте интернет.', 'error');
+                console.error('❌ ICE connection failed! Пробуем ICE restart...');
+                statusEl.textContent = 'Переподключение...';
+                // Пробуем ICE restart
+                try {
+                    peerConnection.restartIce();
+                    console.log('🔄 ICE restart initiated');
+                } catch (e) {
+                    console.error('ICE restart failed:', e);
+                    statusEl.textContent = 'Ошибка соединения';
+                    showToast('Не удалось установить соединение. Проверьте интернет.', 'error');
+                }
             } else if (peerConnection.iceConnectionState === 'disconnected') {
                 statusEl.textContent = 'Переподключение...';
             } else if (peerConnection.iceConnectionState === 'checking') {
@@ -3419,6 +3443,10 @@ async function acceptCall() {
     isVideoCall = incomingCallData.isVideo;
     currentCallUser = { id: incomingCallData.from, username: incomingCallData.fromName };
     currentCallId = incomingCallData.callId;
+    
+    // Сбрасываем состояние ICE буфера
+    pendingIceCandidates = [];
+    isRemoteDescriptionSet = false;
     
     const callModal = document.getElementById('call-modal');
     document.getElementById('call-avatar').textContent = incomingCallData.fromName[0].toUpperCase();
@@ -3527,6 +3555,10 @@ async function acceptCall() {
         
         console.log('📥 Устанавливаем remote description (offer)...');
         await peerConnection.setRemoteDescription(incomingCallData.offer);
+        isRemoteDescriptionSet = true;
+        
+        // Добавляем буферизованные ICE кандидаты
+        await flushPendingIceCandidates();
         
         console.log('📤 Создаём answer...');
         const answer = await peerConnection.createAnswer();
@@ -3569,7 +3601,12 @@ async function handleCallAnswered(data) {
             console.log('📥 Устанавливаем remote description (answer)...');
             const answer = new RTCSessionDescription(data.answer);
             await peerConnection.setRemoteDescription(answer);
+            isRemoteDescriptionSet = true;
             console.log('✅ Remote description установлен');
+            
+            // Добавляем буферизованные ICE кандидаты
+            await flushPendingIceCandidates();
+            
             document.getElementById('call-status').textContent = 'Подключение...';
         } catch (e) {
             console.error('❌ Error setting remote description:', e);
@@ -3598,18 +3635,40 @@ function handleCallFailed(data) {
 }
 
 async function handleIceCandidate(data) {
-    if (peerConnection && data.candidate) {
+    if (!peerConnection || !data.candidate) return;
+    
+    const candidate = new RTCIceCandidate(data.candidate);
+    
+    // Если remote description ещё не установлен, буферизуем кандидата
+    if (!isRemoteDescriptionSet) {
+        console.log('🧊 ICE candidate буферизован (ждём remote description)');
+        pendingIceCandidates.push(candidate);
+        return;
+    }
+    
+    try {
+        await peerConnection.addIceCandidate(candidate);
+        console.log('🧊 ICE candidate добавлен');
+    } catch (e) {
+        console.error('❌ ICE candidate error:', e);
+    }
+}
+
+// Добавить все буферизованные ICE кандидаты
+async function flushPendingIceCandidates() {
+    if (pendingIceCandidates.length === 0) return;
+    
+    console.log(`🧊 Добавляем ${pendingIceCandidates.length} буферизованных ICE кандидатов`);
+    
+    for (const candidate of pendingIceCandidates) {
         try {
-            const candidate = new RTCIceCandidate(data.candidate);
             await peerConnection.addIceCandidate(candidate);
-            console.log('🧊 ICE candidate добавлен');
         } catch (e) {
-            // Игнорируем ошибки если remote description ещё не установлен
-            if (e.name !== 'InvalidStateError') {
-                console.error('❌ ICE candidate error:', e);
-            }
+            console.error('❌ Buffered ICE candidate error:', e);
         }
     }
+    
+    pendingIceCandidates = [];
 }
 
 function handleCallMessage(message) {
