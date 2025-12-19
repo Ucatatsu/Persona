@@ -3225,6 +3225,37 @@ async function getIceServers() {
     };
 }
 
+// Ждём завершения сбора ICE кандидатов (с таймаутом)
+function waitForIceGathering(timeout = 5000) {
+    return new Promise((resolve) => {
+        if (!peerConnection) {
+            resolve();
+            return;
+        }
+        
+        // Если уже завершено
+        if (peerConnection.iceGatheringState === 'complete') {
+            console.log('✅ ICE gathering уже завершён');
+            resolve();
+            return;
+        }
+        
+        const timeoutId = setTimeout(() => {
+            console.log('⏱️ ICE gathering таймаут, продолжаем с тем что есть');
+            resolve();
+        }, timeout);
+        
+        peerConnection.addEventListener('icegatheringstatechange', function onStateChange() {
+            if (peerConnection.iceGatheringState === 'complete') {
+                clearTimeout(timeoutId);
+                peerConnection.removeEventListener('icegatheringstatechange', onStateChange);
+                console.log('✅ ICE gathering завершён');
+                resolve();
+            }
+        });
+    });
+}
+
 function startCall(video = false) {
     console.log('📞 startCall called:', { video, selectedUser: state.selectedUser?.id, socketConnected: state.socket?.connected });
     
@@ -3395,11 +3426,18 @@ async function initCall(video) {
         console.log('📤 Создаём offer...');
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
-        console.log('✅ Offer создан, отправляем call-user');
+        
+        // Ждём сбора всех ICE кандидатов перед отправкой offer
+        console.log('⏳ Ждём сбора ICE кандидатов...');
+        await waitForIceGathering();
+        
+        // Отправляем offer с уже собранными кандидатами
+        const completeOffer = peerConnection.localDescription;
+        console.log('✅ Offer готов с ICE кандидатами, отправляем call-user');
         
         state.socket.emit('call-user', {
             to: state.selectedUser.id,
-            offer: offer,
+            offer: completeOffer,
             isVideo: video
         });
         
@@ -3564,10 +3602,16 @@ async function acceptCall() {
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         
-        console.log('✅ Answer создан, отправляем call-answer');
+        // Ждём сбора всех ICE кандидатов перед отправкой answer
+        console.log('⏳ Ждём сбора ICE кандидатов (acceptCall)...');
+        await waitForIceGathering();
+        
+        // Отправляем answer с уже собранными кандидатами
+        const completeAnswer = peerConnection.localDescription;
+        console.log('✅ Answer готов с ICE кандидатами, отправляем call-answer');
         state.socket.emit('call-answer', {
             to: incomingCallData.from,
-            answer: answer,
+            answer: completeAnswer,
             callId: currentCallId
         });
         
