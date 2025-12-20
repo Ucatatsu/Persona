@@ -28,6 +28,8 @@ const state = {
     selectedGroup: null,
     selectedChannel: null,
     selectedServer: null,
+    // Reply to message
+    replyToMessage: null,
     selectedServerChannel: null
 };
 
@@ -1991,6 +1993,9 @@ function initUserListEvents() {
 async function selectUser(userId, username) {
     state.selectedUser = { id: userId, username };
     
+    // Очищаем reply при смене чата
+    clearReplyToMessage();
+    
     // На мобильных сначала запускаем анимацию перехода
     if (isMobile()) {
         handleMobileAfterSelect();
@@ -2124,15 +2129,48 @@ function createMessageElement(msg, isSent) {
         bubbleContent = linkifyText(escapeHtml(msg.text));
     }
     
+    // Формируем HTML для replied сообщения
+    let replyHtml = '';
+    if (msg.reply_to) {
+        const replySenderName = msg.reply_to.sender_id === state.currentUser?.id 
+            ? 'Вы' 
+            : (msg.reply_to.sender_display_name || msg.reply_to.sender_username || 'Пользователь');
+        let replyText = msg.reply_to.text || '';
+        if (msg.reply_to.message_type === 'image' || msg.reply_to.message_type === 'gif') {
+            replyText = '📷 Фото';
+        } else if (msg.reply_to.message_type === 'video') {
+            replyText = '🎬 Видео';
+        } else if (replyText.length > 50) {
+            replyText = replyText.substring(0, 50) + '...';
+        }
+        replyHtml = `
+            <div class="message-reply" data-reply-id="${escapeAttr(msg.reply_to.id)}">
+                <div class="message-reply-line"></div>
+                <div class="message-reply-content">
+                    <span class="message-reply-name">${escapeHtml(replySenderName)}</span>
+                    <span class="message-reply-text">${escapeHtml(replyText)}</span>
+                </div>
+            </div>
+        `;
+    }
+    
     div.innerHTML = `
         ${getAvatarHtml(isSent)}
         <div class="message-content">
+            ${replyHtml}
             <div class="message-bubble">${bubbleContent}</div>
             <div class="message-time">${formatTime(msg.created_at)}${editedMark}</div>
             ${reactionsHtml}
             <button class="add-reaction-btn" title="Добавить реакцию">😊</button>
         </div>
     `;
+    
+    // Клик на reply - скролл к оригинальному сообщению
+    if (msg.reply_to) {
+        div.querySelector('.message-reply')?.addEventListener('click', () => {
+            scrollToMessage(msg.reply_to.id);
+        });
+    }
     
     // Клик на изображение - открыть просмотр
     if (isMedia) {
@@ -2508,16 +2546,30 @@ function showMessageContextMenu(e, msg, isSent) {
     const menu = document.createElement('div');
     menu.className = 'message-context-menu';
     
+    const isPremiumPlus = state.currentUserProfile?.premiumPlan === 'premium_plus' || state.currentUser?.role === 'admin';
+    
     let menuItems = `
+        <div class="context-menu-item" data-action="reply"><img src="/assets/message.svg" alt="" class="icon-sm ctx-icon"> Ответить</div>
         <div class="context-menu-item" data-action="react"><img src="/assets/emoji.svg" alt="" class="icon-sm ctx-icon"> Реакция</div>
         <div class="context-menu-item" data-action="copy"><img src="/assets/copy.svg" alt="" class="icon-sm ctx-icon"> Копировать</div>
     `;
     
+    // Логика удаления:
+    // Свои сообщения - любой может удалить у себя И у всех
+    // Чужие сообщения - удалить у себя (любой), удалить у всех (только P+)
+    
     if (isSent) {
-        const isPremiumPlus = state.currentUserProfile?.premiumPlan === 'premium_plus' || state.currentUser?.role === 'admin';
+        // Свои сообщения
         menuItems += `
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="edit"><img src="/assets/edit.svg" alt="" class="icon-sm ctx-icon"> Редактировать</div>
+            <div class="context-menu-item danger" data-action="delete"><img src="/assets/trash.svg" alt="" class="icon-sm ctx-icon"> Удалить у себя</div>
+            <div class="context-menu-item danger" data-action="delete-all"><img src="/assets/trash.svg" alt="" class="icon-sm ctx-icon"> Удалить у всех</div>
+        `;
+    } else {
+        // Чужие сообщения
+        menuItems += `
+            <div class="context-menu-divider"></div>
             <div class="context-menu-item danger" data-action="delete"><img src="/assets/trash.svg" alt="" class="icon-sm ctx-icon"> Удалить у себя</div>
             ${isPremiumPlus ? '<div class="context-menu-item danger" data-action="delete-all"><img src="/assets/trash.svg" alt="" class="icon-sm ctx-icon"> Удалить у всех <span class="badge-premium-plus">P+</span></div>' : ''}
         `;
@@ -2569,6 +2621,9 @@ function showMessageContextMenu(e, msg, isSent) {
             case 'react':
                 showReactionPicker(msg.id, ev.target);
                 break;
+            case 'reply':
+                setReplyToMessage(msg);
+                break;
         }
         menu.remove();
     });
@@ -2596,7 +2651,76 @@ async function editMessage(msg) {
     }
 }
 
+// === REPLY TO MESSAGE ===
+function setReplyToMessage(msg) {
+    state.replyToMessage = msg;
+    showReplyPreview(msg);
+    document.getElementById('message-input')?.focus();
+}
+
+function clearReplyToMessage() {
+    state.replyToMessage = null;
+    hideReplyPreview();
+}
+
+function showReplyPreview(msg) {
+    let preview = document.getElementById('reply-preview');
+    if (!preview) {
+        preview = document.createElement('div');
+        preview.id = 'reply-preview';
+        preview.className = 'reply-preview';
+        const messageForm = document.querySelector('.message-form');
+        if (messageForm) {
+            messageForm.insertBefore(preview, messageForm.firstChild);
+        }
+    }
+    
+    const senderName = msg.sender_id === state.currentUser?.id 
+        ? 'Вы' 
+        : (msg.sender_display_name || msg.sender_username || state.selectedUser?.username || 'Пользователь');
+    
+    let previewText = msg.text;
+    if (msg.message_type === 'image' || msg.message_type === 'gif') {
+        previewText = '📷 Фото';
+    } else if (msg.message_type === 'video') {
+        previewText = '🎬 Видео';
+    } else if (previewText && previewText.length > 50) {
+        previewText = previewText.substring(0, 50) + '...';
+    }
+    
+    preview.innerHTML = `
+        <div class="reply-preview-content">
+            <div class="reply-preview-line"></div>
+            <div class="reply-preview-info">
+                <span class="reply-preview-name">${escapeHtml(senderName)}</span>
+                <span class="reply-preview-text">${escapeHtml(previewText)}</span>
+            </div>
+        </div>
+        <button class="reply-preview-close" type="button">✕</button>
+    `;
+    
+    preview.querySelector('.reply-preview-close').addEventListener('click', clearReplyToMessage);
+    preview.classList.add('visible');
+}
+
+function hideReplyPreview() {
+    const preview = document.getElementById('reply-preview');
+    if (preview) {
+        preview.classList.remove('visible');
+    }
+}
+
+function scrollToMessage(messageId) {
+    const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageEl) {
+        messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageEl.classList.add('highlight');
+        setTimeout(() => messageEl.classList.remove('highlight'), 2000);
+    }
+}
+
 async function deleteMessagePrompt(msg, deleteForAll = false) {
+    const isOwnMessage = msg.sender_id === state.currentUser?.id;
     const message = deleteForAll 
         ? 'Сообщение будет удалено у всех участников чата'
         : 'Сообщение будет удалено только у вас';
@@ -2612,8 +2736,9 @@ async function deleteMessagePrompt(msg, deleteForAll = false) {
     if (confirmed) {
         state.socket.emit('delete-message', {
             messageId: msg.id,
-            receiverId: state.selectedUser.id,
-            deleteForAll
+            receiverId: state.selectedUser?.id,
+            deleteForAll,
+            isOwnMessage
         });
     }
 }
@@ -2723,6 +2848,9 @@ function sendMessage() {
     // Получаем время самоуничтожения
     const selfDestructMinutes = state.selfDestructMinutes || 0;
     
+    // Получаем replyToId если есть
+    const replyToId = state.replyToMessage?.id || null;
+    
     // Отправляем в зависимости от типа чата
     if (state.selectedGroup) {
         state.socket.emit('group-message', {
@@ -2745,11 +2873,13 @@ function sendMessage() {
         state.socket.emit('send-message', {
             receiverId: state.selectedUser.id,
             text,
-            selfDestructMinutes
+            selfDestructMinutes,
+            replyToId
         });
     }
     
     input.value = '';
+    clearReplyToMessage();
 }
 
 // Прикрепление файла
@@ -3013,6 +3143,46 @@ function saveSettings() {
     localStorage.setItem('kvant_settings', JSON.stringify(state.settings));
     // Синхронизируем с сервером (без customBg - слишком большой)
     syncSettingsToServer();
+}
+
+// Звуки уведомлений (Web Audio API для генерации)
+const notificationSounds = {
+    default: [440, 0.1, 'sine'],
+    pop: [600, 0.08, 'sine'],
+    ding: [880, 0.15, 'triangle'],
+    chime: [523, 0.2, 'sine'],
+    bubble: [350, 0.12, 'sine'],
+    none: null
+};
+
+function playNotificationSound(preview = false) {
+    if (!preview && state.settings.sounds === false) return;
+    
+    const soundType = state.settings.notificationSound || 'default';
+    const soundConfig = notificationSounds[soundType];
+    
+    if (!soundConfig) return;
+    
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.frequency.value = soundConfig[0];
+        oscillator.type = soundConfig[2];
+        
+        const volume = (state.settings.volume || 50) / 100;
+        gainNode.gain.setValueAtTime(volume * 0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + soundConfig[1]);
+        
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + soundConfig[1]);
+    } catch (e) {
+        console.log('Sound play error:', e);
+    }
 }
 
 let settingsSyncTimeout = null;
@@ -5329,6 +5499,40 @@ document.addEventListener('DOMContentLoaded', () => {
         saveSettings();
     });
     
+    // Звук уведомлений
+    document.getElementById('notification-sound-select')?.addEventListener('change', (e) => {
+        state.settings.notificationSound = e.target.value;
+        saveSettings();
+    });
+    
+    document.getElementById('play-sound-btn')?.addEventListener('click', () => {
+        playNotificationSound(true);
+    });
+    
+    // Приватность
+    document.getElementById('online-visibility-select')?.addEventListener('change', (e) => {
+        state.settings.onlineVisibility = e.target.value;
+        saveSettings();
+        // Отправляем на сервер
+        if (state.socket) {
+            state.socket.emit('update-privacy', { onlineVisibility: e.target.value });
+        }
+    });
+    
+    document.getElementById('setting-hide-typing')?.addEventListener('change', (e) => {
+        state.settings.hideTyping = e.target.checked;
+        saveSettings();
+    });
+    
+    document.getElementById('setting-hide-last-seen')?.addEventListener('change', (e) => {
+        state.settings.hideLastSeen = e.target.checked;
+        saveSettings();
+        // Отправляем на сервер
+        if (state.socket) {
+            state.socket.emit('update-privacy', { hideLastSeen: e.target.checked });
+        }
+    });
+    
     document.getElementById('setting-compact')?.addEventListener('change', (e) => {
         state.settings.compact = e.target.checked;
         saveSettings();
@@ -6311,18 +6515,21 @@ function showSettings() {
     if (soundsCheckbox) soundsCheckbox.checked = state.settings.sounds !== false;
     if (avatarsCheckbox) avatarsCheckbox.checked = !state.settings.hideAvatars;
     
+    // Звук уведомлений
+    const soundSelect = document.getElementById('notification-sound-select');
+    if (soundSelect) soundSelect.value = state.settings.notificationSound || 'default';
+    
+    // Приватность
+    const onlineVisibility = document.getElementById('online-visibility-select');
+    const hideTyping = document.getElementById('setting-hide-typing');
+    const hideLastSeen = document.getElementById('setting-hide-last-seen');
+    
+    if (onlineVisibility) onlineVisibility.value = state.settings.onlineVisibility || 'all';
+    if (hideTyping) hideTyping.checked = state.settings.hideTyping || false;
+    if (hideLastSeen) hideLastSeen.checked = state.settings.hideLastSeen || false;
+    
     // Premium статус
     const isPremium = state.currentUserProfile?.isPremium || state.currentUser?.role === 'admin';
-    
-    // Premium: скрытый онлайн
-    const hideOnlineCheckbox = document.getElementById('setting-hide-online');
-    if (hideOnlineCheckbox) {
-        hideOnlineCheckbox.checked = state.currentUserProfile?.hide_online || false;
-        const hideOnlineSetting = document.getElementById('hide-online-setting');
-        if (hideOnlineSetting) {
-            hideOnlineSetting.classList.toggle('locked', !isPremium);
-        }
-    }
     
     // Блокируем премиум-темы для не-премиум пользователей
     document.querySelectorAll('.theme-option.premium-theme').forEach(opt => {

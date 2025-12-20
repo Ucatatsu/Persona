@@ -1,4 +1,4 @@
-const bcrypt = require('bcryptjs');
+﻿const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
 // Определяем какую БД использовать
@@ -375,6 +375,9 @@ async function initDB() {
         // Миграция: добавляем self_destruct_at в messages
         try { sqlite.exec('ALTER TABLE messages ADD COLUMN self_destruct_at TEXT'); } catch {}
         
+        // Миграция: добавляем reply_to_id в messages
+        try { sqlite.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT'); } catch {}
+        
         // Миграция: добавляем premium_plan в users
         try { sqlite.exec("ALTER TABLE users ADD COLUMN premium_plan TEXT DEFAULT 'premium'"); } catch {}
         
@@ -463,6 +466,7 @@ async function initDB() {
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_duration INTEGER DEFAULT 0').catch(() => {});
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP').catch(() => {});
         await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS self_destruct_at TIMESTAMP').catch(() => {});
+        await client.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id TEXT').catch(() => {});
 
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id)').catch(() => {});
         await client.query('CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)').catch(() => {});
@@ -1102,7 +1106,7 @@ async function searchUsers(query, excludeUserId) {
 
 // === СООБЩЕНИЯ ===
 
-async function saveMessage(senderId, receiverId, text, messageType = 'text', callDuration = 0, selfDestructMinutes = null) {
+async function saveMessage(senderId, receiverId, text, messageType = 'text', callDuration = 0, selfDestructMinutes = null, replyToId = null) {
     try {
         const id = uuidv4();
         const created_at = new Date().toISOString();
@@ -1114,30 +1118,110 @@ async function saveMessage(senderId, receiverId, text, messageType = 'text', cal
         }
         
         if (USE_SQLITE) {
-            sqlite.prepare(`INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at, self_destruct_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, senderId, receiverId, text, messageType, callDuration, created_at, self_destruct_at);
+            sqlite.prepare(`INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at, self_destruct_at, reply_to_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, senderId, receiverId, text, messageType, callDuration, created_at, self_destruct_at, replyToId);
         } else {
             await pool.query(
-                `INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at, self_destruct_at) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [id, senderId, receiverId, text, messageType, callDuration, created_at, self_destruct_at]
+                `INSERT INTO messages (id, sender_id, receiver_id, text, message_type, call_duration, created_at, self_destruct_at, reply_to_id) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                [id, senderId, receiverId, text, messageType, callDuration, created_at, self_destruct_at, replyToId]
             );
         }
         
-        return { id, sender_id: senderId, receiver_id: receiverId, text, created_at, message_type: messageType, call_duration: callDuration, self_destruct_at };
+        return { id, sender_id: senderId, receiver_id: receiverId, text, created_at, message_type: messageType, call_duration: callDuration, self_destruct_at, reply_to_id: replyToId };
     } catch (error) {
         console.error('Save message error:', error);
         throw error;
     }
 }
 
+async function getMessageById(messageId) {
+    try {
+        if (USE_SQLITE) {
+            return sqlite.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) || null;
+        } else {
+            const result = await pool.query('SELECT * FROM messages WHERE id = $1', [messageId]);
+            return result.rows[0] || null;
+        }
+    } catch (error) {
+        console.error('Get message by id error:', error);
+        return null;
+    }
+}
+
 async function getMessages(userId1, userId2, limit = 50, before = null) {
     try {
+        if (USE_SQLITE) {
+            let query = `
+                SELECT m.id, m.sender_id, m.receiver_id, m.text, m.message_type, m.call_duration, m.created_at, m.updated_at, m.reply_to_id,
+                       u.bubble_style as sender_bubble_style,
+                       rm.id as reply_id, rm.text as reply_text, rm.sender_id as reply_sender_id, rm.message_type as reply_message_type,
+                       ru.username as reply_sender_username, ru.display_name as reply_sender_display_name
+                FROM messages m
+                LEFT JOIN users u ON m.sender_id = u.id
+                LEFT JOIN messages rm ON m.reply_to_id = rm.id
+                LEFT JOIN users ru ON rm.sender_id = ru.id
+                WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
+            `;
+            const params = [userId1, userId2, userId2, userId1];
+            
+            if (before) {
+                query += ` AND m.created_at < ?`;
+                params.push(before);
+            }
+            
+            query += ` ORDER BY m.created_at DESC LIMIT ?`;
+            params.push(Math.min(limit, 100));
+            
+            const rows = sqlite.prepare(query).all(...params);
+            const messages = rows.reverse().map(row => ({
+                id: row.id,
+                sender_id: row.sender_id,
+                receiver_id: row.receiver_id,
+                text: row.text,
+                message_type: row.message_type,
+                call_duration: row.call_duration,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                reply_to_id: row.reply_to_id,
+                sender_bubble_style: row.sender_bubble_style,
+                reply_to: row.reply_id ? {
+                    id: row.reply_id,
+                    text: row.reply_text,
+                    sender_id: row.reply_sender_id,
+                    message_type: row.reply_message_type,
+                    sender_username: row.reply_sender_username,
+                    sender_display_name: row.reply_sender_display_name
+                } : null
+            }));
+            
+            if (messages.length > 0) {
+                const messageIds = messages.map(m => m.id);
+                const placeholders = messageIds.map(() => '?').join(',');
+                const reactionsRows = sqlite.prepare(
+                    `SELECT message_id, emoji, COUNT(*) as count, GROUP_CONCAT(user_id) as user_ids
+                     FROM message_reactions WHERE message_id IN (${placeholders}) GROUP BY message_id, emoji`
+                ).all(...messageIds);
+                const reactionsMap = {};
+                for (const r of reactionsRows) {
+                    if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
+                    reactionsMap[r.message_id].push({ emoji: r.emoji, count: parseInt(r.count), user_ids: r.user_ids ? r.user_ids.split(',') : [] });
+                }
+                for (const msg of messages) msg.reactions = reactionsMap[msg.id] || [];
+            }
+            
+            return messages;
+        }
+        
         let query = `
-            SELECT m.id, m.sender_id, m.receiver_id, m.text, m.message_type, m.call_duration, m.created_at, m.updated_at,
-                   u.bubble_style as sender_bubble_style
+            SELECT m.id, m.sender_id, m.receiver_id, m.text, m.message_type, m.call_duration, m.created_at, m.updated_at, m.reply_to_id,
+                   u.bubble_style as sender_bubble_style,
+                   rm.id as reply_id, rm.text as reply_text, rm.sender_id as reply_sender_id, rm.message_type as reply_message_type,
+                   ru.username as reply_sender_username, ru.display_name as reply_sender_display_name
             FROM messages m
             LEFT JOIN users u ON m.sender_id = u.id
+            LEFT JOIN messages rm ON m.reply_to_id = rm.id
+            LEFT JOIN users ru ON rm.sender_id = ru.id
             WHERE (m.sender_id = $1 AND m.receiver_id = $2) OR (m.sender_id = $2 AND m.receiver_id = $1)
         `;
         const params = [userId1, userId2];
@@ -1148,10 +1232,29 @@ async function getMessages(userId1, userId2, limit = 50, before = null) {
         }
         
         query += ` ORDER BY m.created_at DESC LIMIT $${params.length + 1}`;
-        params.push(Math.min(limit, 100)); // Максимум 100
+        params.push(Math.min(limit, 100));
         
         const result = await pool.query(query, params);
-        const messages = result.rows.reverse();
+        const messages = result.rows.reverse().map(row => ({
+            id: row.id,
+            sender_id: row.sender_id,
+            receiver_id: row.receiver_id,
+            text: row.text,
+            message_type: row.message_type,
+            call_duration: row.call_duration,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            reply_to_id: row.reply_to_id,
+            sender_bubble_style: row.sender_bubble_style,
+            reply_to: row.reply_id ? {
+                id: row.reply_id,
+                text: row.reply_text,
+                sender_id: row.reply_sender_id,
+                message_type: row.reply_message_type,
+                sender_username: row.reply_sender_username,
+                sender_display_name: row.reply_sender_display_name
+            } : null
+        }));
         
         // Загружаем реакции
         if (messages.length > 0) {
@@ -1370,25 +1473,41 @@ async function editMessage(messageId, userId, newText) {
     }
 }
 
-async function deleteMessage(messageId, odataId, deleteForAll = false) {
+async function deleteMessage(messageId, userId, deleteForAll = false, isOwnMessage = true) {
     try {
         if (USE_SQLITE) {
-            // Проверяем что пользователь - отправитель
             const msg = sqlite.prepare('SELECT sender_id, receiver_id FROM messages WHERE id = ?').get(messageId);
-            if (!msg || msg.sender_id !== odataId) {
-                return { success: false, error: 'Сообщение не найдено или нет прав' };
+            if (!msg) {
+                return { success: false, error: 'Сообщение не найдено' };
             }
+            
+            // Проверяем что пользователь участник чата
+            if (msg.sender_id !== userId && msg.receiver_id !== userId) {
+                return { success: false, error: 'Нет прав на удаление' };
+            }
+            
             sqlite.prepare('DELETE FROM messages WHERE id = ?').run(messageId);
             return { success: true, receiverId: msg.receiver_id, deleteForAll };
         } else {
-            const result = await pool.query(
-                'DELETE FROM messages WHERE id = $1 AND sender_id = $2 RETURNING id, receiver_id',
-                [messageId, odataId]
+            // Сначала получаем сообщение
+            const msgResult = await pool.query(
+                'SELECT sender_id, receiver_id FROM messages WHERE id = $1',
+                [messageId]
             );
-            if (result.rows.length === 0) {
-                return { success: false, error: 'Сообщение не найдено или нет прав' };
+            
+            if (msgResult.rows.length === 0) {
+                return { success: false, error: 'Сообщение не найдено' };
             }
-            return { success: true, receiverId: result.rows[0].receiver_id, deleteForAll };
+            
+            const msg = msgResult.rows[0];
+            
+            // Проверяем что пользователь участник чата
+            if (msg.sender_id !== userId && msg.receiver_id !== userId) {
+                return { success: false, error: 'Нет прав на удаление' };
+            }
+            
+            await pool.query('DELETE FROM messages WHERE id = $1', [messageId]);
+            return { success: true, receiverId: msg.receiver_id, deleteForAll };
         }
     } catch (error) {
         console.error('Delete message error:', error);
@@ -2611,7 +2730,8 @@ module.exports = {
     updateUserBanner, 
     updateUsername, 
     searchUsers, 
-    saveMessage, 
+    saveMessage,
+    getMessageById,
     getMessages, 
     getContacts, 
     markMessagesAsRead, 

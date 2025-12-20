@@ -2001,7 +2001,7 @@ io.on('connection', async (socket) => {
                 return socket.emit('error', { message: 'Слишком много сообщений, подождите' });
             }
             
-            const { receiverId, text, messageType = 'text', selfDestructMinutes = null } = data;
+            const { receiverId, text, messageType = 'text', selfDestructMinutes = null, replyToId = null } = data;
             
             if (!receiverId || !text || typeof text !== 'string') {
                 return socket.emit('error', { message: 'Неверные данные' });
@@ -2022,10 +2022,26 @@ io.on('connection', async (socket) => {
                 }
             }
             
-            const message = await db.saveMessage(userId, receiverId, sanitizedText, messageType, 0, actualSelfDestruct);
+            const message = await db.saveMessage(userId, receiverId, sanitizedText, messageType, 0, actualSelfDestruct, replyToId);
             
             // Добавляем bubble_style отправителя (для отображения у получателя)
             message.sender_bubble_style = senderUser?.bubble_style || 'default';
+            
+            // Если есть reply_to, загружаем данные о replied сообщении
+            if (replyToId) {
+                const replyMsg = await db.getMessageById(replyToId);
+                if (replyMsg) {
+                    const replyUser = await db.getUser(replyMsg.sender_id);
+                    message.reply_to = {
+                        id: replyMsg.id,
+                        text: replyMsg.text,
+                        sender_id: replyMsg.sender_id,
+                        message_type: replyMsg.message_type,
+                        sender_username: replyUser?.username,
+                        sender_display_name: replyUser?.display_name
+                    };
+                }
+            }
             
             // Отправляем получателю (все его устройства)
             const receiverData = onlineUsers.get(receiverId);
@@ -2085,17 +2101,28 @@ io.on('connection', async (socket) => {
     
     socket.on('delete-message', async (data) => {
         try {
-            const { messageId, receiverId, deleteForAll = false } = data;
+            const { messageId, receiverId, deleteForAll = false, isOwnMessage = true } = data;
             if (!messageId) return;
             
-            // Проверяем Premium+ для "удалить у всех"
+            const user = await db.getUser(userId);
+            const isPremiumPlus = user?.role === 'admin' || user?.premiumPlan === 'premium_plus';
+            
+            // Логика удаления:
+            // Свои сообщения - любой может удалить у себя И у всех
+            // Чужие сообщения - удалить у себя (любой), удалить у всех (только P+)
+            
             let canDeleteForAll = false;
             if (deleteForAll) {
-                const user = await db.getUser(userId);
-                canDeleteForAll = user?.role === 'admin' || user?.premiumPlan === 'premium_plus';
+                if (isOwnMessage) {
+                    // Свои сообщения - любой может удалить у всех
+                    canDeleteForAll = true;
+                } else {
+                    // Чужие сообщения - только P+ может удалить у всех
+                    canDeleteForAll = isPremiumPlus;
+                }
             }
             
-            const result = await db.deleteMessage(messageId, userId, canDeleteForAll);
+            const result = await db.deleteMessage(messageId, userId, canDeleteForAll, isOwnMessage);
             if (result.success) {
                 const deleteData = { messageId, deleteForAll: canDeleteForAll };
                 emitToUser(userId, 'message-deleted', deleteData);
