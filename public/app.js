@@ -9056,7 +9056,7 @@ function applySettings() {
     const messagesDiv = document.getElementById('messages');
     
     if (chatScreen) {
-        chatScreen.classList.remove('bg-gradient1', 'bg-gradient2', 'bg-gradient3', 'bg-solid', 'bg-custom', 'bg-mode-contain');
+        chatScreen.classList.remove('bg-gradient1', 'bg-gradient2', 'bg-gradient3', 'bg-gradient4', 'bg-gradient5', 'bg-solid', 'bg-custom', 'bg-mode-contain');
         chatScreen.style.backgroundImage = '';
         
         if (state.settings.background && state.settings.background !== 'default') {
