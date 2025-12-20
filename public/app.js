@@ -3053,38 +3053,80 @@ function applyPanelOpacity(opacity) {
     // Конвертируем проценты в значение 0-1
     const value = opacity / 100;
     document.documentElement.style.setProperty('--panel-opacity', value);
+    
+    // Применяем к панелям напрямую через rgba
+    const panels = ['.sidebar', '.message-form', '.chat-header-pill'];
+    panels.forEach(selector => {
+        const el = document.querySelector(selector);
+        if (el) {
+            // Получаем базовый цвет из темы и применяем opacity
+            const style = getComputedStyle(document.documentElement);
+            const bgDark = style.getPropertyValue('--bg-dark').trim() || '#0f2140';
+            // Конвертируем hex в rgba
+            const r = parseInt(bgDark.slice(1, 3), 16) || 15;
+            const g = parseInt(bgDark.slice(3, 5), 16) || 33;
+            const b = parseInt(bgDark.slice(5, 7), 16) || 64;
+            el.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${value})`;
+        }
+    });
 }
 
 function applyBgBlur(blur) {
     document.documentElement.style.setProperty('--bg-blur', `${blur}px`);
+    
+    // Размытие применяется к фоновому изображению через ::before псевдоэлемент
+    // Но CSS не позволяет динамически менять ::before, поэтому используем overlay
     const chatScreen = document.getElementById('chat-screen');
-    if (chatScreen) {
-        if (blur > 0) {
-            chatScreen.style.backdropFilter = `blur(${blur}px)`;
-        } else {
-            chatScreen.style.backdropFilter = '';
+    if (!chatScreen) return;
+    
+    let blurOverlay = chatScreen.querySelector('.bg-blur-overlay');
+    
+    if (blur > 0) {
+        if (!blurOverlay) {
+            blurOverlay = document.createElement('div');
+            blurOverlay.className = 'bg-blur-overlay';
+            chatScreen.insertBefore(blurOverlay, chatScreen.firstChild);
         }
+        // Копируем фон и размываем
+        const bgImage = getComputedStyle(chatScreen).backgroundImage;
+        blurOverlay.style.cssText = `
+            position: absolute;
+            inset: 0;
+            background: ${bgImage};
+            background-size: cover;
+            background-position: center;
+            filter: blur(${blur}px);
+            pointer-events: none;
+            z-index: 0;
+            transform: scale(1.1);
+        `;
+    } else if (blurOverlay) {
+        blurOverlay.remove();
     }
 }
 
 function applyBgDim(dim) {
     document.documentElement.style.setProperty('--bg-dim', dim / 100);
     const chatScreen = document.getElementById('chat-screen');
-    if (chatScreen) {
-        // Добавляем overlay для затемнения
-        let overlay = chatScreen.querySelector('.bg-dim-overlay');
-        if (dim > 0) {
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.className = 'bg-dim-overlay';
-                overlay.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:-1;';
-                chatScreen.style.position = 'relative';
-                chatScreen.insertBefore(overlay, chatScreen.firstChild);
-            }
-            overlay.style.background = `rgba(0,0,0,${dim/100})`;
-        } else if (overlay) {
-            overlay.remove();
+    if (!chatScreen) return;
+    
+    let overlay = chatScreen.querySelector('.bg-dim-overlay');
+    
+    if (dim > 0) {
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'bg-dim-overlay';
+            chatScreen.insertBefore(overlay, chatScreen.firstChild);
         }
+        overlay.style.cssText = `
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, ${dim / 100});
+            pointer-events: none;
+            z-index: 1;
+        `;
+    } else if (overlay) {
+        overlay.remove();
     }
 }
 
@@ -8863,7 +8905,11 @@ function applySettings() {
     applyDensity(state.settings.density || 'normal');
     applyBgBlur(state.settings.bgBlur ?? 0);
     applyBgDim(state.settings.bgDim ?? 0);
-    applyPanelOpacity(state.settings.panelOpacity ?? 85);
+    
+    // Прозрачность панелей применяем после темы (чтобы использовать правильные цвета)
+    setTimeout(() => {
+        applyPanelOpacity(state.settings.panelOpacity ?? 85);
+    }, 50);
     
     // Применяем стиль пузырей
     applyBubbleStyle();
