@@ -3390,33 +3390,9 @@ async function createPeerConnection() {
         rtcLog('📡', `Signaling: ${pc.signalingState}`);
     };
     
-    // Perfect Negotiation: обработка negotiationneeded
-    // ВАЖНО: Этот обработчик используется только для renegotiation (добавление видео и т.д.)
-    // При первоначальном звонке мы создаём offer вручную
-    pc.onnegotiationneeded = async () => {
-        // Пропускаем если это первоначальная настройка (ещё нет remote description)
-        if (!callState.initialNegotiationDone) {
-            rtcLog('🔄', 'Negotiation needed (пропускаем - первоначальная настройка)');
-            return;
-        }
-        
-        rtcLog('🔄', 'Negotiation needed (renegotiation)');
-        
-        try {
-            callState.makingOffer = true;
-            await pc.setLocalDescription();
-            
-            rtcLog('📤', 'Отправляем offer (renegotiation)');
-            state.socket.emit('call-signal', {
-                to: callState.remoteUserId,
-                description: pc.localDescription
-            });
-        } catch (e) {
-            rtcLog('❌', 'Negotiation error:', e.message);
-        } finally {
-            callState.makingOffer = false;
-        }
-    };
+    // НЕ используем onnegotiationneeded - он вызывает проблемы с порядком m-lines
+    // Вместо этого используем ручной renegotiation через video-renegotiate
+    // pc.onnegotiationneeded отключён намеренно
     
     return pc;
 }
