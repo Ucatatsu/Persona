@@ -1982,7 +1982,8 @@ io.on('connection', async (socket) => {
             sockets: new Set([socket.id]), 
             lastSeen: Date.now(), 
             status: 'online', 
-            hideOnline 
+            hideOnline,
+            onlineStart: Date.now()
         };
     }
     onlineUsers.set(userId, userData);
@@ -2491,7 +2492,13 @@ io.on('connection', async (socket) => {
         if (userData) {
             userData.sockets.delete(socket.id);
             if (userData.sockets.size === 0) {
-                // Все устройства отключены
+                // Все устройства отключены - сохраняем время онлайн
+                if (userData.onlineStart) {
+                    const minutesOnline = Math.floor((Date.now() - userData.onlineStart) / 60000);
+                    if (minutesOnline > 0) {
+                        db.incrementStat(userId, 'time_online', minutesOnline);
+                    }
+                }
                 onlineUsers.delete(userId);
             }
         }

@@ -3819,6 +3819,15 @@ body,
 .stat-icon {
   font-size: 28px;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon .icon {
+  width: 28px;
+  height: 28px;
+  filter: brightness(0) invert(0.7);
 }
 
 .stat-value {

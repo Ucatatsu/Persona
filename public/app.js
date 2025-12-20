@@ -6531,6 +6531,7 @@ async function showUserStats(userId, userInfo = null) {
         
         // Заполняем статистику
         document.getElementById('stat-messages').textContent = formatNumber(stats.messages_sent || 0);
+        document.getElementById('stat-online').textContent = formatOnlineTime(stats.time_online || 0);
         document.getElementById('stat-calls').textContent = formatCallTime(stats.call_minutes || 0);
         document.getElementById('stat-reactions').textContent = formatNumber(stats.reactions_given || 0);
         document.getElementById('stat-files').textContent = formatNumber(stats.files_sent || 0);
@@ -6546,6 +6547,20 @@ function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toString();
+}
+
+function formatOnlineTime(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours >= 24) {
+        const days = Math.floor(hours / 24);
+        const h = hours % 24;
+        return h > 0 ? `${days}д ${h}ч` : `${days}д`;
+    }
+    if (hours > 0) {
+        return mins > 0 ? `${hours}ч ${mins}м` : `${hours}ч`;
+    }
+    return `${mins}м`;
 }
 
 function formatCallTime(minutes) {
@@ -6739,7 +6754,7 @@ function renderAdminUsers(users) {
             </div>
             <div class="admin-user-actions">
                 <button class="admin-btn admin-btn-stats" data-action="view-stats" title="Статистика">
-                    <img src="/assets/fire.svg" class="icon-sm">
+                    <img src="/assets/statistic.svg" class="icon-sm">
                 </button>
                 <button class="admin-btn admin-btn-remove" data-action="remove-roles" title="Снять роли">
                     <img src="/assets/block-user.svg" class="icon-sm">
