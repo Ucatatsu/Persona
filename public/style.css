@@ -599,6 +599,35 @@ button {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.user-card-stats {
+  position: absolute;
+  top: 68px;
+  left: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.user-card-stats:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.user-card-stats .icon {
+  filter: brightness(0) invert(0.7);
+}
+
+.user-card-stats:hover .icon {
+  filter: brightness(0) invert(1);
+}
+
 .user-card-body {
   padding: 12px 16px 16px;
   text-align: center;
@@ -3721,6 +3750,98 @@ body,
   width: 90%;
   max-width: 800px;
   max-height: 80vh;
+}
+
+/* === СТАТИСТИКА ПОЛЬЗОВАТЕЛЯ === */
+.stats-modal-content {
+  width: 90%;
+  max-width: 420px;
+}
+
+.stats-body {
+  padding: 20px;
+}
+
+.stats-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.stats-user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 20px;
+  background-size: cover;
+  background-position: center;
+}
+
+.stats-user-name {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.stats-user-tag {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-card {
+  background: rgba(79, 195, 247, 0.08);
+  border: 1px solid rgba(79, 195, 247, 0.2);
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  background: rgba(79, 195, 247, 0.12);
+}
+
+.stat-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Кнопка статистики в админке */
+.admin-btn-stats {
+  background: rgba(79, 195, 247, 0.2);
+}
+
+.admin-btn-stats:hover {
+  background: rgba(79, 195, 247, 0.4);
 }
 
 .admin-body {

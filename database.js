@@ -388,6 +388,20 @@ async function initDB() {
         try { sqlite.exec('ALTER TABLE channels ADD COLUMN invite_slug TEXT UNIQUE'); } catch {}
         try { sqlite.exec('ALTER TABLE servers ADD COLUMN invite_slug TEXT UNIQUE'); } catch {}
         
+        // === СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ ===
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS user_stats (
+                user_id TEXT PRIMARY KEY,
+                messages_sent INTEGER DEFAULT 0,
+                time_online INTEGER DEFAULT 0,
+                call_minutes INTEGER DEFAULT 0,
+                reactions_given INTEGER DEFAULT 0,
+                files_sent INTEGER DEFAULT 0,
+                last_online TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
         console.log('✅ SQLite база данных инициализирована');
         return;
     }
@@ -727,6 +741,19 @@ async function initDB() {
         // Миграция: добавляем invite_slug для каналов и серверов
         await client.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS invite_slug TEXT UNIQUE').catch(() => {});
         await client.query('ALTER TABLE servers ADD COLUMN IF NOT EXISTS invite_slug TEXT UNIQUE').catch(() => {});
+
+        // === СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ ===
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_stats (
+                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                messages_sent INTEGER DEFAULT 0,
+                time_online INTEGER DEFAULT 0,
+                call_minutes INTEGER DEFAULT 0,
+                reactions_given INTEGER DEFAULT 0,
+                files_sent INTEGER DEFAULT 0,
+                last_online TIMESTAMP
+            )
+        `);
 
         console.log('✅ PostgreSQL база данных инициализирована');
     } finally {
@@ -2719,6 +2746,68 @@ async function cleanupSelfDestructMessages() {
     }
 }
 
+// === СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ ===
+
+async function getUserStats(userId) {
+    try {
+        if (USE_SQLITE) {
+            let stats = sqlite.prepare('SELECT * FROM user_stats WHERE user_id = ?').get(userId);
+            if (!stats) {
+                sqlite.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(userId);
+                stats = { user_id: userId, messages_sent: 0, time_online: 0, call_minutes: 0, reactions_given: 0, files_sent: 0 };
+            }
+            return stats;
+        } else {
+            let result = await pool.query('SELECT * FROM user_stats WHERE user_id = $1', [userId]);
+            if (result.rows.length === 0) {
+                await pool.query('INSERT INTO user_stats (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [userId]);
+                return { user_id: userId, messages_sent: 0, time_online: 0, call_minutes: 0, reactions_given: 0, files_sent: 0 };
+            }
+            return result.rows[0];
+        }
+    } catch (error) {
+        console.error('Get user stats error:', error);
+        return { messages_sent: 0, time_online: 0, call_minutes: 0, reactions_given: 0, files_sent: 0 };
+    }
+}
+
+async function incrementStat(userId, stat, amount = 1) {
+    try {
+        if (USE_SQLITE) {
+            sqlite.prepare(`INSERT INTO user_stats (user_id, ${stat}) VALUES (?, ?) 
+                ON CONFLICT(user_id) DO UPDATE SET ${stat} = ${stat} + ?`).run(userId, amount, amount);
+        } else {
+            await pool.query(
+                `INSERT INTO user_stats (user_id, ${stat}) VALUES ($1, $2) 
+                 ON CONFLICT(user_id) DO UPDATE SET ${stat} = user_stats.${stat} + $2`,
+                [userId, amount]
+            );
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Increment stat error:', error);
+        return { success: false };
+    }
+}
+
+async function updateLastOnline(userId) {
+    try {
+        const now = new Date().toISOString();
+        if (USE_SQLITE) {
+            sqlite.prepare(`INSERT INTO user_stats (user_id, last_online) VALUES (?, ?) 
+                ON CONFLICT(user_id) DO UPDATE SET last_online = ?`).run(userId, now, now);
+        } else {
+            await pool.query(
+                `INSERT INTO user_stats (user_id, last_online) VALUES ($1, $2) 
+                 ON CONFLICT(user_id) DO UPDATE SET last_online = $2`,
+                [userId, now]
+            );
+        }
+    } catch (error) {
+        console.error('Update last online error:', error);
+    }
+}
+
 module.exports = { 
     initDB, 
     createUser, 
@@ -2816,5 +2905,9 @@ module.exports = {
     getPinnedChatsCount,
     isPinned,
     // Самоуничтожающиеся сообщения
-    cleanupSelfDestructMessages
+    cleanupSelfDestructMessages,
+    // Статистика
+    getUserStats,
+    incrementStat,
+    updateLastOnline
 };

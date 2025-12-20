@@ -963,6 +963,28 @@ app.delete('/api/admin/user/:userId', authMiddleware, adminMiddleware, async (re
     }
 });
 
+// Статистика пользователя (админ)
+app.get('/api/admin/user/:userId/stats', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const stats = await db.getUserStats(req.params.userId);
+        res.json(stats);
+    } catch (error) {
+        console.error('Admin get user stats error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
+// Своя статистика
+app.get('/api/user/:userId/stats', authMiddleware, ownerMiddleware('userId'), async (req, res) => {
+    try {
+        const stats = await db.getUserStats(req.user.id);
+        res.json(stats);
+    } catch (error) {
+        console.error('Get user stats error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
 // Push подписка
 app.post('/api/push-subscribe', authMiddleware, async (req, res) => {
     try {
@@ -2060,6 +2082,12 @@ io.on('connection', async (socket) => {
                 });
             }
             
+            // Обновляем статистику
+            db.incrementStat(userId, 'messages_sent');
+            if (['image', 'video', 'gif'].includes(messageType)) {
+                db.incrementStat(userId, 'files_sent');
+            }
+            
             // Отправляем отправителю на все его устройства (синхронизация)
             emitToUser(userId, 'message-sent', message);
         } catch (error) {
@@ -2147,6 +2175,9 @@ io.on('connection', async (socket) => {
             const reaction = { messageId, odataId: userId, emoji };
             emitToUser(userId, 'reaction-added', reaction);
             emitToUser(receiverId, 'reaction-added', reaction);
+            
+            // Статистика реакций
+            db.incrementStat(userId, 'reactions_given');
         } catch (error) {
             console.error('Add reaction error:', error);
         }
@@ -2383,6 +2414,11 @@ io.on('connection', async (socket) => {
                 
                 emitToUser(call.caller, 'call-message', message);
                 emitToUser(receiver, 'call-message', message);
+                
+                // Обновляем статистику звонков (минуты)
+                const callMinutes = Math.ceil(duration / 60);
+                db.incrementStat(call.caller, 'call_minutes', callMinutes);
+                db.incrementStat(receiver, 'call_minutes', callMinutes);
             } catch (error) {
                 console.error('Save call message error:', error);
             }

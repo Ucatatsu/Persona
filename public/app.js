@@ -6493,6 +6493,75 @@ function setupInfoTabs(modalId) {
     });
 }
 
+// === СТАТИСТИКА ПОЛЬЗОВАТЕЛЯ ===
+
+async function showMyStats() {
+    await showUserStats(state.currentUser.id, state.currentUserProfile || state.currentUser);
+}
+
+async function showUserStats(userId, userInfo = null) {
+    try {
+        const isAdmin = state.currentUser?.role === 'admin';
+        const isOwn = userId === state.currentUser.id;
+        
+        let url = isOwn ? `/api/user/${userId}/stats` : `/api/admin/user/${userId}/stats`;
+        
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed to load stats');
+        const stats = await res.json();
+        
+        // Заполняем информацию о пользователе
+        const userInfoEl = document.getElementById('stats-user-info');
+        if (userInfo) {
+            userInfoEl.innerHTML = `
+                <div class="stats-user-avatar" style="${userInfo.avatar_url ? `background-image: url(${userInfo.avatar_url})` : ''}">
+                    ${userInfo.avatar_url ? '' : (userInfo.username || 'U')[0].toUpperCase()}
+                </div>
+                <div>
+                    <div class="stats-user-name">${userInfo.display_name || userInfo.username}</div>
+                    <div class="stats-user-tag">${userInfo.username}#${userInfo.custom_id || userInfo.tag || '????'}</div>
+                </div>
+            `;
+        } else {
+            userInfoEl.innerHTML = '';
+        }
+        
+        // Заполняем статистику
+        document.getElementById('stat-messages').textContent = formatNumber(stats.messages_sent || 0);
+        document.getElementById('stat-calls').textContent = formatCallTime(stats.call_minutes || 0);
+        document.getElementById('stat-reactions').textContent = formatNumber(stats.reactions_given || 0);
+        document.getElementById('stat-files').textContent = formatNumber(stats.files_sent || 0);
+        
+        document.getElementById('stats-modal').classList.remove('hidden');
+    } catch (error) {
+        console.error('Show stats error:', error);
+        showToast('Не удалось загрузить статистику', 'error');
+    }
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function formatCallTime(minutes) {
+    if (minutes >= 60) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return mins > 0 ? `${hours}ч ${mins}м` : `${hours}ч`;
+    }
+    return `${minutes} мин`;
+}
+
+// Закрытие модалки статистики
+document.getElementById('close-stats')?.addEventListener('click', () => {
+    document.getElementById('stats-modal').classList.add('hidden');
+});
+
 function showSettings() {
     const settingsAvatar = document.getElementById('settings-avatar');
     const settingsUsername = document.getElementById('settings-username');
@@ -6669,6 +6738,9 @@ function renderAdminUsers(users) {
                 <div class="admin-user-tag">${user.username}#${user.custom_id || user.tag || '????'}</div>
             </div>
             <div class="admin-user-actions">
+                <button class="admin-btn admin-btn-stats" data-action="view-stats" title="Статистика">
+                    <img src="/assets/fire.svg" class="icon-sm">
+                </button>
                 <button class="admin-btn admin-btn-remove" data-action="remove-roles" title="Снять роли">
                     <img src="/assets/block-user.svg" class="icon-sm">
                 </button>
@@ -6708,6 +6780,18 @@ async function handleAdminAction(e) {
         await showAddRolesModal(userId, username, userRole, userPremium);
     } else if (action === 'remove-roles') {
         await showRemoveRolesModal(userId, username, userRole, userPremium);
+    } else if (action === 'view-stats') {
+        // Получаем данные пользователя для отображения
+        const userEl2 = btn.closest('.admin-user');
+        const avatarEl = userEl2.querySelector('.admin-user-avatar');
+        const avatarUrl = avatarEl?.style.backgroundImage?.replace(/url\(['"]?([^'"]+)['"]?\)/, '$1') || '';
+        const tag = userEl2.querySelector('.admin-user-tag')?.textContent || '';
+        await showUserStats(userId, { 
+            username: tag.split('#')[0], 
+            display_name: username, 
+            avatar_url: avatarUrl !== 'none' ? avatarUrl : null,
+            tag: tag.split('#')[1] 
+        });
     } else if (action === 'delete-user') {
         await deleteUserAdmin(userId);
     }
@@ -7123,6 +7207,13 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         hideUserCardPopup();
         showSettings();
+    });
+    
+    // Кнопка статистики в карточке
+    document.getElementById('user-card-stats')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideUserCardPopup();
+        showMyStats();
     });
     
     // Кнопка открытия полного профиля

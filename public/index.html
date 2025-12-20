@@ -213,6 +213,9 @@
       <div class="user-card-popup hidden" id="user-card-popup">
         <div class="user-card-banner" id="user-card-banner"></div>
         <div class="user-card-avatar" id="user-card-avatar"></div>
+        <button class="user-card-stats" id="user-card-stats" title="Статистика">
+          <img src="/assets/fire.svg" alt="" class="icon">
+        </button>
         <button class="user-card-settings" id="user-card-settings" title="Настройки">
           <img src="/assets/settings.svg" alt="" class="icon">
         </button>
@@ -1439,6 +1442,42 @@
           <input type="text" id="admin-search" placeholder="Поиск по username или ID...">
         </div>
         <div class="admin-users" id="admin-users"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка статистики пользователя -->
+  <div id="stats-modal" class="modal hidden" role="dialog" aria-label="Статистика" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-content stats-modal-content">
+      <div class="modal-header">
+        <h2><img src="/assets/fire.svg" alt="" class="icon"> Статистика</h2>
+        <button class="modal-close" id="close-stats" aria-label="Закрыть">&times;</button>
+      </div>
+      <div class="stats-body">
+        <div class="stats-user-info" id="stats-user-info"></div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">💬</div>
+            <div class="stat-value" id="stat-messages">0</div>
+            <div class="stat-label">Сообщений</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📞</div>
+            <div class="stat-value" id="stat-calls">0 мин</div>
+            <div class="stat-label">В звонках</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">😊</div>
+            <div class="stat-value" id="stat-reactions">0</div>
+            <div class="stat-label">Реакций</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📎</div>
+            <div class="stat-value" id="stat-files">0</div>
+            <div class="stat-label">Файлов</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
