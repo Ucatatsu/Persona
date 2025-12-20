@@ -3339,6 +3339,8 @@ emoji-picker {
 #chat-screen.bg-gradient1 { background: linear-gradient(135deg, #1a1a2e, #16213e) !important; }
 #chat-screen.bg-gradient2 { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e) !important; }
 #chat-screen.bg-gradient3 { background: linear-gradient(135deg, #232526, #414345) !important; }
+#chat-screen.bg-gradient4 { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important; }
+#chat-screen.bg-gradient5 { background: linear-gradient(135deg, #2c1654, #4a1942, #6b1d3a) !important; }
 #chat-screen.bg-solid { background: #0a1628 !important; }
 #chat-screen.bg-custom { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }
 #chat-screen.bg-custom.bg-mode-contain { background-size: contain !important; }
