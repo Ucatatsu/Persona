@@ -11402,41 +11402,54 @@ class StickerManager {
         // Радостные эмоции (приоритет 1)
         if (lowerName.includes('happy') || lowerName.includes('smile') || lowerName.includes('joy') || 
             lowerName.includes('laugh') || lowerName.includes('grin') || lowerName.includes('радост') ||
-            lowerName.includes('смех') || lowerName.includes('улыб')) {
+            lowerName.includes('смех') || lowerName.includes('улыб') || lowerName.includes('😊') ||
+            lowerName.includes('😄') || lowerName.includes('😃') || lowerName.includes('😁') ||
+            // Добавляем числовые диапазоны для стикеров с номерами
+            /^(0[1-9]|1[0-9]|2[0-9]|30)/.test(lowerName)) { // 01-30
             return 1;
         }
         
         // Любовь и сердечки (приоритет 2)
         if (lowerName.includes('love') || lowerName.includes('heart') || lowerName.includes('kiss') ||
-            lowerName.includes('любов') || lowerName.includes('сердц') || lowerName.includes('поцел')) {
+            lowerName.includes('любов') || lowerName.includes('сердц') || lowerName.includes('поцел') ||
+            lowerName.includes('❤️') || lowerName.includes('💕') || lowerName.includes('💖') ||
+            /^(3[1-9]|4[0-9]|50)/.test(lowerName)) { // 31-50
             return 2;
         }
         
         // Удивление (приоритет 3)
         if (lowerName.includes('surprise') || lowerName.includes('wow') || lowerName.includes('shock') ||
-            lowerName.includes('удивл') || lowerName.includes('шок')) {
+            lowerName.includes('удивл') || lowerName.includes('шок') || lowerName.includes('😮') ||
+            lowerName.includes('😯') || lowerName.includes('😲') ||
+            /^(5[1-9]|6[0-9]|70)/.test(lowerName)) { // 51-70
             return 3;
         }
         
         // Грустные эмоции (приоритет 4)
         if (lowerName.includes('sad') || lowerName.includes('cry') || lowerName.includes('tear') ||
-            lowerName.includes('грус') || lowerName.includes('плач') || lowerName.includes('слез')) {
+            lowerName.includes('грус') || lowerName.includes('плач') || lowerName.includes('слез') ||
+            lowerName.includes('😢') || lowerName.includes('😭') || lowerName.includes('😞') ||
+            /^(7[1-9]|8[0-9]|90)/.test(lowerName)) { // 71-90
             return 4;
         }
         
         // Злость (приоритет 5)
         if (lowerName.includes('angry') || lowerName.includes('mad') || lowerName.includes('rage') ||
-            lowerName.includes('злос') || lowerName.includes('сердит') || lowerName.includes('ярос')) {
+            lowerName.includes('злос') || lowerName.includes('сердит') || lowerName.includes('ярос') ||
+            lowerName.includes('😠') || lowerName.includes('😡') || lowerName.includes('🤬') ||
+            /^(9[1-9]|100)/.test(lowerName)) { // 91-100
             return 5;
         }
         
         // Страх (приоритет 6)
         if (lowerName.includes('fear') || lowerName.includes('scared') || lowerName.includes('afraid') ||
-            lowerName.includes('страх') || lowerName.includes('испуг') || lowerName.includes('боя')) {
+            lowerName.includes('страх') || lowerName.includes('испуг') || lowerName.includes('боя') ||
+            lowerName.includes('😨') || lowerName.includes('😰') || lowerName.includes('😱') ||
+            /^(10[1-9]|1[1-4][0-9]|150)/.test(lowerName)) { // 101-150
             return 6;
         }
         
-        // Нейтральные и остальные (приоритет 7)
+        // Нейтральные и остальные (приоритет 7) - все остальные номера
         return 7;
     }
     
