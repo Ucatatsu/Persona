@@ -1354,7 +1354,7 @@ button {
   position: fixed;
   bottom: 100px;
   right: 20px;
-  width: 350px;
+  width: 420px; /* Увеличено для 9 колонок */
   height: 400px;
   background: var(--bg-dark);
   border: 1px solid var(--glass-border);

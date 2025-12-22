@@ -11715,12 +11715,57 @@ class StickerManager {
     }
     
     sendStickerMessage(sticker) {
-        // Добавляем стикер в текстовое поле как эмодзи
-        const messageInput = document.getElementById('message-input');
-        if (messageInput) {
-            // Используем специальный символ для анимированного стикера
-            messageInput.value += `🎭${sticker.id}`;
-            messageInput.focus();
+        // Отправляем стикер напрямую как сообщение, а не добавляем в поле ввода
+        if (!state.socket) return;
+        
+        // Проверяем что выбран какой-то чат
+        if (!state.selectedUser && !state.selectedGroup && !state.selectedChannel && !state.selectedServerChannel) return;
+        
+        // Отправляем в зависимости от типа чата
+        if (state.selectedGroup) {
+            state.socket.emit('group-message', {
+                groupId: state.selectedGroup.id,
+                text: '', // Пустой текст для чистого стикера
+                messageType: 'sticker',
+                sticker: {
+                    id: sticker.id,
+                    filename: sticker.filename,
+                    name: sticker.name
+                }
+            });
+        } else if (state.selectedChannel) {
+            state.socket.emit('channel-post', {
+                channelId: state.selectedChannel.id,
+                text: '',
+                messageType: 'sticker',
+                sticker: {
+                    id: sticker.id,
+                    filename: sticker.filename,
+                    name: sticker.name
+                }
+            });
+        } else if (state.selectedServerChannel) {
+            state.socket.emit('server-message', {
+                channelId: state.selectedServerChannel.id,
+                text: '',
+                messageType: 'sticker',
+                sticker: {
+                    id: sticker.id,
+                    filename: sticker.filename,
+                    name: sticker.name
+                }
+            });
+        } else if (state.selectedUser) {
+            state.socket.emit('send-message', {
+                receiverId: state.selectedUser.id,
+                text: '',
+                messageType: 'sticker',
+                sticker: {
+                    id: sticker.id,
+                    filename: sticker.filename,
+                    name: sticker.name
+                }
+            });
         }
         
         // Закрываем пикер
