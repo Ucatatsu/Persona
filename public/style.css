@@ -1362,6 +1362,281 @@ button {
   animation: emojiPickerIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ===== STICKER PICKER ===== */
+.sticker-picker {
+  position: fixed;
+  bottom: 100px;
+  right: 80px;
+  width: 350px;
+  height: 400px;
+  background: var(--bg-dark);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  animation: emojiPickerIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.sticker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--bg-medium);
+}
+
+.sticker-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.sticker-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.sticker-close:hover {
+  background: var(--accent-glow);
+  color: var(--text);
+}
+
+.sticker-categories {
+  display: flex;
+  padding: 12px 16px;
+  gap: 8px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--bg-medium);
+}
+
+.sticker-category {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sticker-category:hover {
+  background: var(--accent-glow);
+  color: var(--text);
+}
+
+.sticker-category.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.sticker-grid {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.sticker-item {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  background: var(--bg-medium);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+  position: relative;
+}
+
+.sticker-item:hover {
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.sticker-item:active {
+  transform: scale(0.95);
+}
+
+.sticker-animation {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.sticker-loading {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--glass-border);
+  border-top: 3px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.sticker-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--bg-darkest);
+  border: 1px solid var(--glass-border);
+  font-size: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+.sticker-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.sticker-btn:active {
+  transform: scale(0.95);
+}
+
+.sticker-btn .icon {
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) invert(0.6);
+}
+
+.sticker-btn:hover .icon {
+  filter: brightness(0) saturate(100%) invert(76%) sepia(52%) saturate(1000%) hue-rotate(166deg) brightness(101%) contrast(96%);
+}
+
+.sticker-empty,
+.sticker-error {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.sticker-empty .empty-icon,
+.sticker-error .error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.sticker-empty h4,
+.sticker-error h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.sticker-empty p,
+.sticker-error p {
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 4px 0;
+}
+
+.sticker-error {
+  color: #ef4444;
+}
+
+.sticker-error .error-icon {
+  color: #ef4444;
+}
+
+/* === STICKERS IN MESSAGES === */
+.sticker-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+.sticker-animation-msg {
+  width: 150px;
+  height: 150px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sticker-animation-msg:hover {
+  transform: scale(1.05);
+}
+
+.sticker-animation-msg:active {
+  transform: scale(0.95);
+}
+
+.message-bubble:has(.sticker-message) {
+  background: transparent !important;
+  border: none !important;
+  padding: 8px !important;
+  box-shadow: none !important;
+}
+
+.message.sent .message-bubble:has(.sticker-message),
+.message.received .message-bubble:has(.sticker-message) {
+  background: transparent !important;
+  border: none !important;
+}
+
+.sticker-message .sticker-error {
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-medium);
+  border-radius: 12px;
+  color: #ef4444;
+  font-size: 24px;
+}
+
 @keyframes emojiPickerIn {
   from {
     opacity: 0;

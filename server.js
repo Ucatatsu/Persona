@@ -449,6 +449,43 @@ app.get('/api/users', authMiddleware, async (req, res) => {
     }
 });
 
+// Получить список стикеров
+app.get('/api/stickers', authMiddleware, async (req, res) => {
+    try {
+        const stickersPath = path.join(__dirname, 'public', 'stickers');
+        
+        // Проверяем существование папки
+        if (!fs.existsSync(stickersPath)) {
+            return res.json([]);
+        }
+        
+        // Читаем файлы в папке
+        const files = fs.readdirSync(stickersPath);
+        
+        // Фильтруем только .tgs файлы
+        const tgsFiles = files.filter(file => 
+            file.toLowerCase().endsWith('.tgs') && 
+            file !== 'README.md'
+        );
+        
+        // Создаём объекты стикеров
+        const stickers = tgsFiles.map((filename, index) => ({
+            id: `sticker_${index + 1}`,
+            filename: filename,
+            name: filename.replace('.tgs', '').replace(/[_-]/g, ' '),
+            url: `/stickers/${filename}`,
+            size: fs.statSync(path.join(stickersPath, filename)).size
+        }));
+        
+        console.log(`📦 Найдено ${stickers.length} стикеров`);
+        res.json(stickers);
+        
+    } catch (error) {
+        console.error('Stickers API error:', error);
+        res.status(500).json({ error: 'Ошибка загрузки стикеров' });
+    }
+});
+
 // Контакты пользователя
 app.get('/api/contacts/:userId', authMiddleware, ownerMiddleware('userId'), async (req, res) => {
     try {
@@ -1990,14 +2027,28 @@ io.on('connection', async (socket) => {
                 return socket.emit('error', { message: 'Слишком много сообщений, подождите' });
             }
             
-            const { receiverId, text, messageType = 'text', selfDestructMinutes = null, replyToId = null } = data;
+            const { receiverId, text, messageType = 'text', selfDestructMinutes = null, replyToId = null, sticker = null } = data;
             
-            if (!receiverId || !text || typeof text !== 'string') {
+            if (!receiverId) {
                 return socket.emit('error', { message: 'Неверные данные' });
             }
             
-            const sanitizedText = text.trim().substring(0, 5000);
-            if (!sanitizedText) return;
+            // Для стикеров text может быть пустым
+            if (!sticker && (!text || typeof text !== 'string')) {
+                return socket.emit('error', { message: 'Неверные данные' });
+            }
+            
+            let sanitizedText = '';
+            let actualMessageType = messageType;
+            
+            if (sticker) {
+                // Для стикеров сохраняем JSON данные в text поле
+                sanitizedText = JSON.stringify(sticker);
+                actualMessageType = 'sticker';
+            } else {
+                sanitizedText = text.trim().substring(0, 5000);
+                if (!sanitizedText) return;
+            }
             
             // Получаем данные отправителя для bubble_style
             const senderUser = await db.getUser(userId);
@@ -2011,10 +2062,19 @@ io.on('connection', async (socket) => {
                 }
             }
             
-            const message = await db.saveMessage(userId, receiverId, sanitizedText, messageType, 0, actualSelfDestruct, replyToId);
+            const message = await db.saveMessage(userId, receiverId, sanitizedText, actualMessageType, 0, actualSelfDestruct, replyToId);
             
             // Добавляем bubble_style отправителя (для отображения у получателя)
             message.sender_bubble_style = senderUser?.bubble_style || 'default';
+            
+            // Если это стикер, парсим данные обратно
+            if (actualMessageType === 'sticker') {
+                try {
+                    message.sticker = JSON.parse(message.text);
+                } catch (e) {
+                    console.error('Ошибка парсинга стикера:', e);
+                }
+            }
             
             // Если есть reply_to, загружаем данные о replied сообщении
             if (replyToId) {
@@ -2038,9 +2098,14 @@ io.on('connection', async (socket) => {
                 emitToUser(receiverId, 'new-message', message);
             } else {
                 // Оффлайн - push уведомление
-                const notifBody = ['image', 'video', 'gif'].includes(messageType) 
-                    ? '📷 Медиафайл' 
-                    : (sanitizedText.length > 100 ? sanitizedText.substring(0, 100) + '...' : sanitizedText);
+                let notifBody;
+                if (actualMessageType === 'sticker') {
+                    notifBody = '🎭 Стикер';
+                } else if (['image', 'video', 'gif'].includes(actualMessageType)) {
+                    notifBody = '📷 Медиафайл';
+                } else {
+                    notifBody = sanitizedText.length > 100 ? sanitizedText.substring(0, 100) + '...' : sanitizedText;
+                }
                 sendPushNotification(receiverId, {
                     title: socket.user.username || 'Новое сообщение',
                     body: notifBody,

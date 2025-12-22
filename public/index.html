@@ -13,6 +13,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
 <body>
   <!-- Skip link для accessibility -->
@@ -353,6 +355,9 @@
              disabled aria-label="Текст сообщения">
       <button type="button" class="emoji-btn" aria-label="Выбрать эмодзи" aria-haspopup="true">
         <img src="/assets/emoji.svg" alt="" class="icon">
+      </button>
+      <button type="button" class="sticker-btn" aria-label="Выбрать стикер" aria-haspopup="true">
+        <img src="/assets/Sparkles.svg" alt="" class="icon">
       </button>
       <button type="submit" class="send-btn" disabled aria-label="Отправить сообщение">
         <img src="/assets/send.svg" alt="" class="icon">
@@ -1431,6 +1436,24 @@
   <!-- Emoji Picker -->
   <div id="emoji-picker" class="emoji-picker hidden" role="dialog" aria-label="Выбор эмодзи">
     <emoji-picker></emoji-picker>
+  </div>
+
+  <!-- Sticker Picker -->
+  <div id="sticker-picker" class="sticker-picker hidden" role="dialog" aria-label="Выбор стикера">
+    <div class="sticker-header">
+      <h3>Стикеры</h3>
+      <button class="sticker-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="sticker-categories">
+      <button class="sticker-category active" data-category="all">Все</button>
+      <button class="sticker-category" data-category="recent">Недавние</button>
+    </div>
+    <div class="sticker-grid" id="sticker-grid">
+      <div class="sticker-loading">
+        <div class="loading-spinner"></div>
+        <p>Загрузка стикеров...</p>
+      </div>
+    </div>
   </div>
 
   <!-- Модалка звонка -->

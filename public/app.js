@@ -2081,9 +2081,10 @@ function createMessageElement(msg, isSent) {
     let bubbleContent;
     let isMedia = msg.message_type === 'image' || msg.message_type === 'gif';
     let isVideo = msg.message_type === 'video';
+    let isSticker = msg.message_type === 'sticker';
     
     // Автодетект изображений по URL (для старых сообщений без message_type)
-    if (!isMedia && !isVideo && msg.text) {
+    if (!isMedia && !isVideo && !isSticker && msg.text) {
         const text = msg.text.trim();
         const imageExtensions = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i;
         const videoExtensions = /\.(mp4|webm)(\?.*)?$/i;
@@ -2101,7 +2102,32 @@ function createMessageElement(msg, isSent) {
         }
     }
     
-    if (isMedia) {
+    if (isSticker) {
+        // Отображение стикера
+        let stickerData;
+        try {
+            stickerData = typeof msg.sticker === 'string' ? JSON.parse(msg.sticker) : msg.sticker;
+        } catch (e) {
+            try {
+                stickerData = JSON.parse(msg.text);
+            } catch (e2) {
+                console.error('Ошибка парсинга стикера:', e2);
+                stickerData = { name: 'Стикер', filename: 'unknown.tgs' };
+            }
+        }
+        
+        bubbleContent = `
+            <div class="sticker-message" data-sticker-id="${stickerData.id || 'unknown'}">
+                <div class="sticker-animation-msg" id="msg-sticker-${msg.id}"></div>
+            </div>
+        `;
+        
+        // Загружаем анимацию стикера после рендера
+        setTimeout(() => {
+            loadMessageStickerAnimation(msg.id, stickerData);
+        }, 100);
+        
+    } else if (isMedia) {
         bubbleContent = `<img src="${escapeAttr(msg.text)}" class="message-media" alt="Изображение" loading="lazy">`;
     } else if (isVideo) {
         // Telegram-style: превью с временем, автоплей без звука
@@ -11252,4 +11278,283 @@ function initCustomSelect(customSelectId, hiddenSelectId) {
         setInitialValue();
     });
     observer.observe(hiddenSelect, { attributes: true, attributeFilter: ['value'] });
+}
+// === STICKER SYSTEM ===
+class StickerManager {
+    constructor() {
+        this.stickers = [];
+        this.recentStickers = JSON.parse(localStorage.getItem('kvant_recent_stickers') || '[]');
+        this.loadedAnimations = new Map();
+        this.init();
+    }
+    
+    async init() {
+        await this.loadStickers();
+        this.setupEventListeners();
+    }
+    
+    async loadStickers() {
+        try {
+            // В реальном приложении здесь будет API для получения списка стикеров
+            // Пока создаём заглушку для демонстрации
+            this.stickers = await this.getStickerList();
+            this.renderStickers();
+        } catch (error) {
+            console.error('Ошибка загрузки стикеров:', error);
+            this.showError();
+        }
+    }
+    
+    async getStickerList() {
+        try {
+            const response = await api.get('/api/stickers');
+            if (response.ok) {
+                return await response.json();
+            } else {
+                console.error('Ошибка загрузки стикеров:', response.status);
+                return [];
+            }
+        } catch (error) {
+            console.error('Ошибка API стикеров:', error);
+            return [];
+        }
+    }
+    
+    renderStickers() {
+        const grid = document.getElementById('sticker-grid');
+        if (!grid) return;
+        
+        if (this.stickers.length === 0) {
+            grid.innerHTML = `
+                <div class="sticker-empty">
+                    <div class="empty-icon">📦</div>
+                    <h4>Стикеры не найдены</h4>
+                    <p>Загрузите .tgs файлы в папку /public/stickers/</p>
+                    <p>Поддерживается до 994 анимированных стикеров</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const currentCategory = document.querySelector('.sticker-category.active')?.dataset.category || 'all';
+        let stickersToShow = this.stickers;
+        
+        if (currentCategory === 'recent') {
+            stickersToShow = this.recentStickers.map(id => 
+                this.stickers.find(s => s.id === id)
+            ).filter(Boolean);
+        }
+        
+        grid.innerHTML = stickersToShow.map(sticker => `
+            <div class="sticker-item" data-sticker-id="${sticker.id}" title="${sticker.name}">
+                <div class="sticker-animation" id="sticker-${sticker.id}"></div>
+            </div>
+        `).join('');
+        
+        // Загружаем анимации для видимых стикеров
+        this.loadVisibleAnimations();
+    }
+    
+    loadVisibleAnimations() {
+        const stickerItems = document.querySelectorAll('.sticker-item');
+        
+        stickerItems.forEach(item => {
+            const stickerId = item.dataset.stickerId;
+            const animationContainer = item.querySelector('.sticker-animation');
+            
+            if (!this.loadedAnimations.has(stickerId)) {
+                this.loadStickerAnimation(stickerId, animationContainer);
+            }
+        });
+    }
+    
+    async loadStickerAnimation(stickerId, container) {
+        try {
+            const sticker = this.stickers.find(s => s.id === stickerId);
+            if (!sticker) return;
+            
+            // Загружаем .tgs файл и конвертируем в Lottie анимацию
+            const response = await fetch(`/stickers/${sticker.filename}`);
+            const arrayBuffer = await response.arrayBuffer();
+            
+            // .tgs файлы - это gzip сжатые JSON файлы Lottie
+            const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+            const animationData = JSON.parse(decompressed);
+            
+            const animation = lottie.loadAnimation({
+                container: container,
+                renderer: 'svg',
+                loop: true,
+                autoplay: false,
+                animationData: animationData
+            });
+            
+            this.loadedAnimations.set(stickerId, animation);
+            
+            // Воспроизводим анимацию при hover
+            container.parentElement.addEventListener('mouseenter', () => {
+                animation.play();
+            });
+            
+            container.parentElement.addEventListener('mouseleave', () => {
+                animation.pause();
+                animation.goToAndStop(0);
+            });
+            
+        } catch (error) {
+            console.error('Ошибка загрузки стикера:', error);
+            container.innerHTML = '<div class="sticker-error">❌</div>';
+        }
+    }
+    
+    setupEventListeners() {
+        const stickerBtn = document.querySelector('.sticker-btn');
+        const stickerPicker = document.getElementById('sticker-picker');
+        const stickerClose = document.querySelector('.sticker-close');
+        const categories = document.querySelectorAll('.sticker-category');
+        
+        // Открытие/закрытие стикер-пикера
+        stickerBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!state.selectedUser && !state.selectedGroup && !state.selectedChannel && !state.selectedServerChannel) {
+                return;
+            }
+            stickerPicker?.classList.toggle('hidden');
+            
+            // Закрываем emoji picker если открыт
+            document.getElementById('emoji-picker')?.classList.add('hidden');
+        });
+        
+        stickerClose?.addEventListener('click', () => {
+            stickerPicker?.classList.add('hidden');
+        });
+        
+        // Переключение категорий
+        categories.forEach(category => {
+            category.addEventListener('click', () => {
+                categories.forEach(c => c.classList.remove('active'));
+                category.classList.add('active');
+                this.renderStickers();
+            });
+        });
+        
+        // Выбор стикера
+        document.addEventListener('click', (e) => {
+            const stickerItem = e.target.closest('.sticker-item');
+            if (stickerItem) {
+                const stickerId = stickerItem.dataset.stickerId;
+                this.selectSticker(stickerId);
+            }
+        });
+        
+        // Закрытие при клике вне области
+        document.addEventListener('click', (e) => {
+            if (stickerPicker && !stickerPicker.contains(e.target) && e.target !== stickerBtn) {
+                stickerPicker.classList.add('hidden');
+            }
+        });
+    }
+    
+    selectSticker(stickerId) {
+        const sticker = this.stickers.find(s => s.id === stickerId);
+        if (!sticker) return;
+        
+        // Добавляем в недавние
+        this.addToRecent(stickerId);
+        
+        // Отправляем стикер как сообщение
+        this.sendStickerMessage(sticker);
+        
+        // Закрываем пикер
+        document.getElementById('sticker-picker')?.classList.add('hidden');
+    }
+    
+    addToRecent(stickerId) {
+        this.recentStickers = this.recentStickers.filter(id => id !== stickerId);
+        this.recentStickers.unshift(stickerId);
+        this.recentStickers = this.recentStickers.slice(0, 20); // Максимум 20 недавних
+        
+        localStorage.setItem('kvant_recent_stickers', JSON.stringify(this.recentStickers));
+    }
+    
+    sendStickerMessage(sticker) {
+        if (!state.socket || !state.selectedUser) return;
+        
+        const messageData = {
+            text: '', // Пустой текст для стикера
+            sticker: {
+                id: sticker.id,
+                filename: sticker.filename,
+                name: sticker.name
+            },
+            receiverId: state.selectedUser.id
+        };
+        
+        state.socket.emit('send-message', messageData);
+    }
+    
+    showError() {
+        const grid = document.getElementById('sticker-grid');
+        if (grid) {
+            grid.innerHTML = `
+                <div class="sticker-error">
+                    <div class="error-icon">⚠️</div>
+                    <h4>Ошибка загрузки</h4>
+                    <p>Не удалось загрузить стикеры</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// Инициализируем стикер-менеджер
+let stickerManager;
+document.addEventListener('DOMContentLoaded', () => {
+    stickerManager = new StickerManager();
+});
+// Функция для загрузки анимации стикера в сообщении
+async function loadMessageStickerAnimation(messageId, stickerData) {
+    try {
+        const container = document.getElementById(`msg-sticker-${messageId}`);
+        if (!container || !stickerData.filename) return;
+        
+        // Загружаем .tgs файл
+        const response = await fetch(`/stickers/${stickerData.filename}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // .tgs файлы - это gzip сжатые JSON файлы Lottie
+        const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+        const animationData = JSON.parse(decompressed);
+        
+        const animation = lottie.loadAnimation({
+            container: container,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: animationData
+        });
+        
+        // Сохраняем ссылку на анимацию для управления
+        container.lottieAnimation = animation;
+        
+        // Пауза/воспроизведение по клику
+        container.addEventListener('click', () => {
+            if (animation.isPaused) {
+                animation.play();
+            } else {
+                animation.pause();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Ошибка загрузки стикера в сообщении:', error);
+        const container = document.getElementById(`msg-sticker-${messageId}`);
+        if (container) {
+            container.innerHTML = '<div class="sticker-error">❌</div>';
+        }
+    }
 }
