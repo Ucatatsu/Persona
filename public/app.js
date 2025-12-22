@@ -5673,16 +5673,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.getElementById('play-sound-btn')?.addEventListener('click', (e) => {
-        const btn = e.target;
+        const btn = e.target.closest('.btn-play-sound');
+        const icon = btn.querySelector('.play-icon');
+        const text = btn.querySelector('.play-text');
         
         // Визуальная обратная связь
-        btn.style.transform = 'scale(0.9)';
-        btn.textContent = '⏸';
+        btn.style.transform = 'translateY(0) scale(0.95)';
+        icon.textContent = '⏸';
+        text.textContent = 'Играет...';
         
         setTimeout(() => {
             btn.style.transform = '';
-            btn.textContent = '▶';
-        }, 300);
+            icon.textContent = '▶';
+            text.textContent = 'Прослушать';
+        }, 400);
         
         playNotificationSound(true);
     });
