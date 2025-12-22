@@ -1886,8 +1886,8 @@ emoji-picker {
 }
 
 .settings-item:hover {
-  background: var(--accent-glow);
-  border-radius: 12px;
+  background: var(--accent-glow) !important;
+  border-radius: 12px !important;
 }
 
 .settings-divider {
@@ -2762,8 +2762,15 @@ emoji-picker {
 }
 
 .settings-item:hover {
-  background: var(--accent-glow);
-  border-radius: 8px;
+  background: var(--accent-glow) !important;
+  border-radius: 8px !important;
+}
+
+/* Специфичные стили для секции приватности */
+#section-privacy .settings-item:hover,
+.settings-section .settings-item:hover {
+  background: var(--accent-glow) !important;
+  border-radius: 12px !important;
 }
 
 .settings-item:last-child {
@@ -13240,4 +13247,21 @@ select option {
 .settings-item:has(.settings-select) .settings-item-info {
   flex: 1;
   min-width: 200px;
+}
+
+/* === FORCE ROUNDED CORNERS FOR ALL SETTINGS ITEMS === */
+.settings-item:hover,
+#section-privacy .settings-item:hover,
+.settings-section .settings-item:hover,
+.settings-modal .settings-item:hover {
+  background: var(--accent-glow) !important;
+  border-radius: 12px !important;
+  margin: 2px 8px !important;
+}
+
+/* Ensure all settings items have rounded corners */
+.settings-item {
+  border-radius: 12px !important;
+  margin: 2px 8px !important;
+  transition: all 0.2s ease !important;
 }
