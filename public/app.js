@@ -11344,6 +11344,8 @@ class StickerManager {
         this.stickers = [];
         this.recentStickers = JSON.parse(localStorage.getItem('kvant_recent_stickers') || '[]');
         this.loadedAnimations = new Map();
+        this.stickerCache = new Map(); // Кэш для .tgs файлов
+        this.animationDataCache = new Map(); // Кэш для распакованных данных
         this.init();
     }
     
@@ -11504,13 +11506,28 @@ class StickerManager {
             const sticker = this.stickers.find(s => s.id === stickerId);
             if (!sticker) return;
             
-            // Загружаем .tgs файл и конвертируем в Lottie анимацию
-            const response = await fetch(`/stickers/${sticker.filename}`);
-            const arrayBuffer = await response.arrayBuffer();
+            let animationData;
             
-            // .tgs файлы - это gzip сжатые JSON файлы Lottie
-            const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
-            const animationData = JSON.parse(decompressed);
+            // Проверяем кэш анимационных данных
+            if (this.animationDataCache.has(sticker.filename)) {
+                animationData = this.animationDataCache.get(sticker.filename);
+            } else {
+                // Проверяем кэш .tgs файлов
+                let arrayBuffer;
+                if (this.stickerCache.has(sticker.filename)) {
+                    arrayBuffer = this.stickerCache.get(sticker.filename);
+                } else {
+                    // Загружаем .tgs файл только если его нет в кэше
+                    const response = await fetch(`/stickers/${sticker.filename}`);
+                    arrayBuffer = await response.arrayBuffer();
+                    this.stickerCache.set(sticker.filename, arrayBuffer);
+                }
+                
+                // .tgs файлы - это gzip сжатые JSON файлы Lottie
+                const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+                animationData = JSON.parse(decompressed);
+                this.animationDataCache.set(sticker.filename, animationData);
+            }
             
             const animation = lottie.loadAnimation({
                 container: container,
@@ -11626,17 +11643,39 @@ async function loadMessageStickerAnimation(messageId, stickerData) {
         const container = document.getElementById(`msg-sticker-${messageId}`);
         if (!container || !stickerData.filename) return;
         
-        // Загружаем .tgs файл
-        const response = await fetch(`/stickers/${stickerData.filename}`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        let animationData;
+        
+        // Используем глобальный кэш из StickerManager
+        if (window.stickerManager?.animationDataCache?.has(stickerData.filename)) {
+            animationData = window.stickerManager.animationDataCache.get(stickerData.filename);
+        } else {
+            // Проверяем кэш .tgs файлов
+            let arrayBuffer;
+            if (window.stickerManager?.stickerCache?.has(stickerData.filename)) {
+                arrayBuffer = window.stickerManager.stickerCache.get(stickerData.filename);
+            } else {
+                // Загружаем .tgs файл только если его нет в кэше
+                const response = await fetch(`/stickers/${stickerData.filename}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                arrayBuffer = await response.arrayBuffer();
+                
+                // Сохраняем в кэш если StickerManager доступен
+                if (window.stickerManager?.stickerCache) {
+                    window.stickerManager.stickerCache.set(stickerData.filename, arrayBuffer);
+                }
+            }
+            
+            // .tgs файлы - это gzip сжатые JSON файлы Lottie
+            const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+            animationData = JSON.parse(decompressed);
+            
+            // Сохраняем в кэш если StickerManager доступен
+            if (window.stickerManager?.animationDataCache) {
+                window.stickerManager.animationDataCache.set(stickerData.filename, animationData);
+            }
         }
-        
-        const arrayBuffer = await response.arrayBuffer();
-        
-        // .tgs файлы - это gzip сжатые JSON файлы Lottie
-        const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
-        const animationData = JSON.parse(decompressed);
         
         const animation = lottie.loadAnimation({
             container: container,
@@ -11673,17 +11712,39 @@ async function loadInlineStickerAnimation(stickerId, stickerData) {
         const container = document.getElementById(stickerId);
         if (!container || !stickerData.filename) return;
         
-        // Загружаем .tgs файл
-        const response = await fetch(`/stickers/${stickerData.filename}`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        let animationData;
+        
+        // Используем глобальный кэш из StickerManager
+        if (window.stickerManager?.animationDataCache?.has(stickerData.filename)) {
+            animationData = window.stickerManager.animationDataCache.get(stickerData.filename);
+        } else {
+            // Проверяем кэш .tgs файлов
+            let arrayBuffer;
+            if (window.stickerManager?.stickerCache?.has(stickerData.filename)) {
+                arrayBuffer = window.stickerManager.stickerCache.get(stickerData.filename);
+            } else {
+                // Загружаем .tgs файл только если его нет в кэше
+                const response = await fetch(`/stickers/${stickerData.filename}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                arrayBuffer = await response.arrayBuffer();
+                
+                // Сохраняем в кэш если StickerManager доступен
+                if (window.stickerManager?.stickerCache) {
+                    window.stickerManager.stickerCache.set(stickerData.filename, arrayBuffer);
+                }
+            }
+            
+            // .tgs файлы - это gzip сжатые JSON файлы Lottie
+            const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+            animationData = JSON.parse(decompressed);
+            
+            // Сохраняем в кэш если StickerManager доступен
+            if (window.stickerManager?.animationDataCache) {
+                window.stickerManager.animationDataCache.set(stickerData.filename, animationData);
+            }
         }
-        
-        const arrayBuffer = await response.arrayBuffer();
-        
-        // .tgs файлы - это gzip сжатые JSON файлы Lottie
-        const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
-        const animationData = JSON.parse(decompressed);
         
         const animation = lottie.loadAnimation({
             container: container,
