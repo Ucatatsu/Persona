@@ -8502,7 +8502,7 @@ input[type="range"].volume-slider::-webkit-slider-thumb,
   box-shadow: 0 3px 10px rgba(79, 195, 247, 0.5) !important;
   transition: all 0.2s ease !important;
   border: 3px solid white !important;
-  margin-top: -7px !important;
+  margin-top: -10px !important;
   position: relative !important;
 }
 
