@@ -763,18 +763,7 @@ button {
   background: var(--accent-glow);
   border: 1px solid var(--accent);
   transform: translateX(0);
-}
-
-.user-item.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  background: var(--accent);
-  border-radius: 0 3px 3px 0;
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.2);
 }
 
 .user-avatar {
@@ -2639,6 +2628,9 @@ emoji-picker {
   cursor: pointer;
   transition: all 0.2s;
   font-size: 14px;
+  border-radius: 12px;
+  margin: 0 8px;
+  position: relative;
 }
 
 .settings-nav-item:hover {
@@ -2647,7 +2639,8 @@ emoji-picker {
 
 .settings-nav-item.active {
   background: var(--accent-glow);
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.2);
 }
 
 .nav-icon {
@@ -4979,6 +4972,8 @@ body,
   .settings-nav-item.active {
     border-left: none;
     background: var(--accent-glow);
+    border: 1px solid var(--accent);
+    box-shadow: 0 2px 8px rgba(79, 195, 247, 0.2);
   }
   
   .settings-sidebar-footer {
