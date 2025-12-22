@@ -11346,6 +11346,9 @@ class StickerManager {
         this.loadedAnimations = new Map();
         this.stickerCache = new Map(); // Кэш для .tgs файлов
         this.animationDataCache = new Map(); // Кэш для распакованных данных
+        this.intersectionObserver = null;
+        this.maxLoadedAnimations = 50; // Максимум 50 анимаций в памяти
+        this.maxCacheSize = 100; // Максимум 100 файлов в кэше
         this.init();
     }
     
@@ -11491,18 +11494,44 @@ class StickerManager {
     loadVisibleAnimations() {
         const stickerItems = document.querySelectorAll('.sticker-item');
         
+        // Используем Intersection Observer для ленивой загрузки
+        if (!this.intersectionObserver) {
+            this.intersectionObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const item = entry.target;
+                        const stickerId = item.dataset.stickerId;
+                        const animationContainer = item.querySelector('.sticker-animation');
+                        
+                        if (!this.loadedAnimations.has(stickerId)) {
+                            this.loadStickerAnimation(stickerId, animationContainer);
+                        }
+                        
+                        // Прекращаем наблюдение за этим элементом
+                        this.intersectionObserver.unobserve(item);
+                    }
+                });
+            }, {
+                rootMargin: '50px' // Загружаем за 50px до появления
+            });
+        }
+        
+        // Наблюдаем за всеми стикерами
         stickerItems.forEach(item => {
             const stickerId = item.dataset.stickerId;
-            const animationContainer = item.querySelector('.sticker-animation');
-            
             if (!this.loadedAnimations.has(stickerId)) {
-                this.loadStickerAnimation(stickerId, animationContainer);
+                this.intersectionObserver.observe(item);
             }
         });
     }
     
     async loadStickerAnimation(stickerId, container) {
         try {
+            // Проверяем лимит загруженных анимаций
+            if (this.loadedAnimations.size >= this.maxLoadedAnimations) {
+                this.cleanupOldAnimations();
+            }
+            
             // Проверяем доступность библиотек
             if (typeof pako === 'undefined') {
                 console.error('pako library not loaded');
@@ -11550,11 +11579,20 @@ class StickerManager {
                 animationData: animationData
             });
             
-            this.loadedAnimations.set(stickerId, animation);
+            this.loadedAnimations.set(stickerId, {
+                animation: animation,
+                container: container,
+                lastUsed: Date.now()
+            });
             
             // Воспроизводим анимацию при hover
             container.parentElement.addEventListener('mouseenter', () => {
                 animation.play();
+                // Обновляем время последнего использования
+                const animData = this.loadedAnimations.get(stickerId);
+                if (animData) {
+                    animData.lastUsed = Date.now();
+                }
             });
             
             container.parentElement.addEventListener('mouseleave', () => {
@@ -11568,6 +11606,36 @@ class StickerManager {
         }
     }
     
+    // Очистка старых анимаций для освобождения памяти
+    cleanupOldAnimations() {
+        const animations = Array.from(this.loadedAnimations.entries());
+        
+        // Сортируем по времени последнего использования
+        animations.sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+        
+        // Удаляем 25% самых старых анимаций
+        const toRemove = Math.floor(animations.length * 0.25);
+        
+        for (let i = 0; i < toRemove; i++) {
+            const [stickerId, animData] = animations[i];
+            
+            // Уничтожаем Lottie анимацию
+            if (animData.animation) {
+                animData.animation.destroy();
+            }
+            
+            // Очищаем контейнер
+            if (animData.container) {
+                animData.container.innerHTML = '';
+            }
+            
+            // Удаляем из кэша
+            this.loadedAnimations.delete(stickerId);
+        }
+        
+        console.log(`🧹 Очищено ${toRemove} анимаций для освобождения памяти`);
+    }
+    
     setupEventListeners() {
         const stickerPicker = document.getElementById('sticker-picker');
         const stickerClose = document.querySelector('.sticker-close');
@@ -11575,6 +11643,8 @@ class StickerManager {
         
         stickerClose?.addEventListener('click', () => {
             stickerPicker?.classList.add('hidden');
+            // Очищаем память при закрытии пикера
+            this.cleanupOnClose();
         });
         
         // Переключение категорий
@@ -11594,6 +11664,32 @@ class StickerManager {
                 this.selectSticker(stickerId);
             }
         });
+    }
+    
+    // Очистка памяти при закрытии пикера
+    cleanupOnClose() {
+        // Очищаем большую часть анимаций, оставляем только недавние
+        const recentIds = new Set(this.recentStickers);
+        const toRemove = [];
+        
+        for (const [stickerId, animData] of this.loadedAnimations.entries()) {
+            if (!recentIds.has(stickerId)) {
+                toRemove.push(stickerId);
+            }
+        }
+        
+        toRemove.forEach(stickerId => {
+            const animData = this.loadedAnimations.get(stickerId);
+            if (animData?.animation) {
+                animData.animation.destroy();
+            }
+            if (animData?.container) {
+                animData.container.innerHTML = '';
+            }
+            this.loadedAnimations.delete(stickerId);
+        });
+        
+        console.log(`🧹 Очищено ${toRemove.length} анимаций при закрытии пикера`);
     }
     
     selectSticker(stickerId) {
