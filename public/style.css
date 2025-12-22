@@ -601,7 +601,7 @@ button {
 .user-card-stats {
   position: absolute;
   top: 68px;
-  left: 12px;
+  right: 52px; /* Рядом с кнопкой настроек */
   width: 32px;
   height: 32px;
   border-radius: 8px;
