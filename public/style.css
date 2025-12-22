@@ -8461,84 +8461,84 @@ input[type="range"]:focus::-moz-range-thumb {
   font-weight: 600;
 }
 
-/* === BEAUTIFUL VOLUME SLIDER === */
-.volume-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 8px;
-  border-radius: 4px;
-  background: var(--bg-light);
-  outline: none;
-  cursor: pointer;
-  position: relative;
-  transition: all 0.2s ease;
-  flex: 1;
-}
-
-.volume-slider:hover {
-  transform: scaleY(1.2);
-}
-
-.volume-slider::-webkit-slider-runnable-track {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--bg-light);
-}
-
-.volume-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  cursor: grab;
-  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.4);
-  transition: all 0.2s ease;
-  border: 2px solid white;
-}
-
-.volume-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 4px 16px rgba(79, 195, 247, 0.6);
-}
-
-.volume-slider::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.1);
-  box-shadow: 0 2px 12px rgba(79, 195, 247, 0.8);
-}
-
-/* Firefox styles */
-.volume-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  cursor: grab;
-  border: 2px solid white;
-  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.4);
-}
-
-.volume-slider::-moz-range-track {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--bg-light);
-  border: none;
-}
-
-.volume-slider::-moz-range-progress {
-  height: 8px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-light));
-}
-
-/* Progress bar effect for WebKit browsers */
-.volume-slider {
+/* === FORCE BEAUTIFUL VOLUME SLIDER === */
+input[type="range"].volume-slider,
+#volume-slider {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  height: 10px !important;
+  border-radius: 5px !important;
   background: linear-gradient(to right, 
     var(--accent) 0%, 
     var(--accent) var(--progress, 50%), 
     var(--bg-light) var(--progress, 50%), 
-    var(--bg-light) 100%);
+    var(--bg-light) 100%) !important;
+  outline: none !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: all 0.2s ease !important;
+  flex: 1 !important;
+}
+
+input[type="range"].volume-slider:hover,
+#volume-slider:hover {
+  transform: scaleY(1.3) !important;
+}
+
+input[type="range"].volume-slider::-webkit-slider-thumb,
+#volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-light)) !important;
+  cursor: grab !important;
+  box-shadow: 0 3px 12px rgba(79, 195, 247, 0.5) !important;
+  transition: all 0.2s ease !important;
+  border: 3px solid white !important;
+}
+
+input[type="range"].volume-slider::-webkit-slider-thumb:hover,
+#volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3) !important;
+  box-shadow: 0 5px 20px rgba(79, 195, 247, 0.7) !important;
+}
+
+input[type="range"].volume-slider::-webkit-slider-thumb:active,
+#volume-slider::-webkit-slider-thumb:active {
+  cursor: grabbing !important;
+  transform: scale(1.2) !important;
+  box-shadow: 0 3px 15px rgba(79, 195, 247, 0.9) !important;
+}
+
+/* Force volume control layout */
+.volume-control {
+  display: flex !important;
+  align-items: center !important;
+  gap: 15px !important;
+  min-width: 220px !important;
+}
+
+.volume-control .volume-icon {
+  font-size: 20px !important;
+  opacity: 0.9 !important;
+  transition: all 0.2s ease !important;
+}
+
+.volume-control .volume-icon:first-child {
+  color: var(--text-muted) !important;
+}
+
+.volume-control .volume-icon:last-of-type {
+  color: var(--accent) !important;
+}
+
+.volume-control .volume-value {
+  min-width: 40px !important;
+  text-align: right !important;
+  font-size: 14px !important;
+  color: var(--accent) !important;
+  font-weight: 700 !important;
 }
 
 

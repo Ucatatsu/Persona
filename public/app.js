@@ -9049,12 +9049,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const volumeSlider = document.getElementById('volume-slider');
     const volumeValue = document.getElementById('volume-value');
     if (volumeSlider) {
-        volumeSlider.value = state.settings.volume ?? 50;
-        if (volumeValue) volumeValue.textContent = `${volumeSlider.value}%`;
+        // Принудительно устанавливаем атрибуты
+        volumeSlider.setAttribute('step', '10');
+        volumeSlider.setAttribute('min', '0');
+        volumeSlider.setAttribute('max', '100');
+        
+        let vol = state.settings.volume ?? 50;
+        // Округляем до ближайшего числа, кратного 10
+        vol = Math.round(vol / 10) * 10;
+        volumeSlider.value = vol;
+        
+        if (volumeValue) volumeValue.textContent = `${vol}%`;
         updateSliderProgress(volumeSlider);
         
         volumeSlider.addEventListener('input', (e) => {
-            const vol = parseInt(e.target.value);
+            let vol = parseInt(e.target.value);
+            // Принудительно округляем до ближайшего числа, кратного 10
+            vol = Math.round(vol / 10) * 10;
+            e.target.value = vol;
+            
             state.settings.volume = vol;
             if (volumeValue) volumeValue.textContent = `${vol}%`;
             updateSliderProgress(e.target);
