@@ -2106,14 +2106,16 @@ function createMessageElement(msg, isSent) {
         // Отображение стикера
         let stickerData;
         try {
-            stickerData = typeof msg.sticker === 'string' ? JSON.parse(msg.sticker) : msg.sticker;
-        } catch (e) {
-            try {
+            // Сначала пробуем msg.sticker (для новых сообщений)
+            if (msg.sticker) {
+                stickerData = typeof msg.sticker === 'string' ? JSON.parse(msg.sticker) : msg.sticker;
+            } else {
+                // Затем пробуем парсить из text поля (для сохранённых сообщений)
                 stickerData = JSON.parse(msg.text);
-            } catch (e2) {
-                console.error('Ошибка парсинга стикера:', e2);
-                stickerData = { name: 'Стикер', filename: 'unknown.tgs' };
             }
+        } catch (e) {
+            console.error('Ошибка парсинга стикера:', e);
+            stickerData = { name: 'Стикер', filename: 'unknown.tgs' };
         }
         
         bubbleContent = `
@@ -2139,8 +2141,29 @@ function createMessageElement(msg, isSent) {
                 <div class="video-mute-indicator">🔇</div>
             </div>`;
     } else {
-        // Преобразуем URL в кликабельные ссылки
-        bubbleContent = linkifyText(escapeHtml(msg.text));
+        // Преобразуем URL в кликабельные ссылки и обрабатываем встроенные стикеры
+        let processedText = linkifyText(escapeHtml(msg.text));
+        
+        // Обрабатываем встроенные стикеры в тексте
+        const stickerPattern = /\[STICKER:({[^}]+})\]/g;
+        processedText = processedText.replace(stickerPattern, (match, stickerJson) => {
+            try {
+                const stickerData = JSON.parse(stickerJson);
+                const stickerId = `inline-sticker-${msg.id}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Создаём встроенный стикер
+                setTimeout(() => {
+                    loadInlineStickerAnimation(stickerId, stickerData);
+                }, 100);
+                
+                return `<span class="inline-sticker" id="${stickerId}"></span>`;
+            } catch (e) {
+                console.error('Ошибка парсинга встроенного стикера:', e);
+                return '🎭';
+            }
+        });
+        
+        bubbleContent = processedText;
     }
     
     // Формируем HTML для replied сообщения
@@ -2850,7 +2873,7 @@ function appendMessage(msg) {
 
 function sendMessage() {
     const input = document.getElementById('message-input');
-    const text = input.value.trim();
+    let text = input.value.trim();
     
     if (!text || !state.socket) return;
     
@@ -2858,6 +2881,42 @@ function sendMessage() {
     if (!state.selectedUser && !state.selectedGroup && !state.selectedChannel && !state.selectedServerChannel) return;
     
     stopTyping();
+    
+    // Обрабатываем стикеры в тексте
+    const stickerRegex = /🎭(sticker_\d+)/g;
+    let stickerData = null;
+    let hasStickers = false;
+    
+    // Проверяем есть ли стикеры в тексте
+    const stickerMatch = text.match(stickerRegex);
+    if (stickerMatch && stickerMatch.length === 1 && text.trim() === stickerMatch[0]) {
+        // Это чистый стикер (только один стикер без текста)
+        const stickerId = stickerMatch[0].replace('🎭', '');
+        const sticker = window.stickerManager?.stickers?.find(s => s.id === stickerId);
+        if (sticker) {
+            stickerData = {
+                id: sticker.id,
+                filename: sticker.filename,
+                name: sticker.name
+            };
+            hasStickers = true;
+            text = ''; // Очищаем текст для чистых стикеров
+        }
+    } else if (stickerMatch) {
+        // Смешанный контент - заменяем стикер-коды на текстовые метки
+        text = text.replace(stickerRegex, (match, stickerId) => {
+            const sticker = window.stickerManager?.stickers?.find(s => s.id === stickerId);
+            if (sticker) {
+                return `[STICKER:${JSON.stringify({
+                    id: sticker.id,
+                    filename: sticker.filename,
+                    name: sticker.name
+                })}]`;
+            }
+            return match;
+        });
+        hasStickers = true;
+    }
     
     // Получаем время самоуничтожения
     const selfDestructMinutes = state.selfDestructMinutes || 0;
@@ -2870,25 +2929,31 @@ function sendMessage() {
         state.socket.emit('group-message', {
             groupId: state.selectedGroup.id,
             text,
-            messageType: 'text'
+            messageType: hasStickers && stickerData ? 'sticker' : 'text',
+            sticker: stickerData
         });
     } else if (state.selectedChannel) {
         state.socket.emit('channel-post', {
             channelId: state.selectedChannel.id,
-            text
+            text,
+            messageType: hasStickers && stickerData ? 'sticker' : 'text',
+            sticker: stickerData
         });
     } else if (state.selectedServerChannel) {
         state.socket.emit('server-message', {
             channelId: state.selectedServerChannel.id,
             text,
-            messageType: 'text'
+            messageType: hasStickers && stickerData ? 'sticker' : 'text',
+            sticker: stickerData
         });
     } else if (state.selectedUser) {
         state.socket.emit('send-message', {
             receiverId: state.selectedUser.id,
             text,
             selfDestructMinutes,
-            replyToId
+            replyToId,
+            messageType: hasStickers && stickerData ? 'sticker' : 'text',
+            sticker: stickerData
         });
     }
     
@@ -5804,20 +5869,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // === EMOJI & STICKERS ===
+    // === STICKERS ===
     
     const emojiBtn = document.querySelector('.emoji-btn');
-    const emojiPicker = document.getElementById('emoji-picker');
-    const emojiPickerElement = document.querySelector('emoji-picker');
-    const emojiStickerMenu = document.getElementById('emoji-sticker-menu');
     const stickerPicker = document.getElementById('sticker-picker');
-    
-    // Обработка выбора эмодзи из библиотеки
-    emojiPickerElement?.addEventListener('emoji-click', (e) => {
-        messageInput.value += e.detail.unicode;
-        messageInput.focus();
-        emojiPicker.classList.add('hidden');
-    });
     
     emojiBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -5826,34 +5881,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // Закрываем все открытые пикеры
-        emojiPicker?.classList.add('hidden');
-        stickerPicker?.classList.add('hidden');
-        
-        // Показываем/скрываем меню выбора
-        emojiStickerMenu?.classList.toggle('hidden');
-    });
-    
-    // Обработчики для опций меню
-    document.getElementById('emoji-option')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        emojiStickerMenu?.classList.add('hidden');
-        emojiPicker?.classList.remove('hidden');
-    });
-    
-    document.getElementById('sticker-option')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        emojiStickerMenu?.classList.add('hidden');
-        stickerPicker?.classList.remove('hidden');
+        // Показываем/скрываем стикер-пикер
+        stickerPicker?.classList.toggle('hidden');
     });
     
     document.addEventListener('click', (e) => {
-        if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
-            emojiPicker.classList.add('hidden');
-        }
-        if (emojiStickerMenu && !emojiStickerMenu.contains(e.target) && e.target !== emojiBtn) {
-            emojiStickerMenu.classList.add('hidden');
-        }
         if (stickerPicker && !stickerPicker.contains(e.target) && e.target !== emojiBtn) {
             stickerPicker.classList.add('hidden');
         }
@@ -11498,19 +11530,16 @@ class StickerManager {
     }
     
     sendStickerMessage(sticker) {
-        if (!state.socket || !state.selectedUser) return;
+        // Добавляем стикер в текстовое поле как эмодзи
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) {
+            // Используем специальный символ для анимированного стикера
+            messageInput.value += `🎭${sticker.id}`;
+            messageInput.focus();
+        }
         
-        const messageData = {
-            text: '', // Пустой текст для стикера
-            sticker: {
-                id: sticker.id,
-                filename: sticker.filename,
-                name: sticker.name
-            },
-            receiverId: state.selectedUser.id
-        };
-        
-        state.socket.emit('send-message', messageData);
+        // Закрываем пикер
+        document.getElementById('sticker-picker')?.classList.add('hidden');
     }
     
     showError() {
@@ -11575,6 +11604,53 @@ async function loadMessageStickerAnimation(messageId, stickerData) {
         const container = document.getElementById(`msg-sticker-${messageId}`);
         if (container) {
             container.innerHTML = '<div class="sticker-error">❌</div>';
+        }
+    }
+}
+
+// Функция для загрузки встроенных стикеров в тексте
+async function loadInlineStickerAnimation(stickerId, stickerData) {
+    try {
+        const container = document.getElementById(stickerId);
+        if (!container || !stickerData.filename) return;
+        
+        // Загружаем .tgs файл
+        const response = await fetch(`/stickers/${stickerData.filename}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // .tgs файлы - это gzip сжатые JSON файлы Lottie
+        const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+        const animationData = JSON.parse(decompressed);
+        
+        const animation = lottie.loadAnimation({
+            container: container,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: animationData
+        });
+        
+        // Сохраняем ссылку на анимацию для управления
+        container.lottieAnimation = animation;
+        
+        // Пауза/воспроизведение по клику
+        container.addEventListener('click', () => {
+            if (animation.isPaused) {
+                animation.play();
+            } else {
+                animation.pause();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Ошибка загрузки встроенного стикера:', error);
+        const container = document.getElementById(stickerId);
+        if (container) {
+            container.innerHTML = '🎭';
         }
     }
 }

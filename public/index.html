@@ -12,7 +12,6 @@
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
-  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
@@ -353,8 +352,8 @@
       </button>
       <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off" 
              disabled aria-label="Текст сообщения">
-      <button type="button" class="emoji-btn" aria-label="Выбрать эмодзи или стикер" aria-haspopup="true">
-        <img src="/assets/emoji.svg" alt="" class="icon">
+      <button type="button" class="emoji-btn" aria-label="Выбрать стикер" aria-haspopup="true">
+        <img src="/assets/Sparkles.svg" alt="" class="icon">
       </button>
       <button type="submit" class="send-btn" disabled aria-label="Отправить сообщение">
         <img src="/assets/send.svg" alt="" class="icon">
@@ -373,17 +372,7 @@
     </div>
   </div>
 
-  <!-- Меню выбора эмодзи/стикеров -->
-  <div class="emoji-sticker-menu hidden" id="emoji-sticker-menu">
-    <button class="emoji-sticker-option" id="emoji-option">
-      <img src="/assets/emoji.svg" alt="" class="icon-sm"> Эмодзи
-    </button>
-    <button class="emoji-sticker-option" id="sticker-option">
-      <img src="/assets/Sparkles.svg" alt="" class="icon-sm"> Стикеры
-    </button>
-  </div>
-
-  <!-- Модальное окно профиля -->
+  <!-- Sticker Picker -->
   <div id="profile-modal" class="modal hidden" role="dialog" aria-labelledby="profile-name" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="modal-content profile-modal-content">
@@ -1440,10 +1429,7 @@
     </div>
   </div>
 
-  <!-- Emoji Picker -->
-  <div id="emoji-picker" class="emoji-picker hidden" role="dialog" aria-label="Выбор эмодзи">
-    <emoji-picker></emoji-picker>
-  </div>
+
 
   <!-- Sticker Picker -->
   <div id="sticker-picker" class="sticker-picker hidden" role="dialog" aria-label="Выбор стикера">
