@@ -1350,6 +1350,52 @@ button {
 
 .profile-actions button { width: 100%; }
 
+/* ===== EMOJI & STICKER MENU ===== */
+.emoji-sticker-menu {
+  position: absolute;
+  bottom: 60px;
+  right: 60px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  z-index: 1000;
+  min-width: 140px;
+  animation: emojiPickerIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.emoji-sticker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  background: none;
+  border: none;
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.emoji-sticker-option:hover {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.emoji-sticker-option .icon-sm {
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(0.6);
+}
+
+.emoji-sticker-option:hover .icon-sm {
+  filter: brightness(0) saturate(100%) invert(76%) sepia(52%) saturate(1000%) hue-rotate(166deg) brightness(101%) contrast(96%);
+}
+
 /* ===== EMOJI PICKER ===== */
 .emoji-picker {
   position: fixed;

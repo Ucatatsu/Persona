@@ -5804,11 +5804,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // === EMOJI ===
+    // === EMOJI & STICKERS ===
     
     const emojiBtn = document.querySelector('.emoji-btn');
     const emojiPicker = document.getElementById('emoji-picker');
     const emojiPickerElement = document.querySelector('emoji-picker');
+    const emojiStickerMenu = document.getElementById('emoji-sticker-menu');
+    const stickerPicker = document.getElementById('sticker-picker');
     
     // Обработка выбора эмодзи из библиотеки
     emojiPickerElement?.addEventListener('emoji-click', (e) => {
@@ -5823,12 +5825,37 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Сначала выберите чат', 'error');
             return;
         }
-        emojiPicker?.classList.toggle('hidden');
+        
+        // Закрываем все открытые пикеры
+        emojiPicker?.classList.add('hidden');
+        stickerPicker?.classList.add('hidden');
+        
+        // Показываем/скрываем меню выбора
+        emojiStickerMenu?.classList.toggle('hidden');
+    });
+    
+    // Обработчики для опций меню
+    document.getElementById('emoji-option')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiStickerMenu?.classList.add('hidden');
+        emojiPicker?.classList.remove('hidden');
+    });
+    
+    document.getElementById('sticker-option')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiStickerMenu?.classList.add('hidden');
+        stickerPicker?.classList.remove('hidden');
     });
     
     document.addEventListener('click', (e) => {
         if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
             emojiPicker.classList.add('hidden');
+        }
+        if (emojiStickerMenu && !emojiStickerMenu.contains(e.target) && e.target !== emojiBtn) {
+            emojiStickerMenu.classList.add('hidden');
+        }
+        if (stickerPicker && !stickerPicker.contains(e.target) && e.target !== emojiBtn) {
+            stickerPicker.classList.add('hidden');
         }
     });
     
@@ -11370,6 +11397,19 @@ class StickerManager {
     
     async loadStickerAnimation(stickerId, container) {
         try {
+            // Проверяем доступность библиотек
+            if (typeof pako === 'undefined') {
+                console.error('pako library not loaded');
+                container.innerHTML = '<div class="sticker-error">📦</div>';
+                return;
+            }
+            
+            if (typeof lottie === 'undefined') {
+                console.error('lottie library not loaded');
+                container.innerHTML = '<div class="sticker-error">🎬</div>';
+                return;
+            }
+            
             const sticker = this.stickers.find(s => s.id === stickerId);
             if (!sticker) return;
             
@@ -11408,22 +11448,9 @@ class StickerManager {
     }
     
     setupEventListeners() {
-        const stickerBtn = document.querySelector('.sticker-btn');
         const stickerPicker = document.getElementById('sticker-picker');
         const stickerClose = document.querySelector('.sticker-close');
         const categories = document.querySelectorAll('.sticker-category');
-        
-        // Открытие/закрытие стикер-пикера
-        stickerBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!state.selectedUser && !state.selectedGroup && !state.selectedChannel && !state.selectedServerChannel) {
-                return;
-            }
-            stickerPicker?.classList.toggle('hidden');
-            
-            // Закрываем emoji picker если открыт
-            document.getElementById('emoji-picker')?.classList.add('hidden');
-        });
         
         stickerClose?.addEventListener('click', () => {
             stickerPicker?.classList.add('hidden');
@@ -11444,13 +11471,6 @@ class StickerManager {
             if (stickerItem) {
                 const stickerId = stickerItem.dataset.stickerId;
                 this.selectSticker(stickerId);
-            }
-        });
-        
-        // Закрытие при клике вне области
-        document.addEventListener('click', (e) => {
-            if (stickerPicker && !stickerPicker.contains(e.target) && e.target !== stickerBtn) {
-                stickerPicker.classList.add('hidden');
             }
         });
     }
