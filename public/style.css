@@ -14801,11 +14801,22 @@ select option {
   width: 32px;
   height: 32px;
   pointer-events: none;
+  position: relative;
 }
 
 .emoji-animation svg {
   width: 100% !important;
   height: 100% !important;
+}
+
+.emoji-static-fallback {
+  font-size: 20px;
+  display: block;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Static emoji fallback */

@@ -12206,7 +12206,7 @@ const animatedEmojiMapping = {
 };
 
 const emojiData = {
-    // Смайлики и эмоции (по популярности)
+    // Смайлики и эмоции (только те, для которых есть .tgs файлы)
     smileys: [
         '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
         '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
@@ -12222,103 +12222,42 @@ const emojiData = {
         '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩'
     ],
     
-    // Люди и части тела
+    // Люди и части тела (только жесты с .tgs файлами)
     people: [
         '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏',
         '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆',
         '🖕', '👇', '☝️', '👍', '👎', '👊', '✊', '🤛',
         '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️',
-        '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂',
-        '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀',
-        '👁️', '👅', '👄', '💋', '🩸', '👶', '🧒', '👦',
-        '👧', '🧑', '👱', '👨', '🧔', '👩', '🧓', '👴',
-        '👵', '🙍', '🙎', '🙅', '🙆', '💁', '🙋', '🧏',
-        '🙇', '🤦', '🤷', '👮', '🕵️', '💂', '🥷', '👷'
+        '💅', '🤳', '💪'
     ],
     
-    // Животные и природа
+    // Животные и природа (только основные с .tgs файлами)
     animals: [
         '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼',
-        '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵',
-        '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤',
-        '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗',
-        '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜',
-        '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎',
-        '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡',
-        '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅',
-        '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪',
-        '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖'
+        '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵'
     ],
     
-    // Еда и напитки
+    // Еда и напитки (только основные с .tgs файлами)
     food: [
-        '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐',
-        '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅',
-        '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽',
-        '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥖',
-        '🍞', '🥨', '🥯', '🧀', '🥚', '🍳', '🧈', '🥞',
-        '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔',
-        '🍟', '🍕', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔',
-        '🥗', '🥘', '🫕', '🍝', '🍜', '🍲', '🍛', '🍣',
-        '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥',
-        '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧'
+        '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈',
+        '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆'
     ],
     
-    // Путешествия и места
-    travel: [
-        '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑',
-        '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍️', '🛵',
-        '🚲', '🛴', '🛹', '🛼', '🚁', '🛸', '✈️', '🛩️',
-        '🛫', '🛬', '🪂', '💺', '🚀', '🛰️', '🚢', '⛵',
-        '🚤', '🛥️', '🛳️', '⛴️', '🚂', '🚃', '🚄', '🚅',
-        '🚆', '🚇', '🚈', '🚉', '🚊', '🚝', '🚞', '🚋',
-        '🚌', '🚍', '🎡', '🎢', '🎠', '🏗️', '🌁', '🗼',
-        '🏭', '⛲', '🎑', '⛰️', '🏔️', '🗻', '🌋', '🏕️',
-        '🏖️', '🏜️', '🏝️', '🏞️', '🏟️', '🏛️', '🏗️', '🧱',
-        '🪨', '🪵', '🛖', '🏘️', '🏚️', '🏠', '🏡', '🏢'
-    ],
+    // Путешествия и места (пока пустая - нет .tgs файлов)
+    travel: [],
     
-    // Предметы
-    objects: [
-        '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉',
-        '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍',
-        '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿',
-        '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿',
-        '⛷️', '🏂', '🪂', '🏋️', '🤸', '🤼', '🤽', '🤾',
-        '🧗', '🚵', '🚴', '🏇', '🧘', '🏄', '🏊', '🤽',
-        '📱', '💻', '🖥️', '🖨️', '⌨️', '🖱️', '🖲️', '💽',
-        '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥',
-        '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻',
-        '🎙️', '🎚️', '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️'
-    ],
+    // Предметы (пока пустая - нет .tgs файлов)
+    objects: [],
     
-    // Символы
+    // Символы (только сердечки и основные символы с .tgs файлами)
     symbols: [
         '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
         '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖',
-        '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️',
-        '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈',
-        '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐',
-        '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️',
-        '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️',
-        '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹',
-        '🈲', '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌',
-        '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️'
+        '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️'
     ],
     
-    // Флаги
-    flags: [
-        '🏳️', '🏴', '🏁', '🚩', '🏳️‍🌈', '🏳️‍⚧️', '🇺🇳', '🇦🇫',
-        '🇦🇱', '🇩🇿', '🇦🇸', '🇦🇩', '🇦🇴', '🇦🇮', '🇦🇶', '🇦🇬',
-        '🇦🇷', '🇦🇲', '🇦🇼', '🇦🇺', '🇦🇹', '🇦🇿', '🇧🇸', '🇧🇭',
-        '🇧🇩', '🇧🇧', '🇧🇾', '🇧🇪', '🇧🇿', '🇧🇯', '🇧🇲', '🇧🇹',
-        '🇧🇴', '🇧🇦', '🇧🇼', '🇧🇷', '🇮🇴', '🇻🇬', '🇧🇳', '🇧🇬',
-        '🇧🇫', '🇧🇮', '🇰🇭', '🇨🇲', '🇨🇦', '🇮🇨', '🇨🇻', '🇧🇶',
-        '🇰🇾', '🇨🇫', '🇹🇩', '🇨🇱', '🇨🇳', '🇨🇽', '🇨🇨', '🇨🇴',
-        '🇰🇲', '🇨🇬', '🇨🇩', '🇨🇰', '🇨🇷', '🇨🇮', '🇭🇷', '🇨🇺',
-        '🇨🇼', '🇨🇾', '🇨🇿', '🇩🇰', '🇩🇯', '🇩🇲', '🇩🇴', '🇪🇨',
-        '🇪🇬', '🇸🇻', '🇬🇶', '🇪🇷', '🇪🇪', '🇪🇹', '🇪🇺', '🇫🇰'
-    ]
+    // Флаги (пока пустая - нет .tgs файлов)
+    flags: []
 };
 
 let currentEmojiCategory = 'smileys';
@@ -12393,10 +12332,11 @@ function loadEmojiCategory(category) {
     const emojiGrid = document.getElementById('emoji-grid');
     const emojis = emojiData[category] || [];
     
-    // Clear the grid
+    // Clear the grid and cleanup previous animations
+    cleanupEmojiAnimations();
     emojiGrid.innerHTML = '';
     
-    // Create animated emoji items
+    // Create emoji items with lazy loading
     emojis.forEach((emoji, index) => {
         const tgsFile = animatedEmojiMapping[emoji];
         
@@ -12406,23 +12346,45 @@ function loadEmojiCategory(category) {
             emojiItem.className = 'emoji-item animated-emoji';
             emojiItem.dataset.emoji = emoji;
             emojiItem.dataset.tgsFile = tgsFile;
+            emojiItem.dataset.loaded = 'false';
             
             // Create container for Lottie animation
             const animationContainer = document.createElement('div');
             animationContainer.className = 'emoji-animation';
             animationContainer.id = `animated-emoji-${category}-${index}`;
+            
+            // Show static emoji initially
+            const staticFallback = document.createElement('span');
+            staticFallback.className = 'emoji-static-fallback';
+            staticFallback.textContent = emoji;
+            animationContainer.appendChild(staticFallback);
+            
             emojiItem.appendChild(animationContainer);
-            
             emojiGrid.appendChild(emojiItem);
-            
-            // Load Lottie animation
-            loadAnimatedEmoji(animationContainer.id, tgsFile);
             
             // Add click handler
             emojiItem.addEventListener('click', () => {
                 insertEmojiIntoMessage(emoji);
                 addToRecentEmojis(emoji);
             });
+            
+            // Load animation on hover with debounce
+            let hoverTimeout;
+            emojiItem.addEventListener('mouseenter', () => {
+                if (emojiItem.dataset.loaded === 'false') {
+                    hoverTimeout = setTimeout(() => {
+                        loadAnimatedEmoji(animationContainer.id, tgsFile);
+                        emojiItem.dataset.loaded = 'true';
+                    }, 100); // Small delay to prevent excessive loading
+                }
+            });
+            
+            emojiItem.addEventListener('mouseleave', () => {
+                if (hoverTimeout) {
+                    clearTimeout(hoverTimeout);
+                }
+            });
+            
         } else {
             // Fallback to static emoji if no .tgs file found
             const emojiItem = document.createElement('button');
@@ -12437,42 +12399,77 @@ function loadEmojiCategory(category) {
             });
         }
     });
+    
+    // Load first few animations immediately for better UX
+    setTimeout(() => {
+        const firstEmojis = emojiGrid.querySelectorAll('.animated-emoji');
+        for (let i = 0; i < Math.min(8, firstEmojis.length); i++) {
+            const item = firstEmojis[i];
+            if (item.dataset.loaded === 'false') {
+                const container = item.querySelector('.emoji-animation');
+                loadAnimatedEmoji(container.id, item.dataset.tgsFile);
+                item.dataset.loaded = 'true';
+            }
+        }
+    }, 50);
 }
 
-// Function to load animated emoji using Lottie
+// Optimized function to load animated emoji using Lottie
 async function loadAnimatedEmoji(containerId, tgsFile) {
     try {
         const container = document.getElementById(containerId);
         if (!container) return;
         
-        // Fetch and decompress .tgs file
-        const response = await fetch(`/stickers/${tgsFile}`);
+        // Check if already loading or loaded
+        if (container.dataset.loading === 'true' || container._lottieAnimation) return;
+        container.dataset.loading = 'true';
+        
+        // Fetch and decompress .tgs file with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(`/stickers/${tgsFile}`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         if (!response.ok) throw new Error('Failed to load .tgs file');
         
         const arrayBuffer = await response.arrayBuffer();
         const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
         const animationData = JSON.parse(decompressed);
         
-        // Load Lottie animation
+        // Hide static fallback
+        const fallback = container.querySelector('.emoji-static-fallback');
+        if (fallback) fallback.style.display = 'none';
+        
+        // Load Lottie animation with optimized settings
         const animation = lottie.loadAnimation({
             container: container,
             renderer: 'svg',
             loop: true,
             autoplay: true,
-            animationData: animationData
+            animationData: animationData,
+            rendererSettings: {
+                progressiveLoad: true,
+                preserveAspectRatio: 'xMidYMid slice'
+            }
         });
         
         // Store animation reference for cleanup
         container._lottieAnimation = animation;
+        container.dataset.loading = 'false';
         
     } catch (error) {
         console.error('Error loading animated emoji:', error);
-        // Fallback to static emoji
         const container = document.getElementById(containerId);
-        if (container && container.parentElement) {
-            const emoji = container.parentElement.dataset.emoji;
-            container.parentElement.innerHTML = emoji;
-            container.parentElement.className = 'emoji-item static-emoji';
+        if (container) {
+            container.dataset.loading = 'false';
+            // Show static fallback on error
+            const fallback = container.querySelector('.emoji-static-fallback');
+            if (fallback) {
+                fallback.style.display = 'block';
+            }
         }
     }
 }
