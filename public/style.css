@@ -14792,38 +14792,6 @@ select option {
   transform: scale(0.95);
 }
 
-/* Animated emoji styles */
-.emoji-item.animated-emoji {
-  padding: 2px;
-}
-
-.emoji-animation {
-  width: 32px;
-  height: 32px;
-  pointer-events: none;
-  position: relative;
-}
-
-.emoji-animation svg {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.emoji-static-fallback {
-  font-size: 20px;
-  display: block;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Static emoji fallback */
-.emoji-item.static-emoji {
-  font-size: 20px;
-}
-
 /* Мобильная адаптация */
 @media (max-width: 768px) {
   .emoji-picker {
@@ -14843,19 +14811,6 @@ select option {
   .emoji-item {
     width: 32px;
     height: 32px;
-    font-size: 18px;
-  }
-  
-  .emoji-item.animated-emoji {
-    padding: 1px;
-  }
-  
-  .emoji-item.animated-emoji .emoji-animation {
-    width: 30px;
-    height: 30px;
-  }
-  
-  .emoji-item.static-emoji {
     font-size: 18px;
   }
   
