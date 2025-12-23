@@ -14687,33 +14687,11 @@ select option {
   flex-shrink: 0;
 }
 
-.emoji-tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.emoji-tab {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.emoji-tab:hover {
-  background: var(--accent-glow);
-  color: var(--accent);
-}
-
-.emoji-tab.active {
-  background: var(--accent);
-  color: white;
+.emoji-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .emoji-close {
@@ -14802,6 +14780,7 @@ select option {
   font-size: 20px;
   background: transparent;
   border: none;
+  position: relative;
 }
 
 .emoji-item:hover {
@@ -14811,6 +14790,27 @@ select option {
 
 .emoji-item:active {
   transform: scale(0.95);
+}
+
+/* Animated emoji styles */
+.emoji-item.animated-emoji {
+  padding: 2px;
+}
+
+.emoji-animation {
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+}
+
+.emoji-animation svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Static emoji fallback */
+.emoji-item.static-emoji {
+  font-size: 20px;
 }
 
 /* Мобильная адаптация */
@@ -14832,6 +14832,19 @@ select option {
   .emoji-item {
     width: 32px;
     height: 32px;
+    font-size: 18px;
+  }
+  
+  .emoji-item.animated-emoji {
+    padding: 1px;
+  }
+  
+  .emoji-item.animated-emoji .emoji-animation {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .emoji-item.static-emoji {
     font-size: 18px;
   }
   

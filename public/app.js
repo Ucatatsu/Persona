@@ -12004,7 +12004,207 @@ async function loadInlineStickerAnimation(stickerId, stickerData) {
         }
     }
 }
-// === EMOJI PICKER ===
+// === ANIMATED EMOJI PICKER ===
+// Mapping between Unicode emojis and .tgs filenames
+const animatedEmojiMapping = {
+    // Смайлики и эмоции (по популярности) - первые 80 самых популярных
+    '😀': 'RestrictedEmoji_AgAD_B4AAvgn6Us.tgs',
+    '😃': 'RestrictedEmoji_AgAD_BkAAqmLiUo.tgs',
+    '😄': 'RestrictedEmoji_AgAD_CIAAhseAUg.tgs',
+    '😁': 'RestrictedEmoji_AgAD_DoAAukGUEs.tgs',
+    '😆': 'RestrictedEmoji_AgAD_GIAApMEeEs.tgs',
+    '😅': 'RestrictedEmoji_AgAD_h4AAmtFwEo.tgs',
+    '🤣': 'RestrictedEmoji_AgAD_h8AAtwSaUo.tgs',
+    '😂': 'RestrictedEmoji_AgAD_hsAAoq7kUo.tgs',
+    '🙂': 'RestrictedEmoji_AgAD_joAAgH9kEg.tgs',
+    '🙃': 'RestrictedEmoji_AgAD_joAAltDsUs.tgs',
+    '😉': 'RestrictedEmoji_AgAD_RgAAi0diEo.tgs',
+    '😊': 'RestrictedEmoji_AgAD_RoAAiESiUo.tgs',
+    '😇': 'RestrictedEmoji_AgAD_SEAAnnUWUo.tgs',
+    '🥰': 'RestrictedEmoji_AgAD_SQAAnv96Eo.tgs',
+    '😍': 'RestrictedEmoji_AgAD_TAAArYjeUg.tgs',
+    '🤩': 'RestrictedEmoji_AgAD_yAAAo8aiUo.tgs',
+    '😘': 'RestrictedEmoji_AgAD_zAAAjZ8sUo.tgs',
+    '😗': 'RestrictedEmoji_AgAD_zkAArX_UEs.tgs',
+    '☺️': 'RestrictedEmoji_AgAD-h0AAqg2mEo.tgs',
+    '😚': 'RestrictedEmoji_AgAD-i8AAp9PsEo.tgs',
+    '😙': 'RestrictedEmoji_AgAD-igAAiHKkEg.tgs',
+    '🥲': 'RestrictedEmoji_AgAD-iMAAmt_oEs.tgs',
+    '😋': 'RestrictedEmoji_AgAD-iUAAgK7mEs.tgs',
+    '😛': 'RestrictedEmoji_AgAD-j0AAjUY4Es.tgs',
+    '😜': 'RestrictedEmoji_AgAD-R0AAhI_AAFI.tgs',
+    '🤪': 'RestrictedEmoji_AgAD-RgAAqhT4Es.tgs',
+    '😝': 'RestrictedEmoji_AgAD-RoAAu0vaEs.tgs',
+    '🤑': 'RestrictedEmoji_AgAD-SgAAvJlgUo.tgs',
+    '🤗': 'RestrictedEmoji_AgAD-TUAAlvuGEo.tgs',
+    '🤭': 'RestrictedEmoji_AgAD-xoAAsLc4Us.tgs',
+    '🤫': 'RestrictedEmoji_AgAD030AAjT04Us.tgs',
+    '🤔': 'RestrictedEmoji_AgAD0B0AArsfYEs.tgs',
+    '🤐': 'RestrictedEmoji_AgAD0BkAAsOwiUo.tgs',
+    '🤨': 'RestrictedEmoji_AgAD0BoAAjySYUs.tgs',
+    '😐': 'RestrictedEmoji_AgAD0CEAApHEUEk.tgs',
+    '😑': 'RestrictedEmoji_AgAD0hcAAo1I8Us.tgs',
+    '😶': 'RestrictedEmoji_AgAD0i8AAo8OAAFI.tgs',
+    '😏': 'RestrictedEmoji_AgAD0jgAAgMtiEg.tgs',
+    '😒': 'RestrictedEmoji_AgAD0loAArfq0Uk.tgs',
+    '🙄': 'RestrictedEmoji_AgAD0R0AAneA0Eo.tgs',
+    '😬': 'RestrictedEmoji_AgAD0RoAAlB8iEo.tgs',
+    '🤥': 'RestrictedEmoji_AgAD0SEAAmRiaUs.tgs',
+    '😔': 'RestrictedEmoji_AgAD0SoAAsSxeEg.tgs',
+    '😪': 'RestrictedEmoji_AgAD0TsAAq7PkUg.tgs',
+    '🤤': 'RestrictedEmoji_AgAD0xoAAozmkUo.tgs',
+    '😴': 'RestrictedEmoji_AgAD0yUAAtFmoEs.tgs',
+    '😷': 'RestrictedEmoji_AgAD1B0AAvJw0Eo.tgs',
+    '🤒': 'RestrictedEmoji_AgAD1CcAAj_FkUg.tgs',
+    '🤕': 'RestrictedEmoji_AgAD1CsAAsl_sUg.tgs',
+    '🤢': 'RestrictedEmoji_AgAD1D0AAnMMIUo.tgs',
+    '🤮': 'RestrictedEmoji_AgAD1hwAAr5U8Es.tgs',
+    '🤧': 'RestrictedEmoji_AgAD1jcAAjvTkUg.tgs',
+    '🥵': 'RestrictedEmoji_AgAD1SoAAs28cEk.tgs',
+    '🥶': 'RestrictedEmoji_AgAD1SYAAhlbUEk.tgs',
+    '🥴': 'RestrictedEmoji_AgAD1TkAAqkL4Us.tgs',
+    '😵': 'RestrictedEmoji_AgAD1V8AApGZKUk.tgs',
+    '🤯': 'RestrictedEmoji_AgAD1VwAAsjJAAFJ.tgs',
+    '🤠': 'RestrictedEmoji_AgAD1xgAAstFiUo.tgs',
+    '🥳': 'RestrictedEmoji_AgAD1ycAAs-nGEs.tgs',
+    '🥸': 'RestrictedEmoji_AgAD1ygAAlFvGEs.tgs',
+    '😎': 'RestrictedEmoji_AgAD1yoAAsUHIUs.tgs',
+    '🤓': 'RestrictedEmoji_AgAD1yQAAsl2CEo.tgs',
+    '🧐': 'RestrictedEmoji_AgAD1ywAArUx6Eo.tgs',
+    '😕': 'RestrictedEmoji_AgAD1zkAAvRusEg.tgs',
+    '😟': 'RestrictedEmoji_AgAD1zwAAlyOmEg.tgs',
+    '🙁': 'RestrictedEmoji_AgAD2BkAAv9NkUo.tgs',
+    '☹️': 'RestrictedEmoji_AgAD2BoAAna1kEo.tgs',
+    '😮': 'RestrictedEmoji_AgAD2BoAAtAmaEs.tgs',
+    '😯': 'RestrictedEmoji_AgAD2BwAApLC4Es.tgs',
+    '😲': 'RestrictedEmoji_AgAD2CwAAgdIeUg.tgs',
+    '😳': 'RestrictedEmoji_AgAD2h0AAn9voUs.tgs',
+    '🥺': 'RestrictedEmoji_AgAD2hkAAhxqiUo.tgs',
+    '😦': 'RestrictedEmoji_AgAD2icAAlwIUEk.tgs',
+    '😧': 'RestrictedEmoji_AgAD2igAAsPTiEg.tgs',
+    '😨': 'RestrictedEmoji_AgAD2iIAAsbJaUo.tgs',
+    '😰': 'RestrictedEmoji_AgAD2iYAAmNPeUg.tgs',
+    '😥': 'RestrictedEmoji_AgAD2iYAAuJsGEs.tgs',
+    '😢': 'RestrictedEmoji_AgAD2jkAAmRrOUs.tgs',
+    '😭': 'RestrictedEmoji_AgAD2kAAAj3zsUs.tgs',
+    '😱': 'RestrictedEmoji_AgAD2xgAAuN1kEo.tgs',
+    '😖': 'RestrictedEmoji_AgAD2Y8AAmvQqUk.tgs',
+    '😣': 'RestrictedEmoji_AgAD2ycAAtpf-Ek.tgs',
+    '😞': 'RestrictedEmoji_AgAD2zEAAhipiUs.tgs',
+    '😓': 'RestrictedEmoji_AgAD308AAhdmEEs.tgs',
+    '😩': 'RestrictedEmoji_AgAD34IAAknz4Us.tgs',
+    '😫': 'RestrictedEmoji_AgAD3BkAAowpiUo.tgs',
+    '🥱': 'RestrictedEmoji_AgAD3iIAAuwemUs.tgs',
+    '😤': 'RestrictedEmoji_AgAD3kEAArInCUg.tgs',
+    '😡': 'RestrictedEmoji_AgAD3R0AAlzNmEo.tgs',
+    '😠': 'RestrictedEmoji_AgAD3SsAAmGLkUg.tgs',
+    '🤬': 'RestrictedEmoji_AgAD3SYAAnJOoUs.tgs',
+    '😈': 'RestrictedEmoji_AgAD3TIAApXKGEo.tgs',
+    '👿': 'RestrictedEmoji_AgAD3xcAAh5G8Es.tgs',
+    '💀': 'RestrictedEmoji_AgAD3xkAAgd9kEo.tgs',
+    '☠️': 'RestrictedEmoji_AgAD3xoAAnTjiUo.tgs',
+    '💩': 'RestrictedEmoji_AgAD3xoAAqaMkUo.tgs',
+    
+    // Люди и части тела - основные жесты
+    '👋': 'RestrictedEmoji_AgAD3xwAAhTS8Us.tgs',
+    '🤚': 'RestrictedEmoji_AgAD41EAAunwoUo.tgs',
+    '🖐️': 'RestrictedEmoji_AgAD42kAAoMREEk.tgs',
+    '✋': 'RestrictedEmoji_AgAD4BgAAtPUkEs.tgs',
+    '🖖': 'RestrictedEmoji_AgAD4DQAAhwHiEs.tgs',
+    '👌': 'RestrictedEmoji_AgAD4FsAAjg2CEg.tgs',
+    '🤌': 'RestrictedEmoji_AgAD4hkAAh4XSUs.tgs',
+    '🤏': 'RestrictedEmoji_AgAD4hkAAnXjkEo.tgs',
+    '✌️': 'RestrictedEmoji_AgAD4hwAAqDaiEo.tgs',
+    '🤞': 'RestrictedEmoji_AgAD4iIAAhkySUs.tgs',
+    '🤟': 'RestrictedEmoji_AgAD4ioAAupaGUk.tgs',
+    '🤘': 'RestrictedEmoji_AgAD4iUAAlvGkEo.tgs',
+    '🤙': 'RestrictedEmoji_AgAD4lwAAn-PWUs.tgs',
+    '👈': 'RestrictedEmoji_AgAD4RYAAk7UiUo.tgs',
+    '👉': 'RestrictedEmoji_AgAD4SEAAmtPkEo.tgs',
+    '👆': 'RestrictedEmoji_AgAD4yAAApRqmEo.tgs',
+    '🖕': 'RestrictedEmoji_AgAD4yQAAkA0kEg.tgs',
+    '👇': 'RestrictedEmoji_AgAD4zsAAiqB6Us.tgs',
+    '☝️': 'RestrictedEmoji_AgAD51cAAmlPSUo.tgs',
+    '👍': 'RestrictedEmoji_AgAD5B4AAkWHaEo.tgs',
+    '👎': 'RestrictedEmoji_AgAD5BoAAt3piUo.tgs',
+    '👊': 'RestrictedEmoji_AgAD5CgAAt4vSEs.tgs',
+    '✊': 'RestrictedEmoji_AgAD5CQAAtSz-Es.tgs',
+    '🤛': 'RestrictedEmoji_AgAD5hkAAmwEkEo.tgs',
+    '🤜': 'RestrictedEmoji_AgAD5iUAAuV7CUk.tgs',
+    '👏': 'RestrictedEmoji_AgAD5SEAAhA9wEo.tgs',
+    '🙌': 'RestrictedEmoji_AgAD5SMAAmbzUEk.tgs',
+    '👐': 'RestrictedEmoji_AgAD5TMAAqRumUs.tgs',
+    '🤲': 'RestrictedEmoji_AgAD5xkAAlepkUo.tgs',
+    '🤝': 'RestrictedEmoji_AgAD5XQAAgMMEUk.tgs',
+    '🙏': 'RestrictedEmoji_AgAD6CAAAriPYEs.tgs',
+    '✍️': 'RestrictedEmoji_AgAD6CsAAjyPaUs.tgs',
+    '💅': 'RestrictedEmoji_AgAD6E8AAice-Eo.tgs',
+    '🤳': 'RestrictedEmoji_AgAD6EMAArcpmUg.tgs',
+    '💪': 'RestrictedEmoji_AgAD6H8AAnVQKEo.tgs',
+    
+    // Животные - основные
+    '🐶': 'RestrictedEmoji_AgAD6hgAAnxziEo.tgs',
+    '🐱': 'RestrictedEmoji_AgAD6hsAArtciUs.tgs',
+    '🐭': 'RestrictedEmoji_AgAD6iwAAgnGsUo.tgs',
+    '🐹': 'RestrictedEmoji_AgAD6RoAAgk7aEo.tgs',
+    '🐰': 'RestrictedEmoji_AgAD6RoAAh0S8Es.tgs',
+    '🦊': 'RestrictedEmoji_AgAD6SIAAowfuEo.tgs',
+    '🐻': 'RestrictedEmoji_AgAD6UQAApkPOUs.tgs',
+    '🐼': 'RestrictedEmoji_AgAD6VUAAnIK6Eo.tgs',
+    '🐨': 'RestrictedEmoji_AgAD6x0AAsKU6Es.tgs',
+    '🐯': 'RestrictedEmoji_AgAD6xgAAvYI8Us.tgs',
+    '🦁': 'RestrictedEmoji_AgAD738AAnrQMUo.tgs',
+    '🐮': 'RestrictedEmoji_AgAD7h0AAlaI4Es.tgs',
+    '🐷': 'RestrictedEmoji_AgAD7h0AAmcvkEo.tgs',
+    '🐽': 'RestrictedEmoji_AgAD7hgAApFEkEo.tgs',
+    '🐸': 'RestrictedEmoji_AgAD7hwAAkR96Es.tgs',
+    '🐵': 'RestrictedEmoji_AgAD7icAAlMniUo.tgs',
+    
+    // Еда - основные
+    '🍎': 'RestrictedEmoji_AgAD7iEAAi3eoEs.tgs',
+    '🍊': 'RestrictedEmoji_AgAD7iEAAjuzCEg.tgs',
+    '🍋': 'RestrictedEmoji_AgAD7iUAAtjj-Es.tgs',
+    '🍌': 'RestrictedEmoji_AgAD7iYAAlzFQUo.tgs',
+    '🍉': 'RestrictedEmoji_AgAD7SgAAh1EeUg.tgs',
+    '🍇': 'RestrictedEmoji_AgAD7SMAAr3iGEs.tgs',
+    '🍓': 'RestrictedEmoji_AgAD7TYAAvK3IEo.tgs',
+    '🍈': 'RestrictedEmoji_AgAD7UEAAtlFmEg.tgs',
+    '🍒': 'RestrictedEmoji_AgAD7WYAAqgoIUg.tgs',
+    '🍑': 'RestrictedEmoji_AgAD7xoAAsQUiUo.tgs',
+    '🥭': 'RestrictedEmoji_AgAD7zwAApOEQEs.tgs',
+    '🍍': 'RestrictedEmoji_AgAD804AApPvmEo.tgs',
+    '🥥': 'RestrictedEmoji_AgAD8hsAAlu_iEo.tgs',
+    '🥝': 'RestrictedEmoji_AgAD8iYAAkeN6Us.tgs',
+    '🍅': 'RestrictedEmoji_AgAD8R4AAg9FWEo.tgs',
+    '🍆': 'RestrictedEmoji_AgAD8SQAAlSswEo.tgs',
+    
+    // Символы - основные
+    '❤️': 'RestrictedEmoji_AgAD8x8AAk1d6Es.tgs',
+    '🧡': 'RestrictedEmoji_AgAD8xwAArpnYUs.tgs',
+    '💛': 'RestrictedEmoji_AgAD8yEAAuEg4Es.tgs',
+    '💚': 'RestrictedEmoji_AgAD8yMAAqnhWEs.tgs',
+    '💙': 'RestrictedEmoji_AgAD8yUAAiYuAUo.tgs',
+    '💜': 'RestrictedEmoji_AgAD91YAAnR4AAFL.tgs',
+    '🖤': 'RestrictedEmoji_AgAD91YAAvEdWUs.tgs',
+    '🤍': 'RestrictedEmoji_AgAD9CAAAooSiEo.tgs',
+    '🤎': 'RestrictedEmoji_AgAD9CIAAjCgYUo.tgs',
+    '💔': 'RestrictedEmoji_AgAD9DkAAkaGOEs.tgs',
+    '❣️': 'RestrictedEmoji_AgAD9FsAArbFSUg.tgs',
+    '💕': 'RestrictedEmoji_AgAD9icAApl4kEo.tgs',
+    '💞': 'RestrictedEmoji_AgAD9oMAAvgaMUo.tgs',
+    '💓': 'RestrictedEmoji_AgAD9R8AApzP8Es.tgs',
+    '💗': 'RestrictedEmoji_AgAD9RgAAsZ6iUo.tgs',
+    '💖': 'RestrictedEmoji_AgAD9RkAAgqcCUg.tgs',
+    '💘': 'RestrictedEmoji_AgAD9RoAAl1skEo.tgs',
+    '💝': 'RestrictedEmoji_AgAD9SkAApoPUUk.tgs',
+    '💟': 'RestrictedEmoji_AgAD9SUAAtwaUUs.tgs',
+    '☮️': 'RestrictedEmoji_AgAD9TQAAsBmkUg.tgs',
+    '✝️': 'RestrictedEmoji_AgAD9UAAAichsUs.tgs',
+    '☪️': 'RestrictedEmoji_AgAD9xoAAtk5aEs.tgs',
+    '🕉️': 'RestrictedEmoji_AgAD9y0AAsHSsEo.tgs',
+    '☸️': 'RestrictedEmoji_AgAD9yMAAg-wMUg.tgs'
+};
+
 const emojiData = {
     // Смайлики и эмоции (по популярности)
     smileys: [
@@ -12128,32 +12328,7 @@ function initEmojiPicker() {
     const emojiBtn = document.querySelector('.emoji-btn');
     const emojiPicker = document.getElementById('emoji-picker');
     const emojiClose = document.querySelector('.emoji-close');
-    const emojiTabs = document.querySelectorAll('.emoji-tab');
     const emojiCategories = document.querySelectorAll('.emoji-category');
-    const emojiGrid = document.getElementById('emoji-grid');
-    
-    // Переключение между стикерами и эмодзи
-    emojiTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabType = tab.dataset.tab;
-            
-            // Обновляем активную вкладку
-            emojiTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            
-            // Показываем соответствующий контент
-            document.querySelectorAll('.emoji-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(`${tabType}-content`).classList.add('active');
-            
-            if (tabType === 'emojis') {
-                loadEmojiCategory(currentEmojiCategory);
-            } else if (tabType === 'stickers') {
-                loadStickers();
-            }
-        });
-    });
     
     // Переключение категорий эмодзи
     emojiCategories.forEach(category => {
@@ -12168,30 +12343,6 @@ function initEmojiPicker() {
         });
     });
     
-    // Обработчики для стикеров
-    document.addEventListener('click', (e) => {
-        const stickerItem = e.target.closest('.sticker-item');
-        if (stickerItem && stickerItem.closest('#stickers-content')) {
-            const stickerId = stickerItem.dataset.stickerId;
-            if (window.stickerManager) {
-                window.stickerManager.selectSticker(stickerId);
-                emojiPicker.classList.add('hidden');
-            }
-        }
-    });
-    
-    // Обработчики для категорий стикеров
-    document.addEventListener('click', (e) => {
-        const stickerCategory = e.target.closest('.sticker-category');
-        if (stickerCategory && stickerCategory.closest('#stickers-content')) {
-            document.querySelectorAll('#stickers-content .sticker-category').forEach(c => c.classList.remove('active'));
-            stickerCategory.classList.add('active');
-            if (window.stickerManager) {
-                window.stickerManager.renderStickers();
-            }
-        }
-    });
-    
     // Открытие/закрытие пикера
     emojiBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -12201,24 +12352,22 @@ function initEmojiPicker() {
         
         emojiPicker.classList.toggle('hidden');
         if (!emojiPicker.classList.contains('hidden')) {
-            // Загружаем контент при первом открытии
-            const activeTab = document.querySelector('.emoji-tab.active').dataset.tab;
-            if (activeTab === 'stickers') {
-                loadStickers();
-            } else {
-                loadEmojiCategory(currentEmojiCategory);
-            }
+            // Загружаем эмодзи при открытии
+            loadEmojiCategory(currentEmojiCategory);
         }
     });
     
     emojiClose?.addEventListener('click', () => {
         emojiPicker.classList.add('hidden');
+        // Cleanup animations when closing
+        cleanupEmojiAnimations();
     });
     
     // Закрытие при клике вне пикера
     document.addEventListener('click', (e) => {
         if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
             emojiPicker.classList.add('hidden');
+            cleanupEmojiAnimations();
         }
     });
     
@@ -12226,22 +12375,106 @@ function initEmojiPicker() {
     loadEmojiCategory('smileys');
 }
 
+// Cleanup function for emoji animations
+function cleanupEmojiAnimations() {
+    const emojiGrid = document.getElementById('emoji-grid');
+    if (!emojiGrid) return;
+    
+    // Destroy all Lottie animations to free memory
+    emojiGrid.querySelectorAll('.emoji-animation').forEach(container => {
+        if (container._lottieAnimation) {
+            container._lottieAnimation.destroy();
+            container._lottieAnimation = null;
+        }
+    });
+}
+
 function loadEmojiCategory(category) {
     const emojiGrid = document.getElementById('emoji-grid');
     const emojis = emojiData[category] || [];
     
-    emojiGrid.innerHTML = emojis.map(emoji => 
-        `<button class="emoji-item" data-emoji="${emoji}">${emoji}</button>`
-    ).join('');
+    // Clear the grid
+    emojiGrid.innerHTML = '';
     
-    // Добавляем обработчики клика
-    emojiGrid.querySelectorAll('.emoji-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const emoji = item.dataset.emoji;
-            insertEmojiIntoMessage(emoji);
-            addToRecentEmojis(emoji);
-        });
+    // Create animated emoji items
+    emojis.forEach((emoji, index) => {
+        const tgsFile = animatedEmojiMapping[emoji];
+        
+        if (tgsFile) {
+            // Create animated emoji item
+            const emojiItem = document.createElement('div');
+            emojiItem.className = 'emoji-item animated-emoji';
+            emojiItem.dataset.emoji = emoji;
+            emojiItem.dataset.tgsFile = tgsFile;
+            
+            // Create container for Lottie animation
+            const animationContainer = document.createElement('div');
+            animationContainer.className = 'emoji-animation';
+            animationContainer.id = `animated-emoji-${category}-${index}`;
+            emojiItem.appendChild(animationContainer);
+            
+            emojiGrid.appendChild(emojiItem);
+            
+            // Load Lottie animation
+            loadAnimatedEmoji(animationContainer.id, tgsFile);
+            
+            // Add click handler
+            emojiItem.addEventListener('click', () => {
+                insertEmojiIntoMessage(emoji);
+                addToRecentEmojis(emoji);
+            });
+        } else {
+            // Fallback to static emoji if no .tgs file found
+            const emojiItem = document.createElement('button');
+            emojiItem.className = 'emoji-item static-emoji';
+            emojiItem.dataset.emoji = emoji;
+            emojiItem.textContent = emoji;
+            emojiGrid.appendChild(emojiItem);
+            
+            emojiItem.addEventListener('click', () => {
+                insertEmojiIntoMessage(emoji);
+                addToRecentEmojis(emoji);
+            });
+        }
     });
+}
+
+// Function to load animated emoji using Lottie
+async function loadAnimatedEmoji(containerId, tgsFile) {
+    try {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        // Fetch and decompress .tgs file
+        const response = await fetch(`/stickers/${tgsFile}`);
+        if (!response.ok) throw new Error('Failed to load .tgs file');
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const decompressed = pako.inflate(arrayBuffer, { to: 'string' });
+        const animationData = JSON.parse(decompressed);
+        
+        // Load Lottie animation
+        const animation = lottie.loadAnimation({
+            container: container,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: animationData
+        });
+        
+        // Store animation reference for cleanup
+        container._lottieAnimation = animation;
+        
+    } catch (error) {
+        console.error('Error loading animated emoji:', error);
+        // Fallback to static emoji
+        const container = document.getElementById(containerId);
+        if (container && container.parentElement) {
+            const emoji = container.parentElement.dataset.emoji;
+            container.parentElement.innerHTML = emoji;
+            container.parentElement.className = 'emoji-item static-emoji';
+        }
+    }
 }
 
 function insertEmojiIntoMessage(emoji) {
@@ -12269,30 +12502,4 @@ function addToRecentEmojis(emoji) {
     recentEmojis = recentEmojis.slice(0, 32);
     
     localStorage.setItem('kvant_recent_emojis', JSON.stringify(recentEmojis));
-}
-
-// Интеграция со стикерами (используем существующий код)
-function loadStickers() {
-    const stickerGrid = document.getElementById('sticker-grid-main');
-    if (!stickerGrid || !window.stickerManager) return;
-    
-    // Временно меняем id для совместимости с StickerManager
-    const originalGrid = document.getElementById('sticker-grid');
-    if (originalGrid) originalGrid.id = 'sticker-grid-temp';
-    stickerGrid.id = 'sticker-grid';
-    
-    // Используем существующую логику загрузки стикеров
-    if (window.stickerManager.stickers.length === 0) {
-        window.stickerManager.loadStickers().then(() => {
-            window.stickerManager.renderStickers();
-            // Возвращаем id обратно
-            stickerGrid.id = 'sticker-grid-main';
-            if (originalGrid) originalGrid.id = 'sticker-grid';
-        });
-    } else {
-        window.stickerManager.renderStickers();
-        // Возвращаем id обратно
-        stickerGrid.id = 'sticker-grid-main';
-        if (originalGrid) originalGrid.id = 'sticker-grid';
-    }
 }

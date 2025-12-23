@@ -1434,33 +1434,12 @@
   <!-- Emoji Picker -->
   <div id="emoji-picker" class="emoji-picker hidden" role="dialog" aria-label="Выбор эмодзи">
     <div class="emoji-header">
-      <div class="emoji-tabs">
-        <button class="emoji-tab active" data-tab="stickers" title="Стикеры">
-          <img src="/assets/Sparkles.svg" alt="" class="icon-sm">
-        </button>
-        <button class="emoji-tab" data-tab="emojis" title="Эмодзи">
-          <img src="/assets/emoji.svg" alt="" class="icon-sm">
-        </button>
-      </div>
+      <h3>Анимированные эмодзи</h3>
       <button class="emoji-close" aria-label="Закрыть">✕</button>
     </div>
     
-    <!-- Sticker Content -->
-    <div class="emoji-content active" id="stickers-content">
-      <div class="sticker-categories">
-        <button class="sticker-category active" data-category="all">Все</button>
-        <button class="sticker-category" data-category="recent">Недавние</button>
-      </div>
-      <div class="sticker-grid" id="sticker-grid-main">
-        <div class="sticker-loading">
-          <div class="loading-spinner"></div>
-          <p>Загрузка стикеров...</p>
-        </div>
-      </div>
-    </div>
-    
     <!-- Emoji Content -->
-    <div class="emoji-content" id="emojis-content">
+    <div class="emoji-content active" id="emojis-content">
       <div class="emoji-categories">
         <button class="emoji-category active" data-category="smileys" title="Смайлики и эмоции">😀</button>
         <button class="emoji-category" data-category="people" title="Люди и части тела">👋</button>
@@ -1472,7 +1451,7 @@
         <button class="emoji-category" data-category="flags" title="Флаги">🏳️</button>
       </div>
       <div class="emoji-grid" id="emoji-grid">
-        <!-- Эмодзи будут загружены через JavaScript -->
+        <!-- Анимированные эмодзи будут загружены через JavaScript -->
       </div>
     </div>
   </div>
