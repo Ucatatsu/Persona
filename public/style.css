@@ -3608,40 +3608,6 @@ button {
   text-align: right;
 }
 
-/* Styled slider */
-.styled-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 2px;
-  outline: none;
-}
-
-.styled-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: var(--accent);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.styled-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
-
-.styled-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: var(--accent);
-  border-radius: 50%;
-  cursor: pointer;
-  border: none;
-}
-
 /* Density selector */
 .density-selector {
   display: flex;
@@ -8918,68 +8884,6 @@ input[type="range"]:focus::-moz-range-thumb {
 
 
 /* Dock стили перенесены ниже для избежания дублирования */
-
-
-/* === STYLED RANGE SLIDER === */
-.styled-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--bg-light);
-  cursor: pointer;
-}
-
-.styled-slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--bg-light);
-}
-
-.styled-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: white;
-  cursor: grab;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  margin-top: -6px;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.styled-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
-}
-
-.styled-slider::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.05);
-}
-
-.styled-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: white;
-  cursor: grab;
-  border: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.styled-slider::-moz-range-progress {
-  background: var(--accent);
-  border-radius: 3px;
-  height: 6px;
-}
-
-.styled-slider::-moz-range-track {
-  background: var(--bg-light);
-  border-radius: 3px;
-  height: 6px;
-}
 
 /* === BEAUTIFUL VOLUME CONTROL === */
 .volume-control {
