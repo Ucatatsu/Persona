@@ -892,20 +892,20 @@ async function showChat() {
         const sidebar = document.querySelector('.sidebar');
         sidebar?.classList.remove('hidden-mobile');
         
-        // Принудительно скрываем элементы чата при инициализации
+        // Убираем все inline стили, чтобы CSS классы работали правильно
         const chatHeader = document.querySelector('.chat-header');
         const messages = document.querySelector('.messages');
         const messageForm = document.querySelector('.message-form');
         
-        if (chatHeader) chatHeader.style.display = 'none';
-        if (messages) messages.style.display = 'none';
-        if (messageForm) messageForm.style.display = 'none';
+        if (chatHeader) chatHeader.style.display = '';
+        if (messages) messages.style.display = '';
+        if (messageForm) messageForm.style.display = '';
         
-        // Принудительно показываем сайдбар
+        // Убираем inline стили с сайдбара
         if (sidebar) {
-            sidebar.style.display = 'flex';
-            sidebar.style.transform = 'translateX(0)';
-            sidebar.style.pointerEvents = 'auto';
+            sidebar.style.display = '';
+            sidebar.style.transform = '';
+            sidebar.style.pointerEvents = '';
         }
     }
     
@@ -3242,14 +3242,14 @@ function handleMobileAfterSelect() {
                 sidebar?.classList.add('hidden-mobile');
                 chatScreen?.classList.add('chat-open');
                 
-                // Принудительно показываем элементы чата
+                // Убираем все inline стили, чтобы CSS классы работали правильно
                 const chatHeader = document.querySelector('.chat-header');
                 const messages = document.querySelector('.messages');
                 const messageForm = document.querySelector('.message-form');
                 
-                if (chatHeader) chatHeader.style.display = 'flex';
-                if (messages) messages.style.display = 'flex';
-                if (messageForm) messageForm.style.display = 'flex';
+                if (chatHeader) chatHeader.style.display = '';
+                if (messages) messages.style.display = '';
+                if (messageForm) messageForm.style.display = '';
                 
                 // Лёгкая вибрация
                 if (navigator.vibrate) {
@@ -3260,6 +3260,15 @@ function handleMobileAfterSelect() {
                 console.log('Mobile: Showing sidebar (no user selected)');
                 sidebar?.classList.remove('hidden-mobile');
                 chatScreen?.classList.remove('chat-open');
+                
+                // Убираем inline стили
+                const chatHeader = document.querySelector('.chat-header');
+                const messages = document.querySelector('.messages');
+                const messageForm = document.querySelector('.message-form');
+                
+                if (chatHeader) chatHeader.style.display = '';
+                if (messages) messages.style.display = '';
+                if (messageForm) messageForm.style.display = '';
             }
         }
     }, 100);
