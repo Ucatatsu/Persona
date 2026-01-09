@@ -12,6 +12,12 @@ services:
         fromDatabase:
           name: kvant-db
           property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VAPID_PUBLIC_KEY
+        value: BDd3hdZyXYibDIQqf_XtardGtmqaELw5_aO6WFWKFT8iLp4IcrIanZqOCsJrKlOh0BchoGdm8mFh9TbT3kRXtA0
+      - key: VAPID_PRIVATE_KEY
+        value: WlsEpZoei1Rcrtrzve2PmL9IoFbNalQ6JiEMQmCj2lk
 
 databases:
   - name: kvant-db

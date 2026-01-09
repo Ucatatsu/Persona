@@ -1,6 +1,12 @@
 // Загружаем переменные окружения из .env
 require('dotenv').config();
 
+console.log('🔧 Переменные окружения:');
+console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`   JWT_SECRET: ${process.env.JWT_SECRET ? 'установлен' : 'НЕ УСТАНОВЛЕН'}`);
+console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'установлен' : 'НЕ УСТАНОВЛЕН'}`);
+console.log(`   VAPID_PUBLIC_KEY: ${process.env.VAPID_PUBLIC_KEY ? 'установлен' : 'НЕ УСТАНОВЛЕН'}`);
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -371,6 +377,16 @@ app.get('/api/test-db', async (req, res) => {
     }
 });
 
+// Тест аутентификации
+app.get('/api/test-auth', authMiddleware, async (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Аутентификация работает',
+        user: req.user,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Регистрация
 app.post('/api/register', authLimiter, async (req, res) => {
     try {
@@ -401,7 +417,10 @@ app.post('/api/login', authLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
         
+        console.log(`🔐 Login attempt for user: ${username}`);
+        
         if (!username || !password) {
+            console.log(`❌ Login failed: missing credentials`);
             return res.status(400).json({ success: false, error: 'Заполните все поля' });
         }
         
@@ -409,12 +428,15 @@ app.post('/api/login', authLimiter, async (req, res) => {
         
         if (result.success) {
             const token = generateToken(result.user);
+            console.log(`✅ Login success: ${username} (${result.user.id})`);
+            console.log(`🎫 Generated token: ${token.substring(0, 20)}...`);
             res.json({ 
                 success: true, 
                 user: result.user,
                 token 
             });
         } else {
+            console.log(`❌ Login failed: ${result.error}`);
             res.status(401).json(result);
         }
     } catch (error) {

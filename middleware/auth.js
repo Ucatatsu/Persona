@@ -29,8 +29,15 @@ function generateToken(user) {
  */
 function verifyToken(token) {
     try {
-        return jwt.verify(token, EFFECTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, EFFECTIVE_JWT_SECRET);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`🔑 Token verified for user: ${decoded.username} (${decoded.id})`);
+        }
+        return decoded;
     } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`❌ Token verification failed: ${error.message}`);
+        }
         return null;
     }
 }
@@ -41,17 +48,35 @@ function verifyToken(token) {
 function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
     
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`🔐 Auth check for ${req.method} ${req.path}`);
+        console.log(`   Authorization header: ${authHeader ? 'present' : 'missing'}`);
+    }
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`❌ Auth failed: missing or invalid header`);
+        }
         return res.status(401).json({ success: false, error: 'Требуется авторизация' });
     }
     
     const token = authHeader.substring(7);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`   Token: ${token.substring(0, 20)}...`);
+    }
+    
     const decoded = verifyToken(token);
     
     if (!decoded) {
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`❌ Auth failed: invalid token`);
+        }
         return res.status(401).json({ success: false, error: 'Недействительный токен' });
     }
     
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`✅ Auth success: user ${decoded.username} (${decoded.id})`);
+    }
     req.user = decoded;
     next();
 }
