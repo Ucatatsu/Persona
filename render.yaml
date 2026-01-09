@@ -9,9 +9,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: kvant-db
-          property: connectionString
+        value: "postgresql://postgres:[ЗАМЕНИТЕ_НА_ВАШ_ПАРОЛЬ]@db.uivqoiqrcaqralwxwsxa.supabase.co:5432/postgres"
       - key: JWT_SECRET
         generateValue: true
       - key: VAPID_PUBLIC_KEY
@@ -19,6 +17,4 @@ services:
       - key: VAPID_PRIVATE_KEY
         value: WlsEpZoei1Rcrtrzve2PmL9IoFbNalQ6JiEMQmCj2lk
 
-databases:
-  - name: kvant-db
-    plan: free
+# Удаляем старую базу данных Render

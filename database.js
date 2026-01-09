@@ -2,11 +2,13 @@
 const { v4: uuidv4 } = require('uuid');
 
 // Определяем какую БД использовать
+// Если DATABASE_URL не установлен ИЛИ USE_SQLITE=true, используем SQLite
 let USE_SQLITE = !process.env.DATABASE_URL || process.env.USE_SQLITE === 'true';
 
 console.log('🔧 Конфигурация базы данных:');
 console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'установлен' : 'НЕ УСТАНОВЛЕН'}`);
-console.log(`   USE_SQLITE: ${USE_SQLITE}`);
+console.log(`   USE_SQLITE: ${process.env.USE_SQLITE || 'не установлен'}`);
+console.log(`   Выбрана БД: ${USE_SQLITE ? 'SQLite' : 'PostgreSQL'}`);
 console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
 
 let pool = null;
@@ -40,7 +42,7 @@ if (USE_SQLITE) {
     const { Pool } = require('pg');
     pool = new Pool({
         connectionString: process.env.DATABASE_URL,
-        ssl: process.env.DATABASE_URL?.includes('postgres.render.com') ? { rejectUnauthorized: false } : false,
+        ssl: process.env.DATABASE_URL?.includes('supabase.com') || process.env.DATABASE_URL?.includes('postgres.render.com') || process.env.DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : false,
         max: 5, // Уменьшаем количество подключений для бесплатного плана
         idleTimeoutMillis: 60000, // 60 секунд простоя
         connectionTimeoutMillis: 30000, // 30 секунд на подключение

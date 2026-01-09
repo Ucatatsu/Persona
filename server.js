@@ -327,6 +327,19 @@ app.get('/api/init-db', async (req, res) => {
     }
 });
 
+// Диагностика переменных окружения (только для отладки)
+app.get('/api/debug-env', async (req, res) => {
+    res.json({
+        NODE_ENV: process.env.NODE_ENV,
+        JWT_SECRET_SET: !!process.env.JWT_SECRET,
+        JWT_SECRET_LENGTH: process.env.JWT_SECRET?.length || 0,
+        DATABASE_URL_SET: !!process.env.DATABASE_URL,
+        VAPID_PUBLIC_KEY_SET: !!process.env.VAPID_PUBLIC_KEY,
+        VAPID_PRIVATE_KEY_SET: !!process.env.VAPID_PRIVATE_KEY,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Тест подключения к базе данных
 app.get('/api/test-db', async (req, res) => {
     try {
@@ -387,6 +400,33 @@ app.get('/api/test-auth', authMiddleware, async (req, res) => {
     });
 });
 
+// Создание тестового пользователя (только для отладки)
+app.post('/api/create-test-user', async (req, res) => {
+    try {
+        const testUsername = 'testuser';
+        const testPassword = 'test123';
+        
+        console.log('🧪 Создание тестового пользователя...');
+        const result = await db.createUser(testUsername, testPassword);
+        
+        res.json({
+            success: true,
+            message: 'Тестовый пользователь создан',
+            result: result,
+            credentials: {
+                username: testUsername,
+                password: testPassword
+            }
+        });
+    } catch (error) {
+        console.error('❌ Ошибка создания тестового пользователя:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Регистрация
 app.post('/api/register', authLimiter, async (req, res) => {
     try {
@@ -418,15 +458,19 @@ app.post('/api/login', authLimiter, async (req, res) => {
         const { username, password } = req.body;
         
         console.log(`🔐 Login attempt for user: ${username}`);
+        console.log(`🔧 JWT_SECRET available: ${!!process.env.JWT_SECRET}`);
         
         if (!username || !password) {
             console.log(`❌ Login failed: missing credentials`);
             return res.status(400).json({ success: false, error: 'Заполните все поля' });
         }
         
+        console.log(`🔍 Checking user in database...`);
         const result = await db.loginUser(username, password);
+        console.log(`📊 Database result:`, { success: result.success, error: result.error });
         
         if (result.success) {
+            console.log(`🎫 Generating token for user:`, result.user);
             const token = generateToken(result.user);
             console.log(`✅ Login success: ${username} (${result.user.id})`);
             console.log(`🎫 Generated token: ${token.substring(0, 20)}...`);
@@ -440,8 +484,8 @@ app.post('/api/login', authLimiter, async (req, res) => {
             res.status(401).json(result);
         }
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+        console.error('💥 Login error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера', details: error.message });
     }
 });
 
@@ -449,7 +493,12 @@ app.post('/api/login', authLimiter, async (req, res) => {
 let serverReady = false;
 app.get('/health', (_req, res) => {
     // Всегда возвращаем 200, чтобы Render не убивал сервер
-    res.status(200).send('OK');
+    res.status(200).json({
+        status: 'OK',
+        ready: serverReady,
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
 });
 
 // Функция для установки готовности
