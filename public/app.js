@@ -1527,7 +1527,7 @@ function renderServerChannels(categories, channels, canManage) {
 }
 
 function renderServerChannelItem(channel, canManage) {
-    const icon = channel.type === 'voice' ? '🔊' : '#';
+    const icon = channel.type === 'voice' ? '<img src="/assets/volume.svg" alt="" class="icon-sm">' : '#';
     const isActive = state.selectedServerChannel?.id === channel.id;
     
     return `
@@ -1703,7 +1703,7 @@ function updateVoiceConnectionPill() {
             avatarEl.textContent = '';
         } else {
             avatarEl.style.backgroundImage = '';
-            avatarEl.textContent = vc.type === 'server' ? '🔊' : '📞';
+            avatarEl.innerHTML = vc.type === 'server' ? '<img src="/assets/volume.svg" alt="" class="icon-sm">' : '📞';
         }
     }
     
@@ -2172,7 +2172,7 @@ function createMessageElement(msg, isSent) {
                 <video class="video-preview" loop muted playsinline preload="metadata" src="${escapeAttr(msg.text)}">
                 </video>
                 <span class="video-duration">0:00</span>
-                <div class="video-mute-indicator">🔇</div>
+                <div class="video-mute-indicator"><img src="/assets/volume-slash.svg" alt="" class="icon-sm"></div>
             </div>`;
     } else {
         // Преобразуем URL в кликабельные ссылки и обрабатываем встроенные стикеры
@@ -2361,7 +2361,7 @@ function initVideoMessage(container) {
     muteIndicator?.addEventListener('click', (e) => {
         e.stopPropagation();
         video.muted = !video.muted;
-        muteIndicator.textContent = video.muted ? '🔇' : '🔊';
+        muteIndicator.innerHTML = video.muted ? '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">' : '<img src="/assets/volume.svg" alt="" class="icon-sm">';
         muteIndicator.classList.toggle('unmuted', !video.muted);
     });
 }
@@ -2388,7 +2388,7 @@ function openVideoViewer(url, startTime = 0) {
                     <div class="vfp-left">
                         <button class="vfp-btn vfp-play">▶</button>
                         <div class="vfp-volume">
-                            <button class="vfp-btn vfp-mute">🔊</button>
+                            <button class="vfp-btn vfp-mute"><img src="/assets/volume.svg" alt="" class="icon-sm"></button>
                             <input type="range" class="vfp-volume-slider" min="0" max="1" step="0.1" value="1">
                         </div>
                         <span class="vfp-time">0:00 / 0:00</span>
@@ -2498,7 +2498,7 @@ function openVideoViewer(url, startTime = 0) {
     video.volume = savedVolume;
     volumeSlider.value = savedVolume;
     updateVolumeSliderVisual(volumeSlider, savedVolume);
-    muteBtn.textContent = savedVolume === 0 ? '🔇' : '🔊';
+    muteBtn.innerHTML = savedVolume === 0 ? '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">' : '<img src="/assets/volume.svg" alt="" class="icon-sm">';
     
     function updateVolumeSliderVisual(slider, value) {
         const percent = value * 100;
@@ -2507,7 +2507,7 @@ function openVideoViewer(url, startTime = 0) {
     
     muteBtn.addEventListener('click', () => {
         video.muted = !video.muted;
-        muteBtn.textContent = video.muted ? '🔇' : '🔊';
+        muteBtn.innerHTML = video.muted ? '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">' : '<img src="/assets/volume.svg" alt="" class="icon-sm">';
         volumeSlider.value = video.muted ? 0 : video.volume;
         updateVolumeSliderVisual(volumeSlider, video.muted ? 0 : video.volume);
     });
@@ -2516,7 +2516,7 @@ function openVideoViewer(url, startTime = 0) {
         const vol = parseFloat(e.target.value);
         video.volume = vol;
         video.muted = vol === 0;
-        muteBtn.textContent = vol === 0 ? '🔇' : '🔊';
+        muteBtn.innerHTML = vol === 0 ? '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">' : '<img src="/assets/volume.svg" alt="" class="icon-sm">';
         updateVolumeSliderVisual(volumeSlider, vol);
         localStorage.setItem('videoVolume', vol.toString());
     });
@@ -2569,7 +2569,7 @@ function openVideoViewer(url, startTime = 0) {
         }
         if (e.key === 'm') { 
             video.muted = !video.muted; 
-            muteBtn.textContent = video.muted ? '🔇' : '🔊';
+            muteBtn.innerHTML = video.muted ? '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">' : '<img src="/assets/volume.svg" alt="" class="icon-sm">';
             updateVolumeSliderVisual(volumeSlider, video.muted ? 0 : video.volume);
         }
         if (e.key === 'f') fullscreenBtn.click();
@@ -5537,6 +5537,28 @@ document.addEventListener('DOMContentLoaded', () => {
     
     agreeTerms?.addEventListener('change', updateRegisterButton);
     agreePrivacy?.addEventListener('change', updateRegisterButton);
+    
+    // Обработчики для активации кнопки входа
+    const loginUsernameInput = document.getElementById('login-username');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginBtn = document.querySelector('.btn-login');
+    
+    function updateLoginButton() {
+        const username = loginUsernameInput?.value.trim() || '';
+        const password = loginPasswordInput?.value.trim() || '';
+        
+        if (username && password && loginBtn) {
+            loginBtn.classList.add('active');
+        } else if (loginBtn) {
+            loginBtn.classList.remove('active');
+        }
+    }
+    
+    loginUsernameInput?.addEventListener('input', updateLoginButton);
+    loginPasswordInput?.addEventListener('input', updateLoginButton);
+    
+    // Инициализируем состояние кнопки при загрузке
+    updateLoginButton();
     
     // Вход
     loginForm?.addEventListener('submit', async (e) => {
@@ -10766,8 +10788,8 @@ class ElasticSlider {
         this.max = options.max ?? 100;
         this.step = options.step ?? 1;
         this.onChange = options.onChange || (() => {});
-        this.leftIcon = options.leftIcon || '🔈';
-        this.rightIcon = options.rightIcon || '🔊';
+        this.leftIcon = options.leftIcon || '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">';
+        this.rightIcon = options.rightIcon || '<img src="/assets/volume.svg" alt="" class="icon-sm">';
         
         this.isDragging = false;
         this.overflow = 0;
@@ -11732,7 +11754,7 @@ function initCustomSelect(customSelectId, hiddenSelectId) {
         'chime': { icon: '🎵', text: 'Перезвон' },
         'digital': { icon: '🤖', text: 'Цифровой' },
         'subtle': { icon: '🍃', text: 'Деликатный' },
-        'none': { icon: '🔇', text: 'Без звука' },
+        'none': { icon: '<img src="/assets/volume-slash.svg" alt="" class="icon-sm">', text: 'Без звука' },
         // Звуки звонков
         'classic': { icon: '📞', text: 'Классический' },
         'urgent': { icon: '🚨', text: 'Срочный' },

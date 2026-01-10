@@ -389,6 +389,32 @@ function newSecureFunction(param) {
 - Проверка производительности
 - Валидация на staging окружении
 
+### Login UI Improvements
+
+#### Visual Cleanup Module
+```javascript
+// Новый модуль: public/js/loginUI.js
+const LoginUIManager = {
+    removeBackgroundEffects() {
+        // Удаление фоновых эффектов из login-container
+    },
+    
+    simplifyInputFeedback() {
+        // Упрощение визуальной обратной связи полей ввода
+    },
+    
+    maintainAccessibility() {
+        // Сохранение доступности при упрощении UI
+    }
+};
+```
+
+#### CSS Optimization Strategy
+- Удаление сложных фоновых эффектов из `.login-container::after`
+- Отключение `.input-underline` анимации при фокусе
+- Сохранение базовой обратной связи через `border-color` изменения
+- Поддержание responsive дизайна
+
 ## Risk Mitigation
 
 ### Rollback Strategy

@@ -295,7 +295,7 @@
       
       <!-- Voice Connection Pill (слева от основного) -->
       <div class="voice-connection-pill hidden" id="voice-connection-pill">
-        <div class="voice-pill-avatar" id="voice-pill-avatar">🔊</div>
+        <div class="voice-pill-avatar" id="voice-pill-avatar"><img src="/assets/volume.svg" alt="" class="icon-sm"></div>
         <div class="voice-pill-info">
           <span class="voice-pill-name" id="voice-pill-name">Общий</span>
           <span class="voice-pill-status" id="voice-pill-status">Подключение...</span>
@@ -558,10 +558,6 @@
         <div class="settings-sidebar-footer">
           <button class="settings-admin-btn hidden" id="admin-btn">
             <img src="/assets/Badge-check.svg" alt="" class="icon-sm"> Админ-панель
-          </button>
-          <button class="settings-logout-btn" id="logout-btn">
-            <img src="/assets/power.svg" alt="" class="icon-sm">
-            <span>Выйти</span>
           </button>
         </div>
       </div>
@@ -875,6 +871,21 @@
         <section class="settings-section" id="section-sound" role="tabpanel">
           <h2>Звук</h2>
           <div class="settings-group">
+            <h3>Общие</h3>
+            <div class="settings-item volume-setting">
+              <div class="settings-item-info">
+                <span class="settings-item-title">Основная громкость</span>
+                <span class="settings-item-desc">Общий уровень громкости приложения</span>
+              </div>
+              <div class="volume-control">
+                <img src="/assets/volume-slash.svg" alt="" class="volume-icon icon-sm">
+                <input type="range" id="volume-slider" class="styled-slider volume-slider" min="0" max="100" step="10" value="50">
+                <img src="/assets/volume.svg" alt="" class="volume-icon icon-sm">
+                <span class="volume-value" id="volume-value">50%</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-group">
             <h3>Уведомления</h3>
             <div class="settings-item sound-setting">
               <div class="settings-item-info">
@@ -949,9 +960,9 @@
                 <span class="settings-item-desc">Уровень громкости звуков уведомлений</span>
               </div>
               <div class="volume-control">
-                <span class="volume-icon">🔈</span>
+                <img src="/assets/volume-slash.svg" alt="" class="volume-icon icon-sm">
                 <input type="range" id="notification-volume-slider" class="styled-slider volume-slider" min="0" max="100" step="10" value="50">
-                <span class="volume-icon">🔊</span>
+                <img src="/assets/volume.svg" alt="" class="volume-icon icon-sm">
                 <span class="volume-value" id="notification-volume-value">50%</span>
               </div>
             </div>
@@ -1022,9 +1033,9 @@
                 <span class="settings-item-desc">Уровень громкости звуков звонков</span>
               </div>
               <div class="volume-control">
-                <span class="volume-icon">🔈</span>
+                <img src="/assets/volume-slash.svg" alt="" class="volume-icon icon-sm">
                 <input type="range" id="call-volume-slider" class="styled-slider volume-slider" min="0" max="100" step="10" value="70">
-                <span class="volume-icon">🔊</span>
+                <img src="/assets/volume.svg" alt="" class="volume-icon icon-sm">
                 <span class="volume-value" id="call-volume-value">70%</span>
               </div>
             </div>
@@ -1485,7 +1496,7 @@
               <span>Текстовый</span>
             </button>
             <button class="channel-type-btn" data-type="voice">
-              <span class="channel-type-icon">🔊</span>
+              <img src="/assets/volume.svg" alt="" class="channel-type-icon icon-sm">
               <span>Голосовой</span>
             </button>
           </div>
