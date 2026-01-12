@@ -1061,15 +1061,121 @@ app.get('/api/subscription/status', authMiddleware, async (req, res) => {
 
 // === АДМИН РОУТЫ ===
 
-// Получить всех пользователей
+// Вход в админку
+app.post('/api/admin/login', authLimiter, async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ success: false, error: 'Заполните все поля' });
+        }
+        
+        const result = await db.loginUser(username, password);
+        
+        if (result.success && result.user.role === 'admin') {
+            const token = generateToken(result.user);
+            res.json({ 
+                success: true, 
+                admin: result.user,
+                token 
+            });
+        } else {
+            res.status(401).json({ success: false, error: 'Неверные данные или нет прав администратора' });
+        }
+    } catch (error) {
+        console.error('Admin login error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера' });
+    }
+});
+
+// Получить статистику для дашборда
+app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const stats = await db.getAdminStats();
+        res.json(stats);
+    } catch (error) {
+        console.error('Admin get stats error:', error);
+        res.status(500).json({ error: 'Ошибка получения статистики' });
+    }
+});
+
+// Получить всех пользователей с пагинацией и фильтрами
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { limit = 50, offset = 0 } = req.query;
-        const result = await db.getAllUsers(parseInt(limit), parseInt(offset));
+        const { 
+            page = 1, 
+            limit = 20, 
+            filter = 'all', 
+            search = '' 
+        } = req.query;
+        
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const result = await db.getAdminUsers(parseInt(limit), offset, filter, search);
         res.json(result);
     } catch (error) {
         console.error('Admin get users error:', error);
         res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// Получить сообщения для админки
+app.get('/api/admin/messages', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 50, 
+            filter = 'all', 
+            search = '' 
+        } = req.query;
+        
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const result = await db.getAdminMessages(parseInt(limit), offset, filter, search);
+        res.json(result);
+    } catch (error) {
+        console.error('Admin get messages error:', error);
+        res.status(500).json({ error: 'Ошибка получения сообщений' });
+    }
+});
+
+// Обновить пользователя (админ)
+app.put('/api/admin/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { role, premium_type, premium_until } = req.body;
+        
+        const updates = {};
+        if (role !== undefined) updates.role = role;
+        if (premium_type !== undefined) updates.premium_type = premium_type;
+        if (premium_until !== undefined) updates.premium_until = premium_until;
+        
+        const result = await db.updateUserByAdmin(userId, updates);
+        res.json(result);
+    } catch (error) {
+        console.error('Admin update user error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка обновления пользователя' });
+    }
+});
+
+// Получить настройки системы
+app.get('/api/admin/settings', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const settings = await db.getSystemSettings();
+        res.json(settings);
+    } catch (error) {
+        console.error('Admin get settings error:', error);
+        res.status(500).json({ error: 'Ошибка получения настроек' });
+    }
+});
+
+// Сохранить настройки системы
+app.post('/api/admin/settings', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const settings = req.body;
+        const result = await db.saveSystemSettings(settings);
+        res.json(result);
+    } catch (error) {
+        console.error('Admin save settings error:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сохранения настроек' });
     }
 });
 

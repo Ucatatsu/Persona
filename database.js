@@ -441,6 +441,14 @@ async function initDB(retryCount = 0) {
             )
         `);
         
+        // === СИСТЕМНЫЕ НАСТРОЙКИ ===
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        `);
+        
         console.log('✅ SQLite база данных инициализирована');
         return;
     }
@@ -818,6 +826,14 @@ async function initDB(retryCount = 0) {
                 reactions_given INTEGER DEFAULT 0,
                 files_sent INTEGER DEFAULT 0,
                 last_online TIMESTAMP
+            )
+        `);
+
+        // === СИСТЕМНЫЕ НАСТРОЙКИ ===
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             )
         `);
 
@@ -2958,6 +2974,580 @@ async function updateLastOnline(userId) {
     }
 }
 
+// === АДМИНСКИЕ МЕТОДЫ ===
+
+// Получить статистику для админ-дашборда
+async function getAdminStats() {
+    try {
+        if (USE_SQLITE) {
+            const totalUsers = sqlite.prepare('SELECT COUNT(*) as count FROM users').get().count;
+            const onlineUsers = 0; // Будет обновляться из Socket.IO
+            const totalMessages = sqlite.prepare('SELECT COUNT(*) as count FROM messages').get().count;
+            const premiumUsers = sqlite.prepare('SELECT COUNT(*) as count FROM users WHERE premium_until > datetime("now")').get().count;
+            
+            return {
+                totalUsers,
+                onlineUsers,
+                totalMessages,
+                premiumUsers
+            };
+        } else {
+            const client = await pool.connect();
+            try {
+                const totalUsersResult = await client.query('SELECT COUNT(*) as count FROM users');
+                const totalMessagesResult = await client.query('SELECT COUNT(*) as count FROM messages');
+                const premiumUsersResult = await client.query('SELECT COUNT(*) as count FROM users WHERE premium_until > NOW()');
+                
+                return {
+                    totalUsers: parseInt(totalUsersResult.rows[0].count),
+                    onlineUsers: 0, // Будет обновляться из Socket.IO
+                    totalMessages: parseInt(totalMessagesResult.rows[0].count),
+                    premiumUsers: parseInt(premiumUsersResult.rows[0].count)
+                };
+            } finally {
+                client.release();
+            }
+        }
+    } catch (error) {
+        console.error('Get admin stats error:', error);
+        return { totalUsers: 0, onlineUsers: 0, totalMessages: 0, premiumUsers: 0 };
+    }
+}
+
+// Получить пользователей для админки с фильтрами
+async function getAdminUsers(limit = 20, offset = 0, filter = 'all', search = '') {
+    try {
+        let whereClause = '';
+        let params = [];
+        let paramIndex = 1;
+        
+        // Фильтры
+        if (filter === 'online') {
+            // Онлайн пользователи определяются в Socket.IO, здесь просто недавно активные
+            // Для PostgreSQL используем updated_at вместо last_seen
+            whereClause = USE_SQLITE ? 
+                'WHERE last_online > datetime("now", "-5 minutes")' :
+                'WHERE updated_at > NOW() - INTERVAL \'5 minutes\'';
+        } else if (filter === 'premium') {
+            whereClause = USE_SQLITE ?
+                'WHERE premium_until > datetime("now")' :
+                'WHERE premium_until > NOW()';
+        } else if (filter === 'admin') {
+            whereClause = 'WHERE role = ?';
+            params.push('admin');
+        }
+        
+        // Поиск
+        if (search.trim()) {
+            const searchClause = USE_SQLITE ?
+                '(username LIKE ? OR display_name LIKE ?)' :
+                '(username ILIKE $' + (paramIndex++) + ' OR display_name ILIKE $' + (paramIndex++) + ')';
+            
+            if (whereClause) {
+                whereClause += ' AND ' + searchClause;
+            } else {
+                whereClause = 'WHERE ' + searchClause;
+            }
+            
+            const searchTerm = `%${search.trim()}%`;
+            params.push(searchTerm, searchTerm);
+        }
+        
+        if (USE_SQLITE) {
+            const query = `
+                SELECT id, username, display_name, role, premium_until, created_at, last_seen, avatar_url
+                FROM users 
+                ${whereClause}
+                ORDER BY created_at DESC 
+                LIMIT ? OFFSET ?
+            `;
+            params.push(limit, offset);
+            
+            const users = sqlite.prepare(query).all(...params);
+            const totalQuery = `SELECT COUNT(*) as count FROM users ${whereClause}`;
+            const totalParams = params.slice(0, -2); // Убираем limit и offset
+            const total = sqlite.prepare(totalQuery).get(...totalParams).count;
+            
+            return {
+                users: users.map(user => ({
+                    ...user,
+                    isOnline: false, // Будет обновляться из Socket.IO
+                    isPremium: user.premium_until && new Date(user.premium_until) > new Date()
+                })),
+                pagination: {
+                    currentPage: Math.floor(offset / limit) + 1,
+                    totalPages: Math.ceil(total / limit),
+                    totalUsers: total
+                }
+            };
+        } else {
+            const client = await pool.connect();
+            try {
+                // Перестраиваем параметры для PostgreSQL
+                let pgParams = [];
+                let pgQuery = `
+                    SELECT id, username, display_name, role, premium_until, created_at, last_seen, avatar_url
+                    FROM users 
+                    ${whereClause.replace(/\?/g, () => '$' + (++pgParams.length))}
+                    ORDER BY created_at DESC 
+                    LIMIT $${++pgParams.length} OFFSET $${++pgParams.length}
+                `;
+                
+                pgParams = [...params, limit, offset];
+                
+                const result = await client.query(pgQuery, pgParams);
+                
+                const totalQuery = `SELECT COUNT(*) as count FROM users ${whereClause.replace(/\?/g, () => '$' + (pgParams.length - params.length + pgParams.indexOf(pgParams[pgParams.length - params.length - 1]) + 1))}`;
+                const totalParams = params.slice(0, -2);
+                const totalResult = await client.query(totalQuery, totalParams);
+                
+                return {
+                    users: result.rows.map(user => ({
+                        ...user,
+                        isOnline: false, // Будет обновляться из Socket.IO
+                        isPremium: user.premium_until && new Date(user.premium_until) > new Date()
+                    })),
+                    pagination: {
+                        currentPage: Math.floor(offset / limit) + 1,
+                        totalPages: Math.ceil(totalResult.rows[0].count / limit),
+                        totalUsers: parseInt(totalResult.rows[0].count)
+                    }
+                };
+            } finally {
+                client.release();
+            }
+        }
+    } catch (error) {
+        console.error('Get admin users error:', error);
+        return { users: [], pagination: { currentPage: 1, totalPages: 0, totalUsers: 0 } };
+    }
+}
+
+// Получить сообщения для админки
+async function getAdminMessages(limit = 50, offset = 0, filter = 'all', search = '') {
+    try {
+        let whereClause = '';
+        let params = [];
+        
+        // Фильтры по времени
+        if (filter === 'today') {
+            whereClause = USE_SQLITE ?
+                'WHERE DATE(m.created_at) = DATE("now")' :
+                'WHERE DATE(m.created_at) = CURRENT_DATE';
+        } else if (filter === 'week') {
+            whereClause = USE_SQLITE ?
+                'WHERE m.created_at > datetime("now", "-7 days")' :
+                'WHERE m.created_at > NOW() - INTERVAL \'7 days\'';
+        } else if (filter === 'month') {
+            whereClause = USE_SQLITE ?
+                'WHERE m.created_at > datetime("now", "-30 days")' :
+                'WHERE m.created_at > NOW() - INTERVAL \'30 days\'';
+        }
+        
+        // Поиск по содержимому
+        if (search.trim()) {
+            const searchClause = USE_SQLITE ?
+                'm.text LIKE ?' :
+                'm.text ILIKE $' + (params.length + 1);
+            
+            if (whereClause) {
+                whereClause += ' AND ' + searchClause;
+            } else {
+                whereClause = 'WHERE ' + searchClause;
+            }
+            
+            params.push(`%${search.trim()}%`);
+        }
+        
+        if (USE_SQLITE) {
+            const query = `
+                SELECT m.id, m.text, m.message_type, m.created_at, m.sender_id, m.receiver_id,
+                       u.username, u.display_name, u.avatar_url
+                FROM messages m
+                JOIN users u ON m.sender_id = u.id
+                ${whereClause}
+                ORDER BY m.created_at DESC 
+                LIMIT ? OFFSET ?
+            `;
+            params.push(limit, offset);
+            
+            const messages = sqlite.prepare(query).all(...params);
+            const totalQuery = `
+                SELECT COUNT(*) as count 
+                FROM messages m 
+                JOIN users u ON m.sender_id = u.id 
+                ${whereClause}
+            `;
+            const totalParams = params.slice(0, -2);
+            const total = sqlite.prepare(totalQuery).get(...totalParams).count;
+            
+            return {
+                messages,
+                pagination: {
+                    currentPage: Math.floor(offset / limit) + 1,
+                    totalPages: Math.ceil(total / limit),
+                    totalMessages: total
+                }
+            };
+        } else {
+            const client = await pool.connect();
+            try {
+                let pgParams = [...params, limit, offset];
+                let pgQuery = `
+                    SELECT m.id, m.text, m.message_type, m.created_at, m.sender_id, m.receiver_id,
+                           u.username, u.display_name, u.avatar_url
+                    FROM messages m
+                    JOIN users u ON m.sender_id = u.id
+                    ${whereClause.replace(/\?/g, () => '$' + (pgParams.length - 1))}
+                    ORDER BY m.created_at DESC 
+                    LIMIT $${pgParams.length - 1} OFFSET $${pgParams.length}
+                `;
+                
+                const result = await client.query(pgQuery, pgParams);
+                
+                const totalQuery = `
+                    SELECT COUNT(*) as count 
+                    FROM messages m 
+                    JOIN users u ON m.sender_id = u.id 
+                    ${whereClause}
+                `;
+                const totalResult = await client.query(totalQuery, params);
+                
+                return {
+                    messages: result.rows,
+                    pagination: {
+                        currentPage: Math.floor(offset / limit) + 1,
+                        totalPages: Math.ceil(totalResult.rows[0].count / limit),
+                        totalMessages: parseInt(totalResult.rows[0].count)
+                    }
+                };
+            } finally {
+                client.release();
+            }
+        }
+    } catch (error) {
+        console.error('Get admin messages error:', error);
+        return { messages: [], pagination: { currentPage: 1, totalPages: 0, totalMessages: 0 } };
+    }
+}
+
+// Обновить пользователя (админ)
+async function updateUserByAdmin(userId, updates) {
+    try {
+        const allowedFields = ['role', 'premium_type', 'premium_until'];
+        const validUpdates = {};
+        
+        for (const field of allowedFields) {
+            if (updates[field] !== undefined) {
+                validUpdates[field] = updates[field];
+            }
+        }
+        
+        if (Object.keys(validUpdates).length === 0) {
+            return { success: false, error: 'Нет данных для обновления' };
+        }
+        
+        if (USE_SQLITE) {
+            const fields = Object.keys(validUpdates);
+            const values = Object.values(validUpdates);
+            const setClause = fields.map(field => `${field} = ?`).join(', ');
+            
+            const stmt = sqlite.prepare(`UPDATE users SET ${setClause} WHERE id = ?`);
+            const result = stmt.run(...values, userId);
+            
+            if (result.changes > 0) {
+                return { success: true, message: 'Пользователь обновлен' };
+            } else {
+                return { success: false, error: 'Пользователь не найден' };
+            }
+        } else {
+            const client = await pool.connect();
+            try {
+                const fields = Object.keys(validUpdates);
+                const values = Object.values(validUpdates);
+                const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+                
+                const result = await client.query(
+                    `UPDATE users SET ${setClause} WHERE id = $${fields.length + 1}`,
+                    [...values, userId]
+                );
+                
+                if (result.rowCount > 0) {
+                    return { success: true, message: 'Пользователь обновлен' };
+                } else {
+                    return { success: false, error: 'Пользователь не найден' };
+                }
+            } finally {
+                client.release();
+            }
+        }
+    } catch (error) {
+        console.error('Update user by admin error:', error);
+        return { success: false, error: 'Ошибка обновления пользователя' };
+    }
+}
+
+// Получить системные настройки
+async function getSystemSettings() {
+    try {
+        const defaultSettings = {
+            allowRegistration: true,
+            maxFileSize: 25,
+            autoModeration: false,
+            profanityFilter: false
+        };
+        
+        if (USE_SQLITE) {
+            const settings = sqlite.prepare('SELECT * FROM system_settings').all();
+            const result = { ...defaultSettings };
+            
+            settings.forEach(setting => {
+                try {
+                    result[setting.key] = JSON.parse(setting.value);
+                } catch {
+                    result[setting.key] = setting.value;
+                }
+            });
+            
+            return result;
+        } else {
+            const client = await pool.connect();
+            try {
+                const result = await client.query('SELECT * FROM system_settings');
+                const settings = { ...defaultSettings };
+                
+                result.rows.forEach(setting => {
+                    try {
+                        settings[setting.key] = JSON.parse(setting.value);
+                    } catch {
+                        settings[setting.key] = setting.value;
+                    }
+                });
+                
+                return settings;
+            } finally {
+                client.release();
+            }
+        }
+    } catch (error) {
+        console.error('Get system settings error:', error);
+        return {
+            allowRegistration: true,
+            maxFileSize: 25,
+            autoModeration: false,
+            profanityFilter: false
+        };
+    }
+}
+
+// Сохранить системные настройки
+async function saveSystemSettings(settings) {
+    try {
+        if (USE_SQLITE) {
+            const stmt = sqlite.prepare(`
+                INSERT OR REPLACE INTO system_settings (key, value) 
+                VALUES (?, ?)
+            `);
+            
+            sqlite.transaction(() => {
+                for (const [key, value] of Object.entries(settings)) {
+                    stmt.run(key, JSON.stringify(value));
+                }
+            })();
+            
+            return { success: true, message: 'Настройки сохранены' };
+        } else {
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                
+                for (const [key, value] of Object.entries(settings)) {
+                    await client.query(`
+                        INSERT INTO system_settings (key, value) 
+                        VALUES ($1, $2)
+                        ON CONFLICT (key) DO UPDATE SET value = $2
+                    `, [key, JSON.stringify(value)]);
+                }
+                
+                await client.query('COMMIT');
+                return { success: true, message: 'Настройки сохранены' };
+            } catch (error) {
+                await client.query('ROLLBACK');
+                throw error;
+            } finally {
+                client.release();
+            }
+        }
+    } catch (error) {
+        console.error('Save system settings error:', error);
+        return { success: false, error: 'Ошибка сохранения настроек' };
+    }
+}
+
+// === ТИКЕТЫ ПОДДЕРЖКИ ===
+
+async function createSupportTicket(userId, category, message) {
+    try {
+        const id = uuidv4();
+        const created_at = new Date().toISOString();
+        
+        if (USE_SQLITE) {
+            sqlite.prepare('INSERT INTO support_tickets (id, user_id, category, message, created_at) VALUES (?, ?, ?, ?, ?)').run(id, userId, category, message, created_at);
+        } else {
+            await pool.query('INSERT INTO support_tickets (id, user_id, category, message, created_at) VALUES ($1, $2, $3, $4, $5)', [id, userId, category, message, created_at]);
+        }
+        
+        return { success: true, ticket: { id, user_id: userId, category, message, status: 'open', created_at } };
+    } catch (error) {
+        console.error('Create support ticket error:', error);
+        return { success: false, error: 'Ошибка создания тикета' };
+    }
+}
+
+async function getAllTickets() {
+    try {
+        let tickets;
+        if (USE_SQLITE) {
+            tickets = sqlite.prepare(`
+                SELECT st.*, u.username, u.display_name, u.avatar_url,
+                    (SELECT COUNT(*) FROM support_replies sr WHERE sr.ticket_id = st.id) as reply_count
+                FROM support_tickets st
+                JOIN users u ON u.id = st.user_id
+                ORDER BY st.created_at DESC
+            `).all();
+        } else {
+            const result = await pool.query(`
+                SELECT st.*, u.username, u.display_name, u.avatar_url,
+                    (SELECT COUNT(*) FROM support_replies sr WHERE sr.ticket_id = st.id) as reply_count
+                FROM support_tickets st
+                JOIN users u ON u.id = st.user_id
+                ORDER BY st.created_at DESC
+            `);
+            tickets = result.rows;
+        }
+        return tickets;
+    } catch (error) {
+        console.error('Get all tickets error:', error);
+        return [];
+    }
+}
+
+async function getTicket(ticketId) {
+    try {
+        let ticket;
+        if (USE_SQLITE) {
+            ticket = sqlite.prepare(`
+                SELECT st.*, u.username, u.display_name, u.avatar_url
+                FROM support_tickets st
+                JOIN users u ON u.id = st.user_id
+                WHERE st.id = ?
+            `).get(ticketId);
+        } else {
+            const result = await pool.query(`
+                SELECT st.*, u.username, u.display_name, u.avatar_url
+                FROM support_tickets st
+                JOIN users u ON u.id = st.user_id
+                WHERE st.id = $1
+            `, [ticketId]);
+            ticket = result.rows[0];
+        }
+        
+        if (!ticket) return null;
+        
+        // Получаем ответы
+        let replies;
+        if (USE_SQLITE) {
+            replies = sqlite.prepare(`
+                SELECT sr.*, u.username, u.display_name, u.avatar_url
+                FROM support_replies sr
+                JOIN users u ON u.id = sr.user_id
+                WHERE sr.ticket_id = ?
+                ORDER BY sr.created_at ASC
+            `).all(ticketId);
+        } else {
+            const repliesResult = await pool.query(`
+                SELECT sr.*, u.username, u.display_name, u.avatar_url
+                FROM support_replies sr
+                JOIN users u ON u.id = sr.user_id
+                WHERE sr.ticket_id = $1
+                ORDER BY sr.created_at ASC
+            `, [ticketId]);
+            replies = repliesResult.rows;
+        }
+        
+        ticket.replies = replies;
+        return ticket;
+    } catch (error) {
+        console.error('Get ticket error:', error);
+        return null;
+    }
+}
+
+async function replyToTicket(ticketId, userId, message, isAdmin = false) {
+    try {
+        const id = uuidv4();
+        const created_at = new Date().toISOString();
+        
+        if (USE_SQLITE) {
+            sqlite.prepare('INSERT INTO support_replies (id, ticket_id, user_id, message, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, ticketId, userId, message, isAdmin ? 1 : 0, created_at);
+            sqlite.prepare('UPDATE support_tickets SET updated_at = ? WHERE id = ?').run(created_at, ticketId);
+        } else {
+            await pool.query('INSERT INTO support_replies (id, ticket_id, user_id, message, is_admin, created_at) VALUES ($1, $2, $3, $4, $5, $6)', [id, ticketId, userId, message, isAdmin, created_at]);
+            await pool.query('UPDATE support_tickets SET updated_at = $1 WHERE id = $2', [created_at, ticketId]);
+        }
+        
+        return { success: true, reply: { id, ticket_id: ticketId, user_id: userId, message, is_admin: isAdmin, created_at } };
+    } catch (error) {
+        console.error('Reply to ticket error:', error);
+        return { success: false, error: 'Ошибка отправки ответа' };
+    }
+}
+
+async function closeTicket(ticketId) {
+    try {
+        const updated_at = new Date().toISOString();
+        
+        if (USE_SQLITE) {
+            sqlite.prepare('UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?').run('closed', updated_at, ticketId);
+        } else {
+            await pool.query('UPDATE support_tickets SET status = $1, updated_at = $2 WHERE id = $3', ['closed', updated_at, ticketId]);
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Close ticket error:', error);
+        return { success: false, error: 'Ошибка закрытия тикета' };
+    }
+}
+
+async function getUserTickets(userId) {
+    try {
+        let tickets;
+        if (USE_SQLITE) {
+            tickets = sqlite.prepare(`
+                SELECT st.*,
+                    (SELECT COUNT(*) FROM support_replies sr WHERE sr.ticket_id = st.id) as reply_count
+                FROM support_tickets st
+                WHERE st.user_id = ?
+                ORDER BY st.created_at DESC
+            `).all(userId);
+        } else {
+            const result = await pool.query(`
+                SELECT st.*,
+                    (SELECT COUNT(*) FROM support_replies sr WHERE sr.ticket_id = st.id) as reply_count
+                FROM support_tickets st
+                WHERE st.user_id = $1
+                ORDER BY st.created_at DESC
+            `, [userId]);
+            tickets = result.rows;
+        }
+        return tickets;
+    } catch (error) {
+        console.error('Get user tickets error:', error);
+        return [];
+    }
+}
+
 module.exports = { 
     initDB, 
     createUser, 
@@ -2982,6 +3572,8 @@ module.exports = {
     setPremium,
     removePremium,
     getAllUsers,
+    getAdminUsers,
+    getAdminMessages,
     deleteUser,
     // Поиск
     globalSearch,
@@ -3059,5 +3651,16 @@ module.exports = {
     // Статистика
     getUserStats,
     incrementStat,
-    updateLastOnline
+    updateLastOnline,
+    getAdminStats,
+    // Системные настройки
+    getSystemSettings,
+    saveSystemSettings,
+    // Тикеты поддержки
+    createSupportTicket,
+    getAllTickets,
+    getTicket,
+    replyToTicket,
+    closeTicket,
+    getUserTickets
 };
