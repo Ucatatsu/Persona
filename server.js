@@ -1076,7 +1076,7 @@ app.post('/api/admin/login', authLimiter, async (req, res) => {
             const token = generateToken(result.user);
             res.json({ 
                 success: true, 
-                admin: result.user,
+                user: result.user,
                 token 
             });
         } else {

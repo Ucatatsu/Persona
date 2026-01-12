@@ -6081,11 +6081,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logout-btn-mobile')?.addEventListener('click', handleLogout);
     document.getElementById('nav-logout-btn')?.addEventListener('click', handleLogout);
     
-    // Кнопка админ-панели
-    document.getElementById('admin-btn')?.addEventListener('click', () => {
-        document.getElementById('settings-modal').classList.add('hidden');
-        showAdminPanel();
-    });
+    // Админ-панель теперь доступна по /admin.html
     
     // Навигация по разделам настроек
     document.querySelectorAll('.settings-nav-item').forEach(item => {
