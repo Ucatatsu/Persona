@@ -2,7 +2,7 @@ services:
   # Backend Go service
   - type: web
     name: persona-backend
-    env: go
+    runtime: go
     buildCommand: go build -o server cmd/server/main.go
     startCommand: ./server
     envVars:
@@ -10,25 +10,15 @@ services:
         value: 8080
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
-        value: ./kvant.db
       - key: CORS_ORIGIN
         value: https://persona-client.onrender.com
-    disk:
-      name: persona-data
-      mountPath: /opt/render/project/src
-      sizeGB: 1
 
-  # Frontend React service
+  # Frontend React service  
   - type: web
     name: persona-client
-    env: static
+    runtime: static
     buildCommand: cd client && npm install && npm run build
     staticPublishPath: ./client/dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: https://persona-backend.onrender.com
