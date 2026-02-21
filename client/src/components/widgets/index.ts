@@ -1,0 +1,7 @@
+export { default as ClockWidget } from './ClockWidget'
+export { default as WeatherWidget } from './WeatherWidget'
+export { default as QuoteWidget } from './QuoteWidget'
+export { default as StatsWidget } from './StatsWidget'
+export { default as SystemWidget } from './SystemWidget'
+export { default as AsciiWidget } from './AsciiWidget'
+export { default as EmptyWidget } from './EmptyWidget'
