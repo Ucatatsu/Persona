@@ -50,3 +50,14 @@ Thumbs.db
 # Uploads
 /uploads/
 /public/uploads/
+
+# Android
+/client/android/build/
+/client/android/app/build/
+/client/android/.gradle/
+/client/android/local.properties
+*.apk
+*.aab
+
+# Capacitor
+/client/android/capacitor-cordova-android-plugins/
