@@ -58,13 +58,19 @@ func main() {
 		"http://localhost:5174", 
 		"http://localhost:5175",
 		"http://192.168.0.47:5173",
+		"https://persona-client-kcnt.onrender.com",
 		"capacitor://localhost",
 		"ionic://localhost",
 		"http://localhost",
 	}
 	
-	if corsOrigin != "" {
+	if corsOrigin != "" && corsOrigin != "*" {
 		allowedOrigins = append(allowedOrigins, corsOrigin)
+	}
+	
+	// If CORS_ORIGIN is *, allow all origins
+	if corsOrigin == "*" {
+		allowedOrigins = []string{"*"}
 	}
 
 	c := cors.New(cors.Options{
