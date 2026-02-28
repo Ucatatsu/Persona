@@ -1,8 +1,14 @@
 import { useEffect } from 'react'
 import { useUIStore } from '../store/uiStore'
+import { initializeBackground } from '../store/backgroundStore'
 
 export function useUISettings() {
   const { fontSize, borderRadius } = useUIStore()
+
+  // Initialize background on mount
+  useEffect(() => {
+    initializeBackground()
+  }, [])
 
   useEffect(() => {
     const root = document.documentElement

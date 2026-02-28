@@ -31,9 +31,7 @@ export const useBackgroundStore = create<BackgroundState>()(
       customUrl: null,
 
       setBackground: (type, presetId, customUrl) => {
-        console.log('setBackground called:', { type, presetId, customUrl })
         set({ type, presetId: presetId || null, customUrl: customUrl || null })
-        // Применяем фон с небольшой задержкой, чтобы избежать частых обновлений
         setTimeout(() => {
           applyBackground(type, presetId, customUrl)
         }, 0)
@@ -59,115 +57,75 @@ export const useBackgroundStore = create<BackgroundState>()(
 
 // Применить фон к документу
 function applyBackground(type: BackgroundType, presetId?: string, customUrl?: string) {
-  console.log('=== APPLY BACKGROUND ===')
-  console.log('Type:', type, 'PresetId:', presetId, 'CustomUrl:', customUrl ? 'provided' : 'none')
+  if (typeof window === 'undefined') return
   
   const body = document.body
-  console.log('Body element:', body)
-  console.log('Current body background:', body.style.background)
+  if (!body) return
   
   const isLightTheme = document.documentElement.classList.contains('light')
-  console.log('Is light theme:', isLightTheme)
 
   if (type === 'none') {
     // Применяем фон по умолчанию в зависимости от темы
     if (isLightTheme) {
       body.style.setProperty('background', 'linear-gradient(to bottom right, #f1f5f9, #f8fafc, #f1f5f9)', 'important')
-      console.log('Applied light theme default background')
     } else {
       body.style.setProperty('background', '#0f172a', 'important')
-      console.log('Applied dark theme default background')
     }
-    console.log('Final body background:', body.style.background)
-    console.log('=== APPLY BACKGROUND COMPLETE ===')
     return
   }
 
   if (type === 'preset' && presetId) {
     const preset = presetBackgrounds.find(p => p.id === presetId)
     if (preset) {
-      console.log('Found preset:', preset.name, preset.url)
-      
       if (preset.url.startsWith('url(')) {
         // Для паттернов - комбинируем с темным фоном
         body.style.setProperty('background', `${preset.url}, #0f172a`, 'important')
         body.style.setProperty('background-size', 'auto', 'important')
         body.style.setProperty('background-repeat', 'repeat', 'important')
-        console.log('Applied pattern background')
       } else {
         // Для градиентов
         body.style.setProperty('background', preset.url, 'important')
         body.style.setProperty('background-size', 'cover', 'important')
         body.style.setProperty('background-repeat', 'no-repeat', 'important')
-        console.log('Applied gradient background')
       }
       body.style.setProperty('background-position', 'center', 'important')
       body.style.setProperty('background-attachment', 'fixed', 'important')
-      
-      console.log('Final body background:', body.style.background)
-      console.log('=== APPLY BACKGROUND COMPLETE ===')
-    } else {
-      console.error('Preset not found:', presetId)
     }
   }
 
   if (type === 'custom' && customUrl) {
-    console.log('Applying custom background, URL length:', customUrl.length)
     body.style.setProperty('background', `url(${customUrl})`, 'important')
     body.style.setProperty('background-size', 'cover', 'important')
     body.style.setProperty('background-position', 'center', 'important')
     body.style.setProperty('background-repeat', 'no-repeat', 'important')
     body.style.setProperty('background-attachment', 'fixed', 'important')
-    console.log('Custom background applied')
-    console.log('Final body background:', body.style.background.substring(0, 100) + '...')
-    console.log('=== APPLY BACKGROUND COMPLETE ===')
   }
 }
 
-// Инициализация фона при загрузке
-if (typeof window !== 'undefined') {
-  // Применяем фон сразу при загрузке модуля
-  const initBackground = () => {
-    console.log('=== INITIALIZING BACKGROUND ===')
-    const stored = localStorage.getItem('persona-background')
-    console.log('Stored background data:', stored)
-    
-    if (stored) {
-      try {
-        const { state } = JSON.parse(stored)
-        console.log('Parsed background state:', state)
-        
-        if (state && state.type !== 'none') {
-          console.log('Applying background from storage:', state)
-          
-          // Для кастомных фонов проверяем sessionStorage
-          if (state.type === 'custom') {
-            const customBg = sessionStorage.getItem('persona-custom-bg')
-            console.log('Custom background from sessionStorage:', customBg ? 'Found' : 'Not found')
-            if (customBg) {
-              applyBackground('custom', undefined, customBg)
-            }
-          } else {
-            applyBackground(state.type, state.presetId, state.customUrl)
+// Функция инициализации фона (вызывается из хука)
+export function initializeBackground() {
+  if (typeof window === 'undefined') return
+  
+  const stored = localStorage.getItem('persona-background')
+  
+  if (stored) {
+    try {
+      const { state } = JSON.parse(stored)
+      
+      if (state && state.type !== 'none') {
+        // Для кастомных фонов проверяем sessionStorage
+        if (state.type === 'custom') {
+          const customBg = sessionStorage.getItem('persona-custom-bg')
+          if (customBg) {
+            applyBackground('custom', undefined, customBg)
           }
         } else {
-          console.log('Background type is "none", using default')
+          applyBackground(state.type, state.presetId, state.customUrl)
         }
-      } catch (e) {
-        console.error('Failed to parse background settings', e)
-        // Очищаем поврежденные данные
-        localStorage.removeItem('persona-background')
       }
-    } else {
-      console.log('No stored background found, using default')
+    } catch (e) {
+      console.error('Failed to parse background settings', e)
+      localStorage.removeItem('persona-background')
     }
-    console.log('=== BACKGROUND INITIALIZATION COMPLETE ===')
-  }
-
-  // Применяем сразу
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBackground)
-  } else {
-    initBackground()
   }
 }
