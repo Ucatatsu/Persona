@@ -18,7 +18,7 @@ function App() {
         v7_relativeSplatPath: true,
       }}
     >
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-slate-900">
         <Routes>
           <Route path="/login" element={!token ? <Login /> : <Navigate to="/chat" />} />
           <Route path="/register" element={!token ? <Register /> : <Navigate to="/chat" />} />

@@ -3,6 +3,13 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.persona.messenger"
     compileSdk = rootProject.ext.compileSdkVersion
+    
+    // Используем Java 17 (совместимо с установленной JDK)
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
     defaultConfig {
         applicationId "com.persona.messenger"
         minSdkVersion rootProject.ext.minSdkVersion
