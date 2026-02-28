@@ -15,7 +15,7 @@ class WebSocketService {
 
     this.isConnecting = true
     
-    const wsUrl = `ws://localhost:8080/api/ws?token=${token}`
+    const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8080'}/api/ws?token=${token}`
     this.ws = new WebSocket(wsUrl)
 
     this.ws.onopen = () => {

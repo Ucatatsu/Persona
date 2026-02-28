@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -7,7 +7,7 @@ interface MessageTextProps {
   users?: Array<{ id: string; username: string; display_name?: string; avatar_url?: string; name_color?: string }>
 }
 
-export default function MessageText({ text, users = [] }: MessageTextProps) {
+const MessageText = memo(function MessageText({ text, users = [] }: MessageTextProps) {
   const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null)
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 })
   const popupRef = useRef<HTMLDivElement>(null)
@@ -157,4 +157,6 @@ export default function MessageText({ text, users = [] }: MessageTextProps) {
       )}
     </>
   )
-}
+})
+
+export default MessageText

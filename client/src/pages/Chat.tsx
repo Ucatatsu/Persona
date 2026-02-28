@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, ReactNode } from 'react'
+import { useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Settings, LogOut, Search, Phone, Video, Paperclip, Smile, Send, Reply, Edit, Forward } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
@@ -8,6 +8,7 @@ import { useAnimationStore } from '../store/animationStore'
 import { useNotificationStore } from '../store/notificationStore'
 import { useCallStore } from '../store/callStore'
 import { useTranslation } from '../hooks/useTranslation'
+import { useMessageCallbacks } from '../hooks/useMessageCallbacks'
 import { useNotifications } from '../hooks/useNotifications'
 import { playNotificationSound } from '../utils/notificationSound'
 import UserProfile from '../components/UserProfile.tsx'
@@ -17,6 +18,7 @@ import SettingsModal from '../components/SettingsModal.tsx'
 import MentionInput from '../components/MentionInput.tsx'
 import MessageText from '../components/MessageText.tsx'
 import MessageImage from '../components/MessageImage.tsx'
+import MessageItem from '../components/MessageItem.tsx'
 import MessageContextMenu from '../components/MessageContextMenu.tsx'
 import Logo from '../components/Logo.tsx'
 import FileUpload from '../components/FileUpload.tsx'
@@ -86,6 +88,15 @@ export default function Chat() {
   const { showMessageNotification } = useNotifications()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<number | null>(null)
+  
+  // Оптимизированные коллбэки для сообщений
+  const messageCallbacks = useMessageCallbacks(
+    setReplyingTo,
+    setContextMenu,
+    scrollToMessage,
+    handleReaction,
+    messageRefs
+  )
   
   // Определяем мобильное устройство
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -875,7 +886,7 @@ export default function Chat() {
                 </div>
 
                 {/* Messages for this date */}
-                <AnimatePresence mode="popLayout">
+                <AnimatePresence>
                   {group.messages.map((msg, index) => {
                     const isSent = msg.sender_id === user?.id
                     const isNewMessage = index === group.messages.length - 1

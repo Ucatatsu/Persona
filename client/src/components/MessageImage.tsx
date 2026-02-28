@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Download, ZoomIn } from 'lucide-react'
 
@@ -7,7 +7,7 @@ interface MessageImageProps {
   alt?: string
 }
 
-export default function MessageImage({ url, alt = 'Image' }: MessageImageProps) {
+const MessageImage = memo(function MessageImage({ url, alt = 'Image' }: MessageImageProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -96,4 +96,6 @@ export default function MessageImage({ url, alt = 'Image' }: MessageImageProps) 
       </AnimatePresence>
     </>
   )
-}
+})
+
+export default MessageImage

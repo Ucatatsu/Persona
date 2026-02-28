@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { UserPlus } from 'lucide-react'
 import Logo from '../components/Logo'
 import LegalModal from '../components/LegalModal'
+import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 
 export default function Register() {
@@ -17,6 +18,7 @@ export default function Register() {
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [showPrivacyModal, setShowPrivacyModal] = useState(false)
   const navigate = useNavigate()
+  const setAuth = useAuthStore((state) => state.setAuth)
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -41,7 +43,16 @@ export default function Register() {
 
     try {
       await api.post('/api/register', { username, password })
-      navigate('/login')
+      // Автоматический вход после регистрации
+      try {
+        const loginResponse = await api.post('/api/login', { username, password })
+        const { token, user } = loginResponse.data
+        setAuth(user, token)
+        navigate('/chat')
+      } catch (loginErr) {
+        // Если автовход не удался, переходим на страницу входа
+        navigate('/login')
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка регистрации')
     } finally {
