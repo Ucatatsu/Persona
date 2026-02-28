@@ -8,7 +8,6 @@ import { useAnimationStore } from '../store/animationStore'
 import { useNotificationStore } from '../store/notificationStore'
 import { useCallStore } from '../store/callStore'
 import { useTranslation } from '../hooks/useTranslation'
-import { useMessageCallbacks } from '../hooks/useMessageCallbacks'
 import { useNotifications } from '../hooks/useNotifications'
 import { playNotificationSound } from '../utils/notificationSound'
 import UserProfile from '../components/UserProfile.tsx'
@@ -88,15 +87,6 @@ export default function Chat() {
   const { showMessageNotification } = useNotifications()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<number | null>(null)
-  
-  // Оптимизированные коллбэки для сообщений
-  const messageCallbacks = useMessageCallbacks(
-    setReplyingTo,
-    setContextMenu,
-    scrollToMessage,
-    handleReaction,
-    messageRefs
-  )
   
   // Определяем мобильное устройство
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
