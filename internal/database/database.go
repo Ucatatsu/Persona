@@ -23,9 +23,15 @@ func Connect() (*sql.DB, error) {
 	password := os.Getenv("DB_PASSWORD")
 	dbname := os.Getenv("DB_NAME")
 
+	// Определяем SSL режим (для Supabase нужен require)
+	sslMode := "disable"
+	if host != "" && (host != "localhost" && host != "127.0.0.1" && host != "postgres") {
+		sslMode = "require"
+	}
+
 	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname,
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslMode,
 	)
 
 	db, err := sql.Open("postgres", connStr)
