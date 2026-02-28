@@ -16,7 +16,22 @@ func Connect() (*sql.DB, error) {
 		return ConnectSQLite()
 	}
 
-	// Use PostgreSQL
+	// Check if DATABASE_URL is provided (Supabase/Render format)
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL != "" {
+		db, err := sql.Open("postgres", databaseURL)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := db.Ping(); err != nil {
+			return nil, err
+		}
+
+		return db, nil
+	}
+
+	// Use PostgreSQL with individual parameters
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
 	user := os.Getenv("DB_USER")
