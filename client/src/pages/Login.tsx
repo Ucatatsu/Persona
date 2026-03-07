@@ -25,7 +25,26 @@ export default function Login() {
       setAuth(user, token)
       navigate('/chat')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка входа')
+      // Обработка различных типов ошибок
+      if (err.response?.data?.message) {
+        // Сообщение от сервера на русском
+        setError(err.response.data.message)
+      } else if (err.response?.data?.error) {
+        // Код ошибки от сервера
+        const errorCode = err.response.data.error
+        const errorMessages: Record<string, string> = {
+          'USER_NOT_FOUND': 'Пользователь с таким именем не найден',
+          'INVALID_PASSWORD': 'Неверный пароль',
+          'INVALID_CREDENTIALS': 'Неверное имя пользователя или пароль',
+        }
+        setError(errorMessages[errorCode] || 'Ошибка входа')
+      } else if (err.response?.status === 401) {
+        setError('Неверное имя пользователя или пароль')
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('Ошибка подключения к серверу. Проверьте интернет-соединение')
+      } else {
+        setError('Произошла ошибка. Попробуйте позже')
+      }
     } finally {
       setLoading(false)
     }

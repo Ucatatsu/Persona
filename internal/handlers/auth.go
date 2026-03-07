@@ -26,12 +26,20 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Username) < 3 || len(req.Username) > 20 {
-		utils.RespondError(w, http.StatusBadRequest, "Username must be 3-20 characters")
+		utils.RespondJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"error":   "INVALID_USERNAME_LENGTH",
+			"message": "Имя пользователя должно быть от 3 до 20 символов",
+		})
 		return
 	}
 
 	if len(req.Password) < 6 {
-		utils.RespondError(w, http.StatusBadRequest, "Password must be at least 6 characters")
+		utils.RespondJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"error":   "INVALID_PASSWORD_LENGTH",
+			"message": "Пароль должен быть не менее 6 символов",
+		})
 		return
 	}
 
@@ -55,7 +63,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		utils.RespondError(w, http.StatusConflict, "Username already exists")
+		utils.RespondJSON(w, http.StatusConflict, map[string]interface{}{
+			"success": false,
+			"error":   "USERNAME_EXISTS",
+			"message": "Пользователь с таким именем уже существует",
+		})
 		return
 	}
 
@@ -88,12 +100,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		utils.RespondError(w, http.StatusUnauthorized, "Invalid credentials")
+		utils.RespondJSON(w, http.StatusUnauthorized, map[string]interface{}{
+			"success": false,
+			"error":   "USER_NOT_FOUND",
+			"message": "Пользователь с таким именем не найден",
+		})
+		return
+	}
+
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Ошибка при поиске пользователя")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
-		utils.RespondError(w, http.StatusUnauthorized, "Invalid credentials")
+		utils.RespondJSON(w, http.StatusUnauthorized, map[string]interface{}{
+			"success": false,
+			"error":   "INVALID_PASSWORD",
+			"message": "Неверный пароль",
+		})
 		return
 	}
 

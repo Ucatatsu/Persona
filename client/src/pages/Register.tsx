@@ -54,7 +54,24 @@ export default function Register() {
         navigate('/login')
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка регистрации')
+      // Обработка различных типов ошибок
+      if (err.response?.data?.message) {
+        // Сообщение от сервера на русском
+        setError(err.response.data.message)
+      } else if (err.response?.data?.error) {
+        // Код ошибки от сервера
+        const errorCode = err.response.data.error
+        const errorMessages: Record<string, string> = {
+          'USERNAME_EXISTS': 'Пользователь с таким именем уже существует',
+          'INVALID_USERNAME_LENGTH': 'Имя пользователя должно быть от 3 до 20 символов',
+          'INVALID_PASSWORD_LENGTH': 'Пароль должен быть не менее 6 символов',
+        }
+        setError(errorMessages[errorCode] || 'Ошибка регистрации')
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('Ошибка подключения к серверу. Проверьте интернет-соединение')
+      } else {
+        setError('Произошла ошибка. Попробуйте позже')
+      }
     } finally {
       setLoading(false)
     }
