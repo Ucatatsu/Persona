@@ -31,10 +31,10 @@ export const useBackgroundStore = create<BackgroundState>()(
       customUrl: null,
 
       setBackground: (type, presetId, customUrl) => {
+        console.log('=== setBackground called ===')
+        console.log('Type:', type, 'PresetId:', presetId, 'CustomUrl:', customUrl ? 'present' : 'none')
         set({ type, presetId: presetId || null, customUrl: customUrl || null })
-        setTimeout(() => {
-          applyBackground(type, presetId, customUrl)
-        }, 0)
+        applyBackground(type, presetId, customUrl)
       },
 
       clearBackground: () => {
@@ -57,14 +57,25 @@ export const useBackgroundStore = create<BackgroundState>()(
 
 // Применить фон к документу
 function applyBackground(type: BackgroundType, presetId?: string, customUrl?: string) {
-  if (typeof window === 'undefined') return
+  console.log('=== applyBackground called ===')
+  console.log('Type:', type, 'PresetId:', presetId, 'CustomUrl:', customUrl ? 'present' : 'none')
+  
+  if (typeof window === 'undefined') {
+    console.log('Window is undefined, skipping')
+    return
+  }
   
   const body = document.body
-  if (!body) return
+  if (!body) {
+    console.log('Body not found, skipping')
+    return
+  }
   
   const isLightTheme = document.documentElement.classList.contains('light')
+  console.log('Is light theme:', isLightTheme)
 
   if (type === 'none') {
+    console.log('Applying default background')
     // Применяем фон по умолчанию в зависимости от темы
     if (isLightTheme) {
       body.style.setProperty('background', 'linear-gradient(to bottom right, #f1f5f9, #f8fafc, #f1f5f9)', 'important')
@@ -75,8 +86,10 @@ function applyBackground(type: BackgroundType, presetId?: string, customUrl?: st
   }
 
   if (type === 'preset' && presetId) {
+    console.log('Applying preset:', presetId)
     const preset = presetBackgrounds.find(p => p.id === presetId)
     if (preset) {
+      console.log('Preset found:', preset.name, preset.url.substring(0, 50))
       if (preset.url.startsWith('url(')) {
         // Для паттернов - комбинируем с темным фоном
         body.style.setProperty('background', `${preset.url}, #0f172a`, 'important')
@@ -90,15 +103,20 @@ function applyBackground(type: BackgroundType, presetId?: string, customUrl?: st
       }
       body.style.setProperty('background-position', 'center', 'important')
       body.style.setProperty('background-attachment', 'fixed', 'important')
+      console.log('Background applied successfully')
+    } else {
+      console.error('Preset not found:', presetId)
     }
   }
 
   if (type === 'custom' && customUrl) {
+    console.log('Applying custom background, URL length:', customUrl.length)
     body.style.setProperty('background', `url(${customUrl})`, 'important')
     body.style.setProperty('background-size', 'cover', 'important')
     body.style.setProperty('background-position', 'center', 'important')
     body.style.setProperty('background-repeat', 'no-repeat', 'important')
     body.style.setProperty('background-attachment', 'fixed', 'important')
+    console.log('Custom background applied')
   }
 }
 
