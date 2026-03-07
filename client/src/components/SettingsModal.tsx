@@ -22,6 +22,7 @@ import { useBackgroundStore, presetBackgrounds } from '../store/backgroundStore'
 import { useOpacityStore } from '../store/opacityStore'
 import { useUIStore } from '../store/uiStore'
 import { useAnimationStore, DeleteAnimationType } from '../store/animationStore'
+import { usePrivacyStore } from '../store/privacyStore'
 import { useNotifications } from '../hooks/useNotifications'
 import { useTranslation } from '../hooks/useTranslation'
 import CustomSelect from './CustomSelect'
@@ -149,12 +150,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 // Privacy Settings Component
 function PrivacySettings() {
   const { t } = useTranslation()
-  const [privacy, setPrivacy] = useState({
-    profilePhoto: 'everyone',
-    lastSeen: 'contacts',
-    status: 'everyone',
-    readReceipts: true,
-  })
+  const { profilePhoto, lastSeen, status, readReceipts, updatePrivacy } = usePrivacyStore()
 
   return (
     <div className="space-y-6">
@@ -167,8 +163,8 @@ function PrivacySettings() {
         <SelectItem
           label={t('profilePhoto')}
           description={t('profilePhotoDesc')}
-          value={privacy.profilePhoto}
-          onChange={(value) => setPrivacy(prev => ({ ...prev, profilePhoto: value }))}
+          value={profilePhoto}
+          onChange={(value) => updatePrivacy({ profilePhoto: value as any })}
           options={[
             { value: 'everyone', label: t('everyone') },
             { value: 'contacts', label: t('contacts') },
@@ -178,8 +174,8 @@ function PrivacySettings() {
         <SelectItem
           label={t('lastSeen')}
           description={t('lastSeenDesc')}
-          value={privacy.lastSeen}
-          onChange={(value) => setPrivacy(prev => ({ ...prev, lastSeen: value }))}
+          value={lastSeen}
+          onChange={(value) => updatePrivacy({ lastSeen: value as any })}
           options={[
             { value: 'everyone', label: t('everyone') },
             { value: 'contacts', label: t('contacts') },
@@ -189,8 +185,8 @@ function PrivacySettings() {
         <SelectItem
           label={t('status')}
           description={t('statusDesc')}
-          value={privacy.status}
-          onChange={(value) => setPrivacy(prev => ({ ...prev, status: value }))}
+          value={status}
+          onChange={(value) => updatePrivacy({ status: value as any })}
           options={[
             { value: 'everyone', label: t('everyone') },
             { value: 'contacts', label: t('contacts') },
@@ -200,8 +196,8 @@ function PrivacySettings() {
         <ToggleItem
           label={t('readReceipts')}
           description={t('readReceiptsDesc')}
-          checked={privacy.readReceipts}
-          onChange={() => setPrivacy(prev => ({ ...prev, readReceipts: !prev.readReceipts }))}
+          checked={readReceipts}
+          onChange={() => updatePrivacy({ readReceipts: !readReceipts })}
         />
       </div>
     </div>
