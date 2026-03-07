@@ -86,7 +86,7 @@ export default function Chat() {
   const { settings: notificationSettings } = useNotificationStore()
   const { showMessageNotification } = useNotifications()
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<number | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   // Определяем мобильное устройство
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -331,13 +331,27 @@ export default function Chat() {
       reply_to_id: replyingTo?.id || null,
       replied_message: replyingTo || null,
     }
-    setMessages(prev => [...prev, newMessage])
-    wsService.sendMessage(selectedChat.id, messageText, replyingTo?.id)
-    setMessageText('')
-    setReplyingTo(null)
     
-    // Отправляем событие для статистики
-    window.dispatchEvent(new Event('message-sent'))
+    // Check if WebSocket is connected before sending
+    if (!wsService.isConnected()) {
+      console.error('Cannot send message: WebSocket not connected')
+      // Optionally show a user-friendly error message
+      return
+    }
+    
+    setMessages(prev => [...prev, newMessage])
+    const sent = wsService.sendMessage(selectedChat.id, messageText, replyingTo?.id)
+    
+    if (sent) {
+      setMessageText('')
+      setReplyingTo(null)
+      
+      // Отправляем событие для статистики
+      window.dispatchEvent(new Event('message-sent'))
+    } else {
+      // Remove temp message if send failed
+      setMessages(prev => prev.filter(msg => msg.id !== tempId))
+    }
   }
 
   // Listen for new messages

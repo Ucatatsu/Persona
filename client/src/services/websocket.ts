@@ -21,6 +21,7 @@ class WebSocketService {
     this.ws.onopen = () => {
       console.log('✅ WebSocket connected')
       this.isConnecting = false
+      this.reconnectAttempts = 0 // Reset reconnect attempts on successful connection
     }
 
     this.ws.onclose = () => {
@@ -46,26 +47,33 @@ class WebSocketService {
     return this
   }
 
+  private reconnectTimeout: number | null = null
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 5
+  private reconnectDelay = 2000
+
   private attemptReconnect() {
-    // Не переподключаемся автоматически - только вручную
-    console.log('WebSocket closed. Not auto-reconnecting.')
-    return
-    
-    /* Закомментировано автопереподключение
+    // Clear any existing reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout)
+      this.reconnectTimeout = null
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Max reconnect attempts reached')
+      console.log('Max reconnect attempts reached. Please refresh the page.')
       return
     }
 
     this.reconnectAttempts++
-    console.log(`Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    const delay = this.reconnectDelay * this.reconnectAttempts
+    console.log(`Reconnecting in ${delay}ms... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
-    setTimeout(() => {
-      if (this.token) {
-        this.connect(this.token)
+    this.reconnectTimeout = setTimeout(() => {
+      const token = localStorage.getItem('token')
+      if (token) {
+        this.connect(token)
       }
-    }, this.reconnectDelay * this.reconnectAttempts)
-    */
+    }, delay) as unknown as number
   }
 
   private messageHandlers: { [key: string]: ((data: any) => void)[] } = {}
@@ -77,6 +85,16 @@ class WebSocketService {
 
   disconnect() {
     console.log('Manually disconnecting WebSocket')
+    
+    // Clear reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout)
+      this.reconnectTimeout = null
+    }
+    
+    // Reset reconnect attempts
+    this.reconnectAttempts = 0
+    
     if (this.ws) {
       this.ws.close()
       this.ws = null
@@ -86,16 +104,22 @@ class WebSocketService {
 
   sendMessage(receiverId: string, text: string, replyToId?: string) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected')
-      return
+      console.error('WebSocket is not connected. Cannot send message.')
+      return false
     }
 
-    this.ws.send(JSON.stringify({
-      type: 'send_message',
-      receiver_id: receiverId,
-      text,
-      reply_to_id: replyToId,
-    }))
+    try {
+      this.ws.send(JSON.stringify({
+        type: 'send_message',
+        receiver_id: receiverId,
+        text,
+        reply_to_id: replyToId,
+      }))
+      return true
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      return false
+    }
   }
 
   sendTypingStart(receiverId: string) {
@@ -103,10 +127,14 @@ class WebSocketService {
       return
     }
 
-    this.ws.send(JSON.stringify({
-      type: 'typing_start',
-      receiver_id: receiverId,
-    }))
+    try {
+      this.ws.send(JSON.stringify({
+        type: 'typing_start',
+        receiver_id: receiverId,
+      }))
+    } catch (error) {
+      console.error('Failed to send typing start:', error)
+    }
   }
 
   sendTypingStop(receiverId: string) {
@@ -114,10 +142,14 @@ class WebSocketService {
       return
     }
 
-    this.ws.send(JSON.stringify({
-      type: 'typing_stop',
-      receiver_id: receiverId,
-    }))
+    try {
+      this.ws.send(JSON.stringify({
+        type: 'typing_stop',
+        receiver_id: receiverId,
+      }))
+    } catch (error) {
+      console.error('Failed to send typing stop:', error)
+    }
   }
 
   markMessagesAsRead(senderId: string) {
@@ -125,10 +157,14 @@ class WebSocketService {
       return
     }
 
-    this.ws.send(JSON.stringify({
-      type: 'mark_read',
-      sender_id: senderId,
-    }))
+    try {
+      this.ws.send(JSON.stringify({
+        type: 'mark_read',
+        sender_id: senderId,
+      }))
+    } catch (error) {
+      console.error('Failed to mark messages as read:', error)
+    }
   }
 
   on(event: string, callback: (data: any) => void) {
